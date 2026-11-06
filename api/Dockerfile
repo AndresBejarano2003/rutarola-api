@@ -19,6 +19,7 @@ ENV PORT=8080 \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 COPY --from=build /app .
+COPY --chmod=755 iniciar-render.sh /app/iniciar-render.sh
 USER $APP_UID
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "RutaRola.Api.dll"]

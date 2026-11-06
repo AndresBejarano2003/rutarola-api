@@ -3,8 +3,8 @@
 # escriben en el panel de Render al crear el Blueprint; nunca van en este archivo.
 #
 # Migraciones: en Producción el API NUNCA migra al iniciar. El plan gratuito no tiene "pre-deploy
-# command", así que el contenedor ejecuta el paso explícito `migrar` (migraciones + datos base,
-# idempotente) y luego arranca el API. Con un plan pago, mover `migrar` a `preDeployCommand`.
+# command", así que el contenedor ejecuta `api/iniciar-render.sh`: el paso explícito `migrar` (migraciones +
+# datos base, idempotente) y luego el API. Render no interpreta comillas en dockerCommand: usar un script. Con un plan pago, mover `migrar` a `preDeployCommand`.
 #
 # Demo: `Seed__Demo__Habilitado` + `Seed__Demo__PermitirEnProduccion` crean los datos ficticios de
 # ejemplo (una sola vez por sección). Quitar ambas variables en un despliegue real con datos de clientes.
@@ -23,7 +23,7 @@ services:
     region: oregon
     dockerfilePath: ./api/Dockerfile
     dockerContext: ./api
-    dockerCommand: sh -c "dotnet RutaRola.Api.dll migrar && exec dotnet RutaRola.Api.dll"
+    dockerCommand: /app/iniciar-render.sh
     healthCheckPath: /health
     autoDeploy: true
     envVars:

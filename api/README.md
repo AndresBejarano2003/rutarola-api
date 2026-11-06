@@ -105,7 +105,7 @@ en el hosting, sus variables de entorno.
 `https://rutarola.netlify.app`. Al crear el Blueprint, Render pide los secretos `sync: false`
 (`Seed__Admin__Password`, `Seed__SuperAdmin__Password`, `Seed__Demo__Password`). El plan gratuito no tiene
 "pre-deploy command": el contenedor corre `migrar` (migraciones + seed, idempotente) y luego el API
-(`dockerCommand`); con un plan pago, mover `migrar` a `preDeployCommand`. El servicio gratuito se duerme tras
+(`dockerCommand: /app/iniciar-render.sh`; Render no interpreta comillas en ese campo, por eso es un script); con un plan pago, mover `migrar` a `preDeployCommand`. El servicio gratuito se duerme tras
 15 min sin uso (el primer pedido tarda ~1 min) y su Postgres gratuito vence a los 30 días: para algo estable,
 plan pago o Neon (`ConnectionStrings__RutaRola` = su URL).
 
