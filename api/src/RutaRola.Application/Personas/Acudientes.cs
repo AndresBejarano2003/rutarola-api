@@ -93,5 +93,10 @@ public class ServicioAcudientes(IBaseDatos db, ServicioAcceso acceso)
             : null;
     }
 
-    protected override Task AntesDeEliminarAsync(Acudiente a, CancellationToken ct) => acceso.EliminarAsync(a.IdUsuario, ct);
+    /// <summary>Su usuario y el registro de WhatsApp (solo existe si tuvo facturas, que ya se eliminaron).</summary>
+    protected override async Task AntesDeEliminarAsync(Acudiente a, CancellationToken ct)
+    {
+        Db.MensajesWhatsapp.RemoveRange(await Db.MensajesWhatsapp.Where(m => m.IdAcudiente == a.Id).ToListAsync(ct));
+        await acceso.EliminarAsync(a.IdUsuario, ct);
+    }
 }

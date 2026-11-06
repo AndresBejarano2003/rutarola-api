@@ -54,7 +54,9 @@ local del frontend: 5 colegios de Neiva con sus cursos, 5 vehículos, 8 empleado
 estudiantes, 4 rutas (R-01…R-04) y 3 asignaciones (R-04 sin asignar; fecha fin vacía = indefinida), 6 facturas
 (febrero–noviembre del año en curso) con sus recibos hasta el último mes pagado (FAC-0002, -0004 y -0006 quedan en
 mora), 4 cotizaciones y 3 programaciones de cobro con envíos de ejemplo (uno FALLIDO). Cada sección se crea
-una sola vez (si la empresa no tiene colegios, rutas o facturas): una base de una fase anterior recibe solo lo nuevo. Los empleados y acudientes ingresan con inicial del nombre + primer apellido (`jcardenas`
+una sola vez (si la empresa no tiene colegios, rutas o facturas): una base de una fase anterior recibe solo lo nuevo. Las fechas de creación
+son históricas (enero del año en curso; recibos en su fecha de pago), como en el modo local, para que la campana y
+el tablero no los traten como registros nuevos. Los empleados y acudientes ingresan con inicial del nombre + primer apellido (`jcardenas`
 conductor, `ycharry` monitora, `mperez` acudiente…) y esa contraseña. En la Opción B:
 `dotnet user-secrets --project src/RutaRola.Api set "Seed:Demo:Password" "<clave>"`.
 
@@ -89,6 +91,8 @@ dotnet run --project src/RutaRola.Api -- migrar
 | `Jwt__MinutosAcceso`, `Jwt__DiasRefresh` | — | Vida del access token (15) y del refresh token (30 días). |
 | `Jwt__SegundosGraciaRotacion` | — | Gracia (30 s) para dos renovaciones simultáneas del mismo refresh (p. ej. dos pestañas). |
 | `Seguridad__IntentosAutenticacionPorMinuto` | — | Límite por IP para `/auth/login` y `/auth/refresh` (10). |
+| `Procesos__Habilitado`, `Procesos__IntervaloMinutos` | — | Proceso de cobros y notificaciones (`true`, cada 15 min). Con varias instancias, habilitarlo en **una sola**. |
+| `Mensajeria__Whatsapp`, `Mensajeria__Correo` | — | `Deshabilitado` (por defecto: no se envía ni se registra nada) o `Simulado` (desarrollo: queda como entregado sin salir del servidor). Aún no hay proveedor real. |
 
 No se guardan secretos en el repo: en desarrollo `dotnet user-secrets` o `api/.env` (ignorado por git);
 en el hosting, sus variables de entorno.
@@ -264,6 +268,35 @@ está EN USO, EF actualiza las filas una por una y un índice único fallaría a
 servicio. Los consecutivos se calculan con el mayor número existente: dos altas simultáneas chocan con el índice
 único y la segunda recibe 409 (reintentar). **Gastos** aún no tiene contrato en el frontend, así que no tiene endpoint.
 
+## Comunicación (fase 7)
+
+| Petición | Permiso | Respuesta |
+|---|---|---|
+| `GET /notificaciones?bandeja&texto&categoria&nivel&lectura&pagina&tamano` | `notificaciones.propias` | Las del usuario del token, de la más reciente a la más antigua. |
+| `GET /notificaciones/resumen` | `notificaciones.propias` | `{noLeidas, criticas, recientes}` (6). Antes revisa si hay hechos nuevos en la empresa. |
+| `PATCH /notificaciones/lectura {ids, leida}`, `PATCH /notificaciones/archivo {ids, archivada}`, `POST /notificaciones/leer-todas`, `POST /notificaciones/eliminar {ids}`, `DELETE /notificaciones?bandeja=` | `notificaciones.propias` | 204. Ids ajenos o inexistentes se ignoran; archivar también marca leída; eliminar y vaciar son lógicos (`eliminada`). |
+| `GET /portal` | `portal.consultar` (acudiente) | Sus estudiantes (colegio, horario, ruta activa con asignación vigente, recorrido de hoy), estado de cuenta, recibos de sus facturas y sus cotizaciones. 403 para otros roles. |
+| `GET /mensajes-whatsapp?texto&acudienteId&estado&desde&hasta` | `mensajes.leer` | Registro paginado de los WhatsApp enviados por el servidor. |
+
+**Notificaciones.** `GeneradorNotificaciones` aplica las reglas de `generar-notificaciones.ts` (eventos de los
+últimos 30 días y condiciones del día) para los administradores activos de la empresa. Cada hecho tiene una
+`clave` única por usuario (`ix` usuario + clave): se notifica una sola vez aunque se elimine. Se genera al pedir
+el resumen si hubo una escritura en la empresa desde la última revisión o pasó un minuto
+(`RevisionNotificaciones`, por instancia), y en el proceso periódico.
+
+**Proceso periódico** (`Api/Procesos/ProcesoComunicacion`, cada `Procesos:IntervaloMinutos`): para cada empresa
+activa, en su propio scope con solo su `id_empresa`, envía los recordatorios de cobro y genera las notificaciones.
+Recordatorio (`ServicioCobros`): programación activa de una factura vigente que cubre el mes en curso, cuota sin
+recibo, hoy entre `fecha límite − días previos` y la fecha límite; un envío por canal habilitado y mes
+(índice único `ix_envios_programacion_unico`, migración `Fase7Comunicacion`), con la plantilla EN USO y sus
+variables (`{acudiente}`, `{estudiante}`, `{factura}`, `{mes}`, `{valor}`, `{fecha_limite}`). Sin teléfono o correo,
+o si el proveedor falla, queda FALLIDO (no se reintenta ese mes; la campana lo avisa). Los WhatsApp quedan en
+`mensajes_whatsapp`. Los logs nunca incluyen el texto ni el destinatario.
+
+**Pendiente:** el proveedor real de WhatsApp (WhatsApp Business) y de correo: se conectan implementando
+`ICanalWhatsapp` / `ICanalCorreo` en `Infrastructure/Mensajeria`. Tampoco hay aún avisos al acudiente de los
+eventos del recorrido (recogido, entregado, no asistió).
+
 ## Diferencias con el modelo de Lucidchart (`docs/modelo-bd-rutarola.json`)
 
 Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
@@ -302,4 +335,6 @@ Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
 6. ✅ Finanzas: facturas (+detalle mensual), recibos, cotizaciones, programaciones de cobro (+plantillas y adjuntos,
    historial de envíos), reportes (ingresos, pendientes, morosos) y tablero; datos demo por sección; el frontend usa
    estos módulos por HTTP. Gastos queda pendiente (sin pantalla en el frontend).
-7. Comunicación: notificaciones, programaciones/envíos, registro de WhatsApp, portal.
+7. ✅ Comunicación: notificaciones generadas por el servidor (bandeja por usuario), proceso periódico de
+   recordatorios de cobro con registro de WhatsApp (canales simulados hasta conectar proveedor) y portal del
+   acudiente; datos demo con fechas históricas; el frontend usa notificaciones y portal por HTTP.

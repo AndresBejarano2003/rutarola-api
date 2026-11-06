@@ -1,3 +1,5 @@
+using RutaRola.Application.Comunicacion;
+using RutaRola.Infrastructure.Mensajeria;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -32,6 +34,8 @@ public static class DependencyInjection
         services.AddSingleton<IGeneradorTokens, GeneradorTokens>();
         services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
         services.AddScoped<SembradorDatos>();
+        services.AddSingleton<ICanalWhatsapp, CanalWhatsappServidor>();
+        services.AddSingleton<ICanalCorreo, CanalCorreoServidor>();
         return services;
     }
 

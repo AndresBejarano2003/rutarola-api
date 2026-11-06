@@ -153,5 +153,7 @@ internal class EnvioProgramacionConfig : IEntityTypeConfiguration<EnvioProgramac
         b.HasOne(x => x.Programacion).WithMany(p => p.Envios).HasForeignKey(x => x.IdProgramacion).OnDelete(DeleteBehavior.Cascade);
         b.HasOne(x => x.MensajeWhatsapp).WithMany().HasForeignKey(x => x.IdMensajeWhatsapp);
         b.HasIndex(x => new { x.IdProgramacion, x.Fecha });
+        // Un recordatorio por canal y mes: si dos procesos coinciden, el segundo choca aquí y no reenvía.
+        b.HasIndex(x => new { x.IdProgramacion, x.Periodo, x.Canal }).IsUnique().HasDatabaseName("ix_envios_programacion_unico");
     }
 }

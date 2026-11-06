@@ -43,6 +43,10 @@ public sealed class BaseDatosPrueba : IAsyncLifetime
         web.UseSetting("Seed:Admin:Password", ContrasenaAdmin);
         web.UseSetting("Seed:SuperAdmin:Password", ContrasenaSuperAdmin);
         web.UseSetting("BaseDatos:MigrarAlIniciar", "false");
+        // El proceso periódico no corre en las pruebas (se invoca a mano); los canales quedan simulados.
+        web.UseSetting("Procesos:Habilitado", "false");
+        web.UseSetting("Mensajeria:Whatsapp", "Simulado");
+        web.UseSetting("Mensajeria:Correo", "Simulado");
         web.UseSetting("Jwt:Clave", ClaveJwt);
         // Sin gracia: reusar un refresh rotado se trata siempre como robo (comportamiento determinista).
         web.UseSetting("Jwt:SegundosGraciaRotacion", "0");

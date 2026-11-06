@@ -382,6 +382,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.HasIndex("IdProgramacion", "Fecha")
                         .HasDatabaseName("ix_envios_programacion_id_programacion_fecha");
 
+                    b.HasIndex("IdProgramacion", "Periodo", "Canal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_envios_programacion_unico");
+
                     b.ToTable("envios_programacion", (string)null);
                 });
 

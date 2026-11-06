@@ -57,6 +57,13 @@ public static class ClienteApi
         return JsonSerializer.Deserialize<T>(cuerpo, Json)!;
     }
 
+    /// <summary>Solo verifica el código (respuestas sin cuerpo, como 204).</summary>
+    public static async Task LeerAsync(this HttpResponseMessage respuesta, HttpStatusCode esperado)
+    {
+        var cuerpo = await respuesta.Content.ReadAsStringAsync();
+        Assert.True(respuesta.StatusCode == esperado, $"Se esperaba {(int)esperado} y llegó {(int)respuesta.StatusCode}: {cuerpo}");
+    }
+
     /// <summary>Verifica un ProblemDetails y devuelve su <c>mensaje</c>.</summary>
     public static async Task<string> MensajeErrorAsync(this HttpResponseMessage respuesta, HttpStatusCode esperado)
     {

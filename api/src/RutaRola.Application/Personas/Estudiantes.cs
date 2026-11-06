@@ -156,4 +156,13 @@ public class ServicioEstudiantes(IBaseDatos db) : ServicioCrud<Estudiante, Estud
             ? $"No se puede eliminar: tiene {facturas} factura(s) registradas. Cámbialo a Inactivo para conservar el historial."
             : null;
     }
+
+    /// <summary>El registro de WhatsApp del acudiente se conserva sin el estudiante.</summary>
+    protected override async Task AntesDeEliminarAsync(Estudiante e, CancellationToken ct)
+    {
+        foreach (var mensaje in await Db.MensajesWhatsapp.Where(m => m.IdEstudiante == e.Id).ToListAsync(ct))
+        {
+            mensaje.IdEstudiante = null;
+        }
+    }
 }

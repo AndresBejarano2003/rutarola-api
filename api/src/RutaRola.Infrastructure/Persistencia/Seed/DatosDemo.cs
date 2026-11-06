@@ -60,14 +60,30 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
         return true;
     }
 
+    /// <summary>
+    /// Fecha de creación histórica (como el modo local) para que la campana y el tablero no traten la demo
+    /// como registros nuevos: el día indicado del año en curso, a la hora de Colombia.
+    /// </summary>
+    private static DateTime Creado(DateOnly hoy, int mes, int dia, int hora = 8) =>
+        new DateTime(hoy.Year, mes, dia, hora, 0, 0, DateTimeKind.Utc) - Fechas.DesfaseColombia;
+
     private void SembrarCatalogos(Guid idEmpresa, IReadOnlyDictionary<string, Rol> roles, string contrasena, DateOnly hoy)
     {
         var colegios = Colegios(idEmpresa);
+        foreach (var c in colegios.Values)
+        {
+            c.FechaCreacion = Creado(hoy, 1, 5);
+        }
         db.Colegios.AddRange(colegios.Values);
-        db.Vehiculos.AddRange(Vehiculos(idEmpresa, hoy));
+        foreach (var v in Vehiculos(idEmpresa, hoy))
+        {
+            v.FechaCreacion = Creado(hoy, 1, 8);
+            db.Vehiculos.Add(v);
+        }
 
         foreach (var e in Empleados(idEmpresa, hoy))
         {
+            e.FechaCreacion = Creado(hoy, 1, 5);
             e.IdUsuario = Usuario(idEmpresa, e, roles[e.TipoEmpleado == TipoEmpleado.Conductor ? Roles.Conductor : Roles.Monitora], contrasena);
             db.Empleados.Add(e);
         }
@@ -75,6 +91,7 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
         var acudientes = Acudientes(idEmpresa);
         foreach (var a in acudientes.Values)
         {
+            a.FechaCreacion = Creado(hoy, 1, 10);
             a.IdUsuario = Usuario(idEmpresa, a, roles[Roles.Acudiente], contrasena);
             db.Acudientes.Add(a);
         }
@@ -82,6 +99,7 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
         foreach (var (estudiante, acudiente, colegio) in Estudiantes(idEmpresa))
         {
             estudiante.IdColegio = colegios[colegio].Id;
+            estudiante.FechaCreacion = Creado(hoy, 1, 15);
             estudiante.Acudientes.Add(new EstudianteAcudiente { IdEstudiante = estudiante.Id, IdAcudiente = acudientes[acudiente].Id, EsPrincipal = true });
             db.Estudiantes.Add(estudiante);
         }
@@ -154,6 +172,7 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
                 IdEmpresa = idEmpresa, NumeroFactura = $"FAC-{numero:0000}", IdAcudiente = a.Id, IdEstudiante = e.Id,
                 NombreAcudiente = a.NombreCompleto, NombreEstudiante = e.NombreCompleto, ValorMensual = valor, PeriodoInicio = inicio,
                 PeriodoFin = fin, Concepto = concepto, ValorTotal = valor * meses.Count, FechaEmision = new DateOnly(anio, 1, 25),
+                FechaCreacion = Creado(hoy, 1, 25),
                 Detalle = meses.Select(p => new FacturaDetalle
                 {
                     Periodo = p, Descripcion = $"{concepto} · {Periodos.Nombre(p, true)}", PrecioUnitario = valor, Total = valor,
@@ -193,6 +212,7 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
                     Periodo = new DateOnly(anio, mes, 1), Valor = f.ValorMensual, FechaPago = fecha, MetodoPago = medio,
                     NumeroReferencia = medio == MetodoPago.Efectivo ? null : (48_210_000 + consecutivo * 137).ToString(Periodos.Colombia.NumberFormat),
                     NumeroFactura = f.NumeroFactura, NombreAcudiente = f.NombreAcudiente, NombreEstudiante = f.NombreEstudiante,
+                    FechaCreacion = Creado(hoy, mes, fecha.Day, 10),
                 });
             }
         }
@@ -205,6 +225,7 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
             {
                 IdEmpresa = idEmpresa, Numero = $"COT-{numero:0000}", Fecha = fecha, IdAcudiente = a?.Id, NombreAcudiente = a?.NombreCompleto ?? nombre,
                 TelefonoAcudiente = a?.Telefono ?? telefono, ValorPorEstudiante = valor, ValorTotal = valor * estudiantes.Length, Estado = estado,
+                FechaCreacion = Creado(hoy, fecha.Month, fecha.Day, 9), FechaActualizacion = Creado(hoy, fecha.Month, fecha.Day, 9),
                 Estudiantes = estudiantes.Select((e, i) => e.Estudiante is { } n
                     ? new CotizacionEstudiante { IdEstudiante = c.Estudiantes[n - 1].Id, Nombre = c.Estudiantes[n - 1].NombreCompleto, Orden = i + 1 }
                     : new CotizacionEstudiante { Nombre = e.Nombre, Orden = i + 1 }).ToList(),
@@ -226,6 +247,7 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
             var p = new ProgramacionCobro
             {
                 IdEmpresa = idEmpresa, Nombre = nombre, IdFactura = factura.Id, DiaLimitePago = dia, DiasPrevios = previos, Whatsapp = true,
+                FechaCreacion = Creado(hoy, 1, 26),
                 Email = email,
                 Plantillas =
                 [

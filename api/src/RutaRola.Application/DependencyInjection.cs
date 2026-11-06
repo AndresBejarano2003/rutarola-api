@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using RutaRola.Application.Autenticacion;
+using RutaRola.Application.Comunicacion;
 using RutaRola.Application.Configuracion;
 using RutaRola.Application.Empresas;
 using RutaRola.Application.Finanzas;
@@ -34,6 +35,12 @@ public static class DependencyInjection
         services.AddScoped<ServicioProgramaciones>();
         services.AddScoped<ServicioReportes>();
         services.AddScoped<ServicioTablero>();
+        services.AddScoped<GeneradorNotificaciones>();
+        services.AddSingleton<RevisionNotificaciones>();
+        services.AddScoped<ServicioNotificaciones>();
+        services.AddScoped<ServicioCobros>();
+        services.AddScoped<ServicioPortal>();
+        services.AddScoped<ServicioMensajesWhatsapp>();
         return services;
     }
 }

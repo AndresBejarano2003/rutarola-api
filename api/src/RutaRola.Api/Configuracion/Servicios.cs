@@ -1,3 +1,4 @@
+using RutaRola.Api.Procesos;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -29,6 +30,7 @@ public static class Servicios
         services.AddScoped<IContextoUsuario>(sp => sp.GetRequiredService<ContextoUsuarioHttp>());
         services.AddSignalR().AddJsonProtocol(o => ConfigurarJson(o.PayloadSerializerOptions));
         services.AddSingleton<IAvisosRecorrido, AvisosRecorridoSignalR>();
+        services.AddHostedService<ProcesoComunicacion>();
         services.AgregarSeguridad(builder.Configuration);
 
         services.AddControllers(o =>
@@ -98,6 +100,7 @@ public static class Servicios
         app.UseAuthentication();
         app.UseRateLimiter();
         app.UseAuthorization();
+        app.UseCambiosDatos();
 
         if (!app.Environment.IsProduction())
         {
