@@ -739,7 +739,6 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasDatabaseName("ix_plantillas_mensaje_id_programacion");
 
                     b.HasIndex("IdProgramacion", "Canal")
-                        .IsUnique()
                         .HasDatabaseName("ix_plantillas_mensaje_en_uso")
                         .HasFilter("estado = 'EN_USO'");
 

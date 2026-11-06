@@ -89,9 +89,11 @@ public static class Servicios
     public static WebApplication UsarPipelineApi(this WebApplication app)
     {
         app.UseForwardedHeaders();
+        // Antes del manejador de errores: registra el código que realmente recibe el cliente (404/409/422),
+        // no un 500 por cada ErrorNegocio.
+        app.UseSerilogRequestLoggingRutaRola();
         app.UseExceptionHandler();
         app.UseStatusCodePages();
-        app.UseSerilogRequestLoggingRutaRola();
         app.UseCors(PoliticaCors);
         app.UseAuthentication();
         app.UseRateLimiter();

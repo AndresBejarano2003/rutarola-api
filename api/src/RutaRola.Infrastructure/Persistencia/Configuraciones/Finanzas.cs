@@ -121,8 +121,10 @@ internal class PlantillaMensajeConfig : IEntityTypeConfiguration<PlantillaMensaj
         b.Property(x => x.Id).HasColumnName("id_plantilla").ValueGeneratedNever();
         b.Property(x => x.Asunto).HasMaxLength(200);
         b.HasOne(x => x.Programacion).WithMany(p => p.Plantillas).HasForeignKey(x => x.IdProgramacion).OnDelete(DeleteBehavior.Cascade);
-        // Exactamente una plantilla EN_USO por canal (la presencia la valida el servicio).
-        b.HasIndex(x => new { x.IdProgramacion, x.Canal }).IsUnique().HasFilter("estado = 'EN_USO'")
+        // Una plantilla EN_USO por canal: la valida ServicioProgramaciones. No es índice único porque al
+        // cambiar cuál está "En uso" las dos filas se actualizan en el mismo guardado y PostgreSQL no
+        // permite diferir un índice parcial.
+        b.HasIndex(x => new { x.IdProgramacion, x.Canal }).HasFilter("estado = 'EN_USO'")
             .HasDatabaseName("ix_plantillas_mensaje_en_uso");
         b.HasIndex(x => x.IdProgramacion);
     }

@@ -51,7 +51,10 @@ de la empresa "RutaRola Demo".
 **Datos de ejemplo (solo desarrollo):** con `Seed:Demo:Habilitado` (activo en `appsettings.Development.json`)
 y `Seed__Demo__Password` (`SEED_DEMO_PASSWORD` en `.env`), el seed crea una vez los mismos datos del modo
 local del frontend: 5 colegios de Neiva con sus cursos, 5 vehículos, 8 empleados, 8 acudientes, 12
-estudiantes, 4 rutas (R-01…R-04) y 3 asignaciones (R-04 sin asignar; fecha fin vacía = indefinida). Los empleados y acudientes ingresan con inicial del nombre + primer apellido (`jcardenas`
+estudiantes, 4 rutas (R-01…R-04) y 3 asignaciones (R-04 sin asignar; fecha fin vacía = indefinida), 6 facturas
+(febrero–noviembre del año en curso) con sus recibos hasta el último mes pagado (FAC-0002, -0004 y -0006 quedan en
+mora), 4 cotizaciones y 3 programaciones de cobro con envíos de ejemplo (uno FALLIDO). Cada sección se crea
+una sola vez (si la empresa no tiene colegios, rutas o facturas): una base de una fase anterior recibe solo lo nuevo. Los empleados y acudientes ingresan con inicial del nombre + primer apellido (`jcardenas`
 conductor, `ycharry` monitora, `mperez` acudiente…) y esa contraseña. En la Opción B:
 `dotnet user-secrets --project src/RutaRola.Api set "Seed:Demo:Password" "<clave>"`.
 
@@ -240,6 +243,27 @@ falta un backplane (Redis o Azure SignalR); hoy es una sola instancia.
   anteriores y nuevos (solo los campos que cambiaron) en jsonb. Nunca guarda el hash de la contraseña (solo
   `"contrasena": "(cambiada)"`) ni el contenido de archivos; los cambios que solo tocan `ultimo_login` no se registran.
 
+## Finanzas (fase 6)
+
+| Recurso | Filtros | Reglas |
+|---|---|---|
+| `/facturas` (tabla `facturas` + `facturas_detalle`) | `texto`, `acudienteId`, `estudianteId`, `estado` | `numero` FAC-0001 del servidor. `valorContratacion` = valor **mensual** entre `periodoInicio` y `periodoFin` (`YYYY-MM`); el detalle tiene una línea por mes y `valorTotal`. El estudiante debe ser del acudiente (422); sin facturas vigentes que se crucen para el mismo estudiante (409). Snapshot de nombres. No se elimina con recibos o programación (anularla = INACTIVO). |
+| `/recibos` (tabla `pagos`) | `texto`, `facturaId`, `medioPago`, `estado`, `desde`, `hasta` | `numero` REC-0001. Factura vigente y mes dentro de su periodo (422); un recibo vigente por factura + mes (409); fecha de pago no futura. Snapshot de la factura. Anular = INACTIVO. |
+| `/cotizaciones` (+ `cotizaciones_estudiantes`) | `texto`, `estado`, `desde`, `hasta` | `numero` COT-0001; `valorTotal = valorPorEstudiante × estudiantes`. Registrados: nombres y teléfono salen del acudiente y estudiantes de la empresa (404 si no existen). Estados PENDIENTE/APROBADA/RECHAZADA. |
+| `/programaciones` (+ `plantillas_mensaje`, `plantillas_mensaje_archivos`) | `texto`, `facturaId`, `estado` | Una por factura (409); activa = al menos un canal; por canal habilitado exactamente una plantilla EN_USO (422). Las plantillas se sincronizan por `id` (sin id = nueva); adjuntos PDF/imagen ≤ 2 MB. `GET /{id}/envios` y `GET /envios/conteo?ids=` leen `envios_programacion` (los crea el proceso de cobro, fase 7). |
+
+| Petición | Permiso | Respuesta |
+|---|---|---|
+| `GET /reportes/ingresos?desde&hasta&medioPago` | `reportes.leer` | Recibos vigentes por mes de pago y por medio, con total, cantidad y promedio. |
+| `GET /reportes/facturas-pendientes?texto&acudienteId&situacion` | `reportes.leer` | Cuotas (meses hasta el actual de facturas vigentes sin recibo vigente) con fecha límite (día de la programación o el 5) y `diasMora`; `situacion` VENCIDAS/POR_VENCER. |
+| `GET /reportes/morosos?texto&diasMinimos` | `reportes.leer` | Acudientes con cuotas vencidas: estudiantes, facturas, valor adeudado y mora máxima. |
+| `GET /tablero` | `tablero.leer` | Indicadores, "Requiere atención", agenda de 30 días, últimos pagos y gráficas, con las reglas de `calcular-tablero.ts`. |
+
+El índice `ix_plantillas_mensaje_en_uso` (programación, canal, estado) **no es único**: al cambiar cuál plantilla
+está EN USO, EF actualiza las filas una por una y un índice único fallaría a mitad del cambio; la regla la valida el
+servicio. Los consecutivos se calculan con el mayor número existente: dos altas simultáneas chocan con el índice
+único y la segunda recibe 409 (reintentar). **Gastos** aún no tiene contrato en el frontend, así que no tiene endpoint.
+
 ## Diferencias con el modelo de Lucidchart (`docs/modelo-bd-rutarola.json`)
 
 Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
@@ -275,5 +299,7 @@ Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
    finalizar, eventos) e historial; el frontend usa estos módulos por HTTP.
 5. ✅ GPS: lotes de posiciones, última posición, trayecto, mapa de recorridos en curso y hub SignalR
    (`posicion`, `recorridoActualizado`); un recorrido abierto de otro día ya no bloquea el de hoy.
-6. Finanzas: facturas, recibos, cotizaciones, gastos, reportes, tablero.
+6. ✅ Finanzas: facturas (+detalle mensual), recibos, cotizaciones, programaciones de cobro (+plantillas y adjuntos,
+   historial de envíos), reportes (ingresos, pendientes, morosos) y tablero; datos demo por sección; el frontend usa
+   estos módulos por HTTP. Gastos queda pendiente (sin pantalla en el frontend).
 7. Comunicación: notificaciones, programaciones/envíos, registro de WhatsApp, portal.

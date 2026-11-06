@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RutaRola.Application.Autenticacion;
 using RutaRola.Application.Configuracion;
 using RutaRola.Application.Empresas;
+using RutaRola.Application.Finanzas;
 using RutaRola.Application.Operacion;
 using RutaRola.Application.Personas;
 
@@ -27,6 +28,12 @@ public static class DependencyInjection
         services.AddScoped<ServicioAsignaciones>();
         services.AddScoped<ServicioRecorridos>();
         services.AddScoped<ServicioGps>();
+        services.AddScoped<ServicioFacturas>();
+        services.AddScoped<ServicioRecibos>();
+        services.AddScoped<ServicioCotizaciones>();
+        services.AddScoped<ServicioProgramaciones>();
+        services.AddScoped<ServicioReportes>();
+        services.AddScoped<ServicioTablero>();
         return services;
     }
 }

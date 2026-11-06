@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using RutaRola.Application.Comun;
 using RutaRola.Domain.Comun;
+using RutaRola.Application.Finanzas;
 using RutaRola.Domain.Enums;
+using RutaRola.Domain.Finanzas;
 using RutaRola.Domain.Operacion;
 using RutaRola.Domain.Personas;
 using RutaRola.Domain.Seguridad;
@@ -11,54 +13,108 @@ namespace RutaRola.Infrastructure.Persistencia.Seed;
 
 /// <summary>
 /// Datos de ejemplo de la empresa demo, iguales a los del modo local del frontend (colegios,
-/// vehículos, empleados, acudientes y estudiantes de Neiva) para que las pantallas no arranquen
-/// vacías al cambiar a HTTP. Solo fuera de producción, con <c>Seed:Demo:Habilitado</c> y la contraseña
-/// de los usuarios demo en <c>Seed:Demo:Password</c>; se crean una sola vez (si la empresa no tiene colegios).
+/// vehículos, empleados, acudientes y estudiantes de Neiva; rutas y asignaciones; facturas, recibos,
+/// cotizaciones y programaciones de cobro) para que las pantallas no arranquen vacías al cambiar a HTTP.
+/// Solo fuera de producción, con <c>Seed:Demo:Habilitado</c> y la contraseña de los usuarios demo en
+/// <c>Seed:Demo:Password</c>. Cada sección se crea una sola vez (si la empresa no tiene colegios, rutas o
+/// facturas), así una base creada en una fase anterior recibe solo lo nuevo; las secciones posteriores
+/// buscan los catálogos por NIT, placa o documento y se omiten si alguno ya no existe.
 /// Usuarios: inicial del nombre + primer apellido (<c>jcardenas</c>, <c>mperez</c>…).
 /// </summary>
 internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, TimeProvider reloj)
 {
+    /// <summary>Catálogos de la demo por la clave del frontend (<c>col-N</c>, <c>acu-N</c>) o su índice base 1 (est-N, veh-N, emp-N).</summary>
+    private sealed record Catalogo(
+        Dictionary<string, Colegio> Colegios, List<Vehiculo> Vehiculos, List<Empleado> Empleados, Dictionary<string, Acudiente> Acudientes,
+        List<Estudiante> Estudiantes);
+
     public async Task<bool> SembrarAsync(Empresa empresa, IReadOnlyDictionary<string, Rol> roles, string contrasena, CancellationToken ct)
     {
-        if (await db.Colegios.AnyAsync(c => c.IdEmpresa == empresa.Id, ct))
-        {
-            return false;
-        }
-
         var hoy = Fechas.Hoy(reloj);
-        var colegios = Colegios(empresa.Id);
-        db.Colegios.AddRange(colegios.Values);
-        var vehiculos = Vehiculos(empresa.Id, hoy).ToList();
-        db.Vehiculos.AddRange(vehiculos);
-
-        var empleados = Empleados(empresa.Id, hoy).ToList();
-        foreach (var e in empleados)
+        var creado = false;
+        if (!await db.Colegios.AnyAsync(c => c.IdEmpresa == empresa.Id, ct))
         {
-            e.IdUsuario = Usuario(empresa.Id, e, roles[e.TipoEmpleado == TipoEmpleado.Conductor ? Roles.Conductor : Roles.Monitora], contrasena);
+            SembrarCatalogos(empresa.Id, roles, contrasena, hoy);
+            await db.SaveChangesAsync(ct);
+            creado = true;
+        }
+        var operacion = !await db.Rutas.AnyAsync(r => r.IdEmpresa == empresa.Id, ct);
+        var finanzas = !await db.Facturas.AnyAsync(f => f.IdEmpresa == empresa.Id, ct);
+        if (!operacion && !finanzas)
+        {
+            return creado;
+        }
+        if (await CatalogoAsync(empresa.Id, hoy, ct) is not { } catalogo)
+        {
+            return creado;
+        }
+        if (operacion)
+        {
+            SembrarOperacion(empresa.Id, catalogo, hoy);
+        }
+        if (finanzas)
+        {
+            SembrarFinanzas(empresa.Id, catalogo, hoy);
+        }
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    private void SembrarCatalogos(Guid idEmpresa, IReadOnlyDictionary<string, Rol> roles, string contrasena, DateOnly hoy)
+    {
+        var colegios = Colegios(idEmpresa);
+        db.Colegios.AddRange(colegios.Values);
+        db.Vehiculos.AddRange(Vehiculos(idEmpresa, hoy));
+
+        foreach (var e in Empleados(idEmpresa, hoy))
+        {
+            e.IdUsuario = Usuario(idEmpresa, e, roles[e.TipoEmpleado == TipoEmpleado.Conductor ? Roles.Conductor : Roles.Monitora], contrasena);
             db.Empleados.Add(e);
         }
 
-        var acudientes = Acudientes(empresa.Id);
+        var acudientes = Acudientes(idEmpresa);
         foreach (var a in acudientes.Values)
         {
-            a.IdUsuario = Usuario(empresa.Id, a, roles[Roles.Acudiente], contrasena);
+            a.IdUsuario = Usuario(idEmpresa, a, roles[Roles.Acudiente], contrasena);
             db.Acudientes.Add(a);
         }
 
-        var estudiantes = new List<Estudiante>();
-        foreach (var (estudiante, acudiente, colegio) in Estudiantes(empresa.Id))
+        foreach (var (estudiante, acudiente, colegio) in Estudiantes(idEmpresa))
         {
             estudiante.IdColegio = colegios[colegio].Id;
             estudiante.Acudientes.Add(new EstudianteAcudiente { IdEstudiante = estudiante.Id, IdAcudiente = acudientes[acudiente].Id, EsPrincipal = true });
             db.Estudiantes.Add(estudiante);
-            estudiantes.Add(estudiante);
         }
+    }
 
-        // Rutas y asignaciones del frontend (rut-1..4, asg-1..3; R-04 sin asignar). Índices base 1 como est-N, veh-N, emp-N.
+    /// <summary>Los registros guardados de la demo, en el orden del frontend; <c>null</c> si falta alguno (se editó o borró).</summary>
+    private async Task<Catalogo?> CatalogoAsync(Guid idEmpresa, DateOnly hoy, CancellationToken ct)
+    {
+        var colegios = await db.Colegios.Where(c => c.IdEmpresa == idEmpresa).ToDictionaryAsync(c => c.Nit, ct);
+        var vehiculos = await db.Vehiculos.Where(v => v.IdEmpresa == idEmpresa).ToDictionaryAsync(v => v.Placa, ct);
+        var empleados = await db.Empleados.Where(e => e.IdEmpresa == idEmpresa).ToDictionaryAsync(e => e.NumeroDocumento, ct);
+        var acudientes = await db.Acudientes.Where(a => a.IdEmpresa == idEmpresa).ToDictionaryAsync(a => a.NumeroDocumento, ct);
+        var estudiantes = await db.Estudiantes.Where(e => e.IdEmpresa == idEmpresa).ToDictionaryAsync(e => e.NumeroDocumento, ct);
+
+        var catalogo = new Catalogo(
+            Colegios(idEmpresa).ToDictionary(x => x.Key, x => colegios.GetValueOrDefault(x.Value.Nit)!),
+            Vehiculos(idEmpresa, hoy).Select(v => vehiculos.GetValueOrDefault(v.Placa)!).ToList(),
+            Empleados(idEmpresa, hoy).Select(e => empleados.GetValueOrDefault(e.NumeroDocumento)!).ToList(),
+            Acudientes(idEmpresa).ToDictionary(x => x.Key, x => acudientes.GetValueOrDefault(x.Value.NumeroDocumento)!),
+            Estudiantes(idEmpresa).Select(x => estudiantes.GetValueOrDefault(x.Item1.NumeroDocumento)!).ToList());
+        var completo = catalogo.Colegios.Values.All(x => x is not null) && catalogo.Vehiculos.All(x => x is not null)
+            && catalogo.Empleados.All(x => x is not null) && catalogo.Acudientes.Values.All(x => x is not null)
+            && catalogo.Estudiantes.All(x => x is not null);
+        return completo ? catalogo : null;
+    }
+
+    /// <summary>Rutas y asignaciones del frontend (rut-1..4, asg-1..3; R-04 sin asignar).</summary>
+    private void SembrarOperacion(Guid idEmpresa, Catalogo c, DateOnly hoy)
+    {
         Ruta Ruta(string codigo, string nombre, string colegio, string jornada, string sector, params int[] est) => new()
         {
-            IdEmpresa = empresa.Id, Codigo = codigo, Nombre = nombre, IdColegio = colegios[colegio].Id, Jornada = jornada, Sector = sector,
-            Estudiantes = est.Select((n, i) => new RutaEstudiante { IdEstudiante = estudiantes[n - 1].Id, OrdenRecogida = i + 1 }).ToList(),
+            IdEmpresa = idEmpresa, Codigo = codigo, Nombre = nombre, IdColegio = c.Colegios[colegio].Id, Jornada = jornada, Sector = sector,
+            Estudiantes = est.Select((n, i) => new RutaEstudiante { IdEstudiante = c.Estudiantes[n - 1].Id, OrdenRecogida = i + 1 }).ToList(),
         };
         var rutas = new[]
         {
@@ -70,12 +126,154 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
         db.Rutas.AddRange(rutas);
         AsignacionRuta Asignacion(int ruta, int vehiculo, int conductor, int monitora) => new()
         {
-            IdEmpresa = empresa.Id, IdRuta = rutas[ruta - 1].Id, IdVehiculo = vehiculos[vehiculo - 1].Id,
-            IdConductor = empleados[conductor - 1].Id, IdMonitora = empleados[monitora - 1].Id,
+            IdEmpresa = idEmpresa, IdRuta = rutas[ruta - 1].Id, IdVehiculo = c.Vehiculos[vehiculo - 1].Id,
+            IdConductor = c.Empleados[conductor - 1].Id, IdMonitora = c.Empleados[monitora - 1].Id,
             FechaInicio = new DateOnly(hoy.Year, 2, 2), // Fecha fin vacía = indefinida: la demo sigue vigente.
         };
         db.AsignacionesRuta.AddRange(Asignacion(1, 1, 1, 6), Asignacion(2, 2, 2, 7), Asignacion(3, 3, 4, 8));
-        return true;
+    }
+
+    /// <summary>
+    /// Facturas fac-1..6 (febrero–noviembre del año en curso), sus recibos mes a mes hasta el último
+    /// pagado (nunca con fecha futura), cotizaciones cot-1..4 y programaciones prg-1..3 con envíos de
+    /// ejemplo de agosto a noviembre (uno FALLIDO), como el modo local.
+    /// </summary>
+    private void SembrarFinanzas(Guid idEmpresa, Catalogo c, DateOnly hoy)
+    {
+        var anio = hoy.Year;
+        var inicio = new DateOnly(anio, 2, 1);
+        var fin = new DateOnly(anio, 11, 1);
+        var concepto = $"Transporte escolar {anio}";
+        Factura Factura(int numero, string acudiente, int estudiante, decimal valor)
+        {
+            var a = c.Acudientes[acudiente];
+            var e = c.Estudiantes[estudiante - 1];
+            var meses = Periodos.Entre(inicio, fin).ToList();
+            return new()
+            {
+                IdEmpresa = idEmpresa, NumeroFactura = $"FAC-{numero:0000}", IdAcudiente = a.Id, IdEstudiante = e.Id,
+                NombreAcudiente = a.NombreCompleto, NombreEstudiante = e.NombreCompleto, ValorMensual = valor, PeriodoInicio = inicio,
+                PeriodoFin = fin, Concepto = concepto, ValorTotal = valor * meses.Count, FechaEmision = new DateOnly(anio, 1, 25),
+                Detalle = meses.Select(p => new FacturaDetalle
+                {
+                    Periodo = p, Descripcion = $"{concepto} · {Periodos.Nombre(p, true)}", PrecioUnitario = valor, Total = valor,
+                }).ToList(),
+            };
+        }
+        var facturas = new[]
+        {
+            Factura(1, "acu-1", 1, 420_000), Factura(2, "acu-1", 2, 380_000), Factura(3, "acu-2", 3, 350_000),
+            Factura(4, "acu-3", 4, 450_000), Factura(5, "acu-4", 6, 400_000), Factura(6, "acu-5", 9, 390_000),
+        };
+        db.Facturas.AddRange(facturas);
+
+        // Último mes pagado de cada factura (fac-2, fac-4 y fac-6 quedan en mora).
+        int[] ultimo = [10, 8, 10, 7, 10, 9];
+        MetodoPago[] medios = [MetodoPago.Transferencia, MetodoPago.Nequi, MetodoPago.Efectivo, MetodoPago.Daviplata, MetodoPago.Tarjeta];
+        var consecutivo = 0;
+        for (var mes = 2; mes <= 10; mes++)
+        {
+            for (var i = 0; i < facturas.Length; i++)
+            {
+                if (mes > ultimo[i])
+                {
+                    continue;
+                }
+                var fecha = new DateOnly(anio, mes, 1 + ((i * 3 + consecutivo + 1) % 9));
+                if (fecha > hoy)
+                {
+                    continue;
+                }
+                consecutivo++;
+                var f = facturas[i];
+                var medio = medios[(i + consecutivo) % medios.Length];
+                db.Pagos.Add(new Pago
+                {
+                    IdEmpresa = idEmpresa, Numero = $"REC-{consecutivo:0000}", IdEstudiante = f.IdEstudiante, IdFactura = f.Id,
+                    Periodo = new DateOnly(anio, mes, 1), Valor = f.ValorMensual, FechaPago = fecha, MetodoPago = medio,
+                    NumeroReferencia = medio == MetodoPago.Efectivo ? null : (48_210_000 + consecutivo * 137).ToString(Periodos.Colombia.NumberFormat),
+                    NumeroFactura = f.NumeroFactura, NombreAcudiente = f.NombreAcudiente, NombreEstudiante = f.NombreEstudiante,
+                });
+            }
+        }
+
+        Cotizacion Cotizacion(int numero, DateOnly fecha, string? acudiente, string nombre, string telefono, (int? Estudiante, string Nombre)[] estudiantes,
+            decimal valor, EstadoCotizacion estado)
+        {
+            var a = acudiente is null ? null : c.Acudientes[acudiente];
+            return new()
+            {
+                IdEmpresa = idEmpresa, Numero = $"COT-{numero:0000}", Fecha = fecha, IdAcudiente = a?.Id, NombreAcudiente = a?.NombreCompleto ?? nombre,
+                TelefonoAcudiente = a?.Telefono ?? telefono, ValorPorEstudiante = valor, ValorTotal = valor * estudiantes.Length, Estado = estado,
+                Estudiantes = estudiantes.Select((e, i) => e.Estudiante is { } n
+                    ? new CotizacionEstudiante { IdEstudiante = c.Estudiantes[n - 1].Id, Nombre = c.Estudiantes[n - 1].NombreCompleto, Orden = i + 1 }
+                    : new CotizacionEstudiante { Nombre = e.Nombre, Orden = i + 1 }).ToList(),
+            };
+        }
+        db.Cotizaciones.AddRange(
+            Cotizacion(1, new DateOnly(anio, 1, 15), "acu-1", "", "", [(1, ""), (2, "")], 400_000, EstadoCotizacion.Aprobada),
+            Cotizacion(2, new DateOnly(anio, 9, 22), null, "Camila Torres Ramírez", "3209988776",
+                [(null, "Miguel Ángel Torres"), (null, "Lucía Torres")], 380_000, EstadoCotizacion.Pendiente),
+            Cotizacion(3, new DateOnly(anio, 10, 3), "acu-6", "", "", [(11, "")], 360_000, EstadoCotizacion.Rechazada),
+            Cotizacion(4, new DateOnly(anio, 10, 28), null, "Julián Peña Cabrera", "3014455667", [(null, "Sofía Peña")], 420_000,
+                EstadoCotizacion.Pendiente));
+
+        const string mensajeBase =
+            "Hola {acudiente}, te recordamos que la mensualidad de transporte de {estudiante} de {mes} por {valor} vence el {fecha_limite}. Factura {factura}. ¡Gracias!";
+        ProgramacionCobro Programacion(string nombre, Factura factura, int dia, int previos, bool email)
+        {
+            var acudiente = c.Acudientes.Values.First(a => a.Id == factura.IdAcudiente);
+            var p = new ProgramacionCobro
+            {
+                IdEmpresa = idEmpresa, Nombre = nombre, IdFactura = factura.Id, DiaLimitePago = dia, DiasPrevios = previos, Whatsapp = true,
+                Email = email,
+                Plantillas =
+                [
+                    new() { Canal = CanalEnvio.Whatsapp, Cuerpo = mensajeBase, Estado = EstadoPlantilla.EnUso, Orden = 1 },
+                    new()
+                    {
+                        Canal = CanalEnvio.Whatsapp, Estado = EstadoPlantilla.Activo, Orden = 2,
+                        Cuerpo = "Hola {acudiente}, {estudiante} tiene pendiente {mes}: {valor}. Puedes pagar por Nequi o transferencia.",
+                    },
+                ],
+            };
+            if (email)
+            {
+                p.Plantillas.Add(new()
+                {
+                    Canal = CanalEnvio.Email, Asunto = "Recordatorio de pago {mes} - {factura}", Estado = EstadoPlantilla.EnUso, Orden = 1,
+                    Cuerpo = $"{mensajeBase}\n\nCordialmente,\nRutaRola Transporte Escolar",
+                });
+            }
+            // Envíos de ejemplo (los reales los hará el proceso de cobro del servidor): agosto–noviembre, el día del aviso.
+            foreach (var periodo in Periodos.Entre(new DateOnly(anio, 8, 1), fin))
+            {
+                var fecha = new DateTime(anio, periodo.Month, dia - previos, 8, 0, 0, DateTimeKind.Utc);
+                if (DateOnly.FromDateTime(fecha) > hoy)
+                {
+                    break;
+                }
+                var fallido = dia == 10 && periodo.Month == 9;
+                p.Envios.Add(new()
+                {
+                    Fecha = fecha, Canal = CanalEnvio.Whatsapp, Destinatario = acudiente.Telefono ?? "", Periodo = periodo,
+                    Estado = fallido ? EstadoEnvio.Fallido : EstadoEnvio.Enviado, Detalle = fallido ? "El número no tiene WhatsApp activo." : "Entregado",
+                });
+                if (email)
+                {
+                    p.Envios.Add(new()
+                    {
+                        Fecha = fecha, Canal = CanalEnvio.Email, Destinatario = acudiente.Correo ?? "", Periodo = periodo,
+                        Estado = EstadoEnvio.Enviado, Detalle = "Entregado",
+                    });
+                }
+            }
+            return p;
+        }
+        db.ProgramacionesCobro.AddRange(
+            Programacion("Mensualidad Juan Sebastián", facturas[0], 5, 3, true),
+            Programacion("Mensualidad Valentina", facturas[1], 5, 3, true),
+            Programacion("Mensualidad Isabella", facturas[3], 10, 5, false));
     }
 
     private Guid Usuario(Guid idEmpresa, Persona p, Rol rol, string contrasena)
