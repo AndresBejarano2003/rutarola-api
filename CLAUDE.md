@@ -49,7 +49,7 @@ src/app/
 - **Adding a page**: create `<modulo>/<nombre>/<nombre>-page.{ts,html}`, add it to `<modulo>.routes.ts`, and add the entry to `layout/menu-lateral/opciones-menu.ts`.
 - **Conventions**: `inject()` instead of constructor injection; `input()`/`output()`/`viewChild()` signal APIs instead of decorators; template-only members are `protected`, injected deps `private readonly`; no `any`; use `toSignal`/`takeUntilDestroyed` for observables instead of bare `subscribe`. All selectors use the `app-` prefix. Identifiers and file names in Spanish.
 - **State**: Angular signals in `providedIn: 'root'` services.
-- **Path alias**: `@environments/*` → `src/environments/*`; `src/app/...` absolute imports also work via `baseUrl`. `environment.apiUrl` is the backend base URL.
+- **Path alias**: `@environments/*` → `src/environments/*`; `src/app/...` absolute imports also work via `baseUrl`. `environment.apiUrl` is the backend base URL including the version: development `http://localhost:8080/api/v1` (`environment.development.ts`); production `/api/v1` (placeholder: set the deployed API URL or a Netlify `/api/*` proxy).
 
 ### CRUD screen pattern (reference implementation: `personas/estudiantes/`)
 
@@ -93,6 +93,11 @@ Cross-entity rules:
   - Quick actions use `?accion=nuevo`: `PaginaCrud.ngOnInit` opens the create form when that query param is present. The greeting uses the session user's first name.
 - **User types / access** (`core/auth.ts`, `core/guardias.ts`, `autenticacion/`). The server decides the role at login; each role gets ITS system: `ADMINISTRADOR` → `/inicio` (admin shell, all modules); `CONDUCTOR`/`MONITORA` → `/ruta-del-dia` (`shell-conductor`, no sidebar, no admin modules); `ACUDIENTE` → `/portal` (`shell-portal`, `Sesion.acudienteId`) — `rutaInicio(rol)`.
   - `AutenticacionRepositorio` (`AutenticacionLocal` → `AutenticacionHttp`, `POST /auth/login` → `Sesion {usuario, nombre, correo, rol, empleadoId, imagen, inicio}`) validates; `AuthService` (root) stores the session in `rutarola.sesion` (`localStorage` with "Recordarme", else `sessionStorage`). Logout clears ONLY the session, never module data.
+  - **With the API**: `AutenticacionHttp` → `POST /auth/login` returns `{sesion, tokens}`; the tokens live inside the stored `Sesion` (`Sesion.tokens`).
+    - `interceptorAutenticacion` (`core/interceptor-autenticacion.ts`, registered in `app.config.ts`) adds the Bearer only for `environment.apiUrl` requests, except `/auth/*`.
+    - On a 401 it refreshes ONCE for all concurrent failures (`RenovacionSesion`, shared in-flight), adopts tokens another tab already rotated, and retries. If the refresh fails it closes the session and goes to `/login?volver=`.
+    - `AuthService.cerrarSesion()` also revokes the refresh token on the server. In local mode (no tokens) the interceptor is a no-op.
+    - The `AutenticacionHttp` provider is switched together with Personas.
   - The login asks for **"Usuario"** (not email); each person picks email, document or any text.
   - Employee AND acudiente credentials are set in their Personas forms, section "Acceso a la app" (`<app-campos-acceso>` + `controlesAcceso`/`contrasenasIguales`/`ajustarContrasena` from `personas/compartido/acceso.ts`): `usuario` (required, unique, 4–40 chars without spaces, stored lowercase, `admin` reserved) and `contrasena` (required on create, min 6, with "Confirmar contraseña"; on edit empty = keep). The password is WRITE-ONLY: the API never returns it and must hash it. The usuario is unique across empleados, acudientes and admin (409); each local repo checks the other module in `validarRelaciones` (`validarUsuarioLibre`); deleting the record frees it.
   - Local login: usuario + contraseña of an empleado → its tipoEmpleado as role; of an acudiente → ACUDIENTE; inactive → rejected; `admin`/`rutarola` (`ADMIN_LOCAL`) → ADMINISTRADOR; generic error "Usuario o contraseña incorrectos". Local passwords live apart from the records in `rutarola.credenciales` (`autenticacion/credenciales-local.ts`, `{usuario: {contrasena, titular: EMPLEADO|ACUDIENTE}}`); seed employees and acudientes use initial + surname (`jcardenas`, `ycharry`, `mperez`…) with `rutarola`. Local mode shows one demo access per role on the login page.
@@ -120,7 +125,7 @@ All components use `ChangeDetectionStrategy.OnPush` (the app is zoneless — no 
 
 ### Placeholders to be aware of
 
-There is no real auth: `AutenticacionLocal` keeps unhashed passwords in the browser (demo only) and a fixed local admin (`admin`, `USUARIO_DEMO` profile); switch to `AutenticacionHttp`, add a token interceptor and an admin-users module when the API exists. Recorridos are stored locally (`RecorridosLocal`); the acudiente portal is computed in the browser (`PortalLocal`) until `GET /portal` exists. `WhatsappService` posts to `${apiUrl}/whatsapp/enviar.php`, which doesn't exist in this repo; automatic billing sends (programación) must be done by the backend. The local admin profile (`USUARIO_DEMO`) and Membresías are hard-coded sample data; the dashboard is computed locally by `TableroLocal`; support requests (`sistema/soporte`) are stored locally until a support API exists; notifications are generated in the browser by `NotificacionesLocal` (switch to `NotificacionesHttp` when the server generates them); Personas, Operación and Finanzas run in local mode (`localStorage`). Templates still open DaisyUI modals with inline `onclick="id.showModal()"`.
+Local auth is still active: `AutenticacionLocal` keeps unhashed passwords in the browser (demo only) and a fixed local admin (`admin`, `USUARIO_DEMO` profile). The API auth, `AutenticacionHttp` and the token interceptor are ready; switch the provider together with Personas and add an admin-users module. Recorridos are stored locally (`RecorridosLocal`); the acudiente portal is computed in the browser (`PortalLocal`) until `GET /portal` exists. `WhatsappService` posts to `${apiUrl}/whatsapp/enviar.php`, which doesn't exist in this repo; automatic billing sends (programación) must be done by the backend. The local admin profile (`USUARIO_DEMO`) and Membresías are hard-coded sample data; the dashboard is computed locally by `TableroLocal`; support requests (`sistema/soporte`) are stored locally until a support API exists; notifications are generated in the browser by `NotificacionesLocal` (switch to `NotificacionesHttp` when the server generates them); Personas, Operación and Finanzas run in local mode (`localStorage`). Templates still open DaisyUI modals with inline `onclick="id.showModal()"`.
 
 ## Styling and design rules (mandatory for every screen)
 
@@ -174,7 +179,7 @@ Commands (from `api/`; Docker must be running for tests and compose):
 
 ```bash
 docker compose up --build            # Postgres + API at http://localhost:8080/docs (needs api/.env, see .env.example)
-docker compose up -d db && dotnet run --project src/RutaRola.Api    # http://localhost:5080/docs (user-secrets for the connection string)
+docker compose up -d db && dotnet run --project src/RutaRola.Api    # http://localhost:8080/docs (user-secrets for the connection string)
 dotnet build && dotnet test
 dotnet ef migrations add <Nombre> -p src/RutaRola.Infrastructure -s src/RutaRola.Infrastructure -o Persistencia/Migraciones
 dotnet run --project src/RutaRola.Api -- migrar     # apply migrations + idempotent seed (explicit deploy step)
