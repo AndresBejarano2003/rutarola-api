@@ -1,0 +1,38 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using RutaRola.Domain.Seguridad;
+using RutaRola.Infrastructure.Persistencia;
+using RutaRola.Infrastructure.Persistencia.Seed;
+
+namespace RutaRola.Infrastructure;
+
+public static class DependencyInjection
+{
+    public const string NombreConexion = "RutaRola";
+    public const string TablaMigraciones = "__ef_migraciones";
+
+    public static IServiceCollection AgregarInfraestructura(this IServiceCollection services)
+    {
+        services.AddDbContext<RutaRolaDbContext>((sp, opciones) =>
+        {
+            var cadena = sp.GetRequiredService<IConfiguration>().GetConnectionString(NombreConexion)
+                ?? throw new InvalidOperationException(
+                    $"Falta la cadena de conexión 'ConnectionStrings:{NombreConexion}' (variable ConnectionStrings__{NombreConexion} o dotnet user-secrets).");
+            Configurar(opciones, cadena);
+        });
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
+        services.AddScoped<SembradorDatos>();
+        return services;
+    }
+
+    public static void Configurar(DbContextOptionsBuilder opciones, string cadena) =>
+        opciones
+            .UseNpgsql(cadena, npgsql => npgsql.MigrationsHistoryTable(TablaMigraciones))
+            .UseSnakeCaseNamingConvention()
+            // Las tablas hijas tienen el mismo filtro de empresa que su padre (ver RutaRolaDbContext).
+            .ConfigureWarnings(w => w.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning));
+}

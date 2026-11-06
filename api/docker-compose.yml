@@ -1,0 +1,36 @@
+# Desarrollo local: PostgreSQL + API.  docker compose up --build   →  http://localhost:8080/docs
+# Las contraseñas vienen de api/.env (copia .env.example); no se versiona.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: rutarola
+      POSTGRES_USER: rutarola
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en api/.env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - datos-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rutarola -d rutarola"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      PORT: 8080
+      ConnectionStrings__RutaRola: Host=db;Port=5432;Database=rutarola;Username=rutarola;Password=${POSTGRES_PASSWORD}
+      BaseDatos__MigrarAlIniciar: "true"
+      Seed__Admin__Password: ${SEED_ADMIN_PASSWORD:-}
+      Seed__SuperAdmin__Password: ${SEED_SUPERADMIN_PASSWORD:-}
+    ports:
+      - "8080:8080"
+
+volumes:
+  datos-postgres:
