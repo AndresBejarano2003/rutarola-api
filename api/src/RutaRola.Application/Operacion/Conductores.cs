@@ -1,3 +1,4 @@
+using RutaRola.Application.Configuracion;
 using Microsoft.EntityFrameworkCore;
 using RutaRola.Application.Comun;
 using RutaRola.Application.Personas;
@@ -19,7 +20,7 @@ public record ConductorDto(
 public record FiltrosConductor(string? Texto = null, string? Licencia = null, string? Asignacion = null, string? Estado = null);
 
 /// <summary>Solo lectura: los datos viven en empleados; se agregan la licencia y la asignación activa.</summary>
-public class ServicioConductores(IBaseDatos db, TimeProvider reloj)
+public class ServicioConductores(IBaseDatos db, TimeProvider reloj, ParametrosEmpresa parametros)
 {
     public async Task<ListaPaginada<ConductorDto>> ListarAsync(FiltrosConductor f, Paginacion paginacion, CancellationToken ct = default)
     {
@@ -51,13 +52,14 @@ public class ServicioConductores(IBaseDatos db, TimeProvider reloj)
             .ToListAsync(ct);
 
         var hoy = Fechas.Hoy(reloj);
+        var diasAlerta = await parametros.DiasAlertaVencimientoAsync(ct);
         var todos = conductores.Select(e =>
         {
             var a = asignaciones.FirstOrDefault(x => x.IdConductor == e.Id);
             return new ConductorDto(
                 e.Id, e.NombreCompleto, ReglasPersona.Iniciales(e), $"{e.TipoDocumento} {e.NumeroDocumento}", e.Telefono,
                 e.Correo ?? "", e.NumeroLicencia ?? "", e.CategoriaLicencia ?? "", e.FechaVencimientoLicencia,
-                Catalogos.EstadoVencimiento(e.FechaVencimientoLicencia, hoy), EstadoRegistro.Texto(e.Activo),
+                Catalogos.EstadoVencimiento(e.FechaVencimientoLicencia, hoy, diasAlerta), EstadoRegistro.Texto(e.Activo),
                 a is null ? null : new AsignacionConductorDto(a.Id, a.Ruta, a.Jornada, a.Vehiculo, a.Monitora?.NombreCompleto ?? ""));
         })
         .Where(c => Texto.Opcional(f.Licencia) is not { } licencia || c.EstadoLicencia == licencia)

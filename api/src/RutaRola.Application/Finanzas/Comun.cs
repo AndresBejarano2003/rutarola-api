@@ -49,7 +49,9 @@ public static class Cobro
     /// <summary>Día límite de pago cuando la factura no tiene programación.</summary>
     public const int DiaLimitePredeterminado = 5;
 
-    public static DateOnly FechaLimite(DateOnly periodo, int? diaLimitePago) => Periodos.Dia(periodo, diaLimitePago ?? DiaLimitePredeterminado);
+    /// <param name="predeterminado">Parámetro <c>finanzas.dia_limite_pago</c> de la empresa, para facturas sin programación.</param>
+    public static DateOnly FechaLimite(DateOnly periodo, int? diaLimitePago, int predeterminado = DiaLimitePredeterminado) =>
+        Periodos.Dia(periodo, diaLimitePago ?? predeterminado);
 
     /// <summary><c>$ 420.000</c>, como el formato de moneda del frontend.</summary>
     public static string Pesos(decimal valor) => "$ " + Math.Round(valor).ToString("N0", Periodos.Colombia);

@@ -49,11 +49,22 @@ public class ValidadorLoteGps : AbstractValidator<SolicitudLoteGps>
 /// </summary>
 public interface IAvisosRecorrido
 {
-    Task PosicionAsync(Guid idEmpresa, PosicionDto posicion, CancellationToken ct = default);
+    /// <summary>
+    /// A la empresa (mapa del administrador) y, si el recorrido sigue EN_CURSO, a quienes lo siguen
+    /// (el acudiente solo ve el vehículo mientras el recorrido está en curso).
+    /// </summary>
+    Task PosicionAsync(Guid idEmpresa, PosicionDto posicion, bool enCurso, CancellationToken ct = default);
 
-    /// <summary>El recorrido cambió (paradas, orden, fin): el compañero lo vuelve a consultar.</summary>
-    Task RecorridoActualizadoAsync(Guid idEmpresa, Guid idRecorrido, DateTime? fechaActualizacion, CancellationToken ct = default);
+    /// <summary>
+    /// El recorrido cambió (inicio, paradas, orden, fin): lo vuelven a consultar quienes lo siguen, la empresa,
+    /// su personal (rutas del día) y los acudientes de sus estudiantes (portal).
+    /// </summary>
+    Task RecorridoActualizadoAsync(Guid idEmpresa, AvisoRecorrido aviso, CancellationToken ct = default);
 }
+
+/// <summary>Evento <c>recorridoActualizado</c> <c>{recorridoId, fechaActualizacion, estado}</c> y a quién llega.</summary>
+public record AvisoRecorrido(
+    Guid RecorridoId, DateTime? FechaActualizacion, EstadoViaje Estado, IReadOnlyList<Guid> Empleados, IReadOnlyList<Guid> Acudientes);
 
 /// <summary>Quién consulta: el administrador ve toda su empresa; el resto, solo lo suyo.</summary>
 public enum AlcanceGps
@@ -131,7 +142,7 @@ public class ServicioGps(IBaseDatos db, IContextoUsuario contexto, IAvisosRecorr
         var ultima = await LeerUltimaAsync(viaje.Id, ct);
         if (validas.Count > 0 && ultima is not null && validas.Any(p => p.Fecha == ultima.Fecha) && contexto.IdEmpresa is { } empresa)
         {
-            await avisos.PosicionAsync(empresa, ultima, ct);
+            await avisos.PosicionAsync(empresa, ultima, viaje.Estado == EstadoViaje.EnCurso, ct);
         }
         return new ResultadoLoteGps(validas.Count, s.Posiciones!.Count - validas.Count, ultima);
     }

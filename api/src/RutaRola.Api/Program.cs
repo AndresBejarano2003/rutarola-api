@@ -14,6 +14,14 @@ try
         builder.WebHost.UseUrls($"http://0.0.0.0:{puerto}");
     }
 
+    // Datos demo en producción solo con permiso explícito (despliegue de demostración con datos ficticios).
+    if (builder.Environment.IsProduction() && builder.Configuration.GetValue<bool>("Seed:Demo:Habilitado")
+        && !builder.Configuration.GetValue<bool>("Seed:Demo:PermitirEnProduccion"))
+    {
+        builder.Configuration["Seed:Demo:Habilitado"] = "false";
+        Log.Warning("Seed:Demo:Habilitado se ignora en producción sin Seed:Demo:PermitirEnProduccion = true.");
+    }
+
     builder.AgregarSerilog().AgregarServiciosApi();
     var app = builder.Build();
 

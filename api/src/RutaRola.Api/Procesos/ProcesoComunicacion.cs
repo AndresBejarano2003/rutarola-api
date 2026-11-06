@@ -9,7 +9,7 @@ namespace RutaRola.Api.Procesos;
 /// <summary>
 /// Proceso del servidor que corre cada <c>Procesos:IntervaloMinutos</c> (15 por defecto) para cada empresa
 /// activa: envía los recordatorios de cobro (<see cref="ServicioCobros"/>) y genera las notificaciones
-/// (<see cref="GeneradorNotificaciones"/>), aunque nadie tenga la app abierta. Cada empresa corre en su
+/// (<see cref="GeneradorNotificaciones"/>) y borra las lecturas GPS vencidas (<c>Gps:DiasRetencion</c>), aunque nadie tenga la app abierta. Cada empresa corre en su
 /// propio scope con el filtro de empresa normal (un contexto con solo su <c>id_empresa</c>), así que un
 /// error o un dato de una no afecta a las demás. Con varias instancias del API, dejar
 /// <c>Procesos:Habilitado</c> en una sola (el índice único de envíos evita duplicados si coinciden).
@@ -51,6 +51,18 @@ public sealed class ProcesoComunicacion(IServiceScopeFactory scopes, IConfigurat
             return;
         }
 
+        try
+        {
+            using var scope = scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<IBaseDatos>();
+            db.UsarModoSistema();
+            await DepurarGpsAsync(db, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Proceso de comunicación: falló la retención GPS");
+        }
+
         foreach (var empresa in empresas)
         {
             try
@@ -71,6 +83,27 @@ public sealed class ProcesoComunicacion(IServiceScopeFactory scopes, IConfigurat
             }
         }
     }
+
+    /// <summary>
+    /// Retención de ubicaciones (<c>Gps:DiasRetencion</c>, 30 por defecto; 0 = conservar siempre): son
+    /// posiciones de un vehículo con menores, así que las lecturas más antiguas se borran para todas las empresas.
+    /// </summary>
+    private async Task DepurarGpsAsync(IBaseDatos db, CancellationToken ct)
+    {
+        var dias = configuracion.GetValue("Gps:DiasRetencion", DiasRetencionGps);
+        if (dias <= 0)
+        {
+            return;
+        }
+        var limite = DateTime.UtcNow.AddDays(-dias);
+        var borradas = await db.GpsVehiculos.Where(g => g.FechaRegistro < limite).ExecuteDeleteAsync(ct);
+        if (borradas > 0)
+        {
+            logger.LogInformation("Retención GPS: {Borradas} lectura(s) de más de {Dias} días eliminadas", borradas, dias);
+        }
+    }
+
+    public const int DiasRetencionGps = 30;
 
     /// <summary>Identidad del proceso: solo la empresa (sin usuario, rol ni permisos).</summary>
     private static ClaimsPrincipal Principal(Guid empresa) =>

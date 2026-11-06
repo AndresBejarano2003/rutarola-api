@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RutaRola.Application.Comun;
+using RutaRola.Application.Configuracion;
 using RutaRola.Domain.Enums;
 
 namespace RutaRola.Application.Finanzas;
@@ -35,7 +36,7 @@ public record FiltrosMorosos(string? Texto = null, int DiasMinimos = 0);
 /// actual de las facturas vigentes sin recibo válido; la fecha límite es el día de la programación de la
 /// factura o el 5 (<see cref="Cobro.FechaLimite"/>). También los usan el tablero y el portal.
 /// </summary>
-public class ServicioReportes(IBaseDatos db, TimeProvider reloj)
+public class ServicioReportes(IBaseDatos db, ParametrosEmpresa parametros, TimeProvider reloj)
 {
     public async Task<ReporteIngresosDto> IngresosAsync(FiltrosIngresos f, CancellationToken ct = default)
     {
@@ -129,13 +130,14 @@ public class ServicioReportes(IBaseDatos db, TimeProvider reloj)
             .Select(p => (p.IdFactura!.Value, p.Periodo)).ToHashSet();
         var diaLimite = await db.ProgramacionesCobro.AsNoTracking().Where(p => ids.Contains(p.IdFactura))
             .ToDictionaryAsync(p => p.IdFactura, p => p.DiaLimitePago, ct);
+        var predeterminado = await parametros.DiaLimitePagoAsync(ct);
 
         return facturas
             .SelectMany(fa => Periodos.Entre(fa.PeriodoInicio, fa.PeriodoFin < mesActual ? fa.PeriodoFin : mesActual)
                 .Where(p => !pagados.Contains((fa.Id, p)))
                 .Select(p =>
                 {
-                    var limite = Cobro.FechaLimite(p, diaLimite.TryGetValue(fa.Id, out var dia) ? dia : null);
+                    var limite = Cobro.FechaLimite(p, diaLimite.TryGetValue(fa.Id, out var dia) ? dia : null, predeterminado);
                     return new CuotaPendienteDto(
                         fa.Id, fa.NumeroFactura, fa.IdAcudiente, fa.NombreAcudiente, fa.NombreEstudiante, Periodos.Texto(p), fa.ValorMensual,
                         limite, hoy.DayNumber - limite.DayNumber);

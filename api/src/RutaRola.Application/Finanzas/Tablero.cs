@@ -1,3 +1,4 @@
+using RutaRola.Application.Configuracion;
 using Microsoft.EntityFrameworkCore;
 using RutaRola.Application.Comun;
 using RutaRola.Application.Operacion;
@@ -30,7 +31,7 @@ public record TableroDto(
     IReadOnlyList<HistoricoDto> Historico, IReadOnlyList<EstudiantesColegioDto> EstudiantesPorColegio, IReadOnlyList<OcupacionRutaDto> OcupacionRutas);
 
 /// <summary>Pantalla de inicio con las mismas reglas de <c>calcular-tablero.ts</c> (datos reales, nada fijo).</summary>
-public class ServicioTablero(IBaseDatos db, ServicioReportes reportes, TimeProvider reloj)
+public class ServicioTablero(IBaseDatos db, ServicioReportes reportes, ParametrosEmpresa parametros, TimeProvider reloj)
 {
     /// <summary>Días hacia adelante de la agenda (y hacia atrás de los envíos fallidos).</summary>
     public const int DiasAgenda = 30;
@@ -92,10 +93,11 @@ public class ServicioTablero(IBaseDatos db, ServicioReportes reportes, TimeProvi
         var rutasSinAsignacion = rutas.Count(r => asignaciones.All(a => a.IdRuta != r.Id));
 
         // Vencimientos
-        var estadosVehiculo = vehiculos.Select(v => v.Documentos.Select(d => Catalogos.EstadoVencimiento(d.FechaVencimiento, hoy)).ToList()).ToList();
+        var diasAlerta = await parametros.DiasAlertaVencimientoAsync(ct);
+        var estadosVehiculo = vehiculos.Select(v => v.Documentos.Select(d => Catalogos.EstadoVencimiento(d.FechaVencimiento, hoy, diasAlerta)).ToList()).ToList();
         var vehiculosVencidos = estadosVehiculo.Count(e => e.Contains("VENCIDA"));
         var vehiculosPorVencer = estadosVehiculo.Count(e => !e.Contains("VENCIDA") && e.Contains("POR_VENCER"));
-        var licencias = conductores.Select(c => Catalogos.EstadoVencimiento(c.FechaVencimientoLicencia, hoy)).ToList();
+        var licencias = conductores.Select(c => Catalogos.EstadoVencimiento(c.FechaVencimientoLicencia, hoy, diasAlerta)).ToList();
 
         // Contratos y programación
         var siguiente = periodo.AddMonths(1);

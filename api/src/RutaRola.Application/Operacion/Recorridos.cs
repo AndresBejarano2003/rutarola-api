@@ -412,11 +412,20 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
         return await ObtenerAsync(id, ct);
     }
 
-    /// <summary>Aviso en tiempo real al compañero (hoy sincroniza consultando; el hub lo hace inmediato).</summary>
-    private Task AvisarAsync(ViajeRuta viaje, CancellationToken ct) =>
-        contexto.IdEmpresa is { } empresa
-            ? avisos.RecorridoActualizadoAsync(empresa, viaje.Id, viaje.FechaActualizacion ?? viaje.FechaCreacion, ct)
-            : Task.CompletedTask;
+    /// <summary>Aviso en tiempo real al compañero, al administrador y a los acudientes de los estudiantes del recorrido.</summary>
+    private async Task AvisarAsync(ViajeRuta viaje, CancellationToken ct)
+    {
+        if (contexto.IdEmpresa is not { } empresa)
+        {
+            return;
+        }
+        var estudiantes = viaje.Paradas.Select(p => p.IdEstudiante).ToList();
+        var acudientes = await db.EstudiantesAcudientes.AsNoTracking().Where(x => estudiantes.Contains(x.IdEstudiante))
+            .Select(x => x.IdAcudiente).Distinct().ToListAsync(ct);
+        Guid[] empleados = viaje.IdMonitora is { } monitora ? [viaje.IdConductor, monitora] : [viaje.IdConductor];
+        await avisos.RecorridoActualizadoAsync(
+            empresa, new AvisoRecorrido(viaje.Id, viaje.FechaActualizacion ?? viaje.FechaCreacion, viaje.Estado, empleados, acudientes), ct);
+    }
 
     private async Task<RecorridoDto?> BuscarDeHoyAsync(Guid idAsignacion, DateOnly fecha, Trayecto trayecto, CancellationToken ct)
     {

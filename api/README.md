@@ -77,7 +77,7 @@ dotnet run --project src/RutaRola.Api -- migrar
 
 | Variable | Obligatoria | Descripción |
 |---|---|---|
-| `ConnectionStrings__RutaRola` | sí | Cadena de conexión de PostgreSQL (`Host=…;Port=5432;Database=…;Username=…;Password=…;SSL Mode=Require` en la nube). |
+| `ConnectionStrings__RutaRola` | sí | Cadena de conexión de PostgreSQL: formato Npgsql (`Host=…;Port=5432;Database=…;Username=…;Password=…;SSL Mode=Require`) o la URL del proveedor (`postgresql://usuario:clave@host/base?sslmode=require`, Render/Neon), que `CadenaConexion` convierte. |
 | `ASPNETCORE_ENVIRONMENT` | — | `Production` en la imagen. Fuera de producción se publican `/openapi/v1.json` y `/docs` (Scalar). |
 | `PORT` | — | Puerto HTTP (8080 en la imagen). |
 | `Cors__Origenes` | — | Orígenes permitidos separados por comas. Por defecto `http://localhost:4200,https://rutarola.netlify.app`. |
@@ -85,28 +85,46 @@ dotnet run --project src/RutaRola.Api -- migrar
 | `Seed__Admin__Usuario`, `Seed__Admin__Email` | — | Por defecto `admin` / `admin@rutarola.com`. |
 | `Seed__SuperAdmin__Password` | — | Si se define, se crea `superadmin` (plataforma, sin empresa). |
 | `Seed__Empresa__Nombre`, `Seed__Empresa__Nit` | — | Empresa demo (por defecto "RutaRola Demo", `900000001-1`). |
-| `Seed__Demo__Habilitado`, `Seed__Demo__Password` | — | Datos de ejemplo y clave de sus usuarios. **Nunca en producción.** |
+| `Seed__Demo__Habilitado`, `Seed__Demo__Password` | — | Datos de ejemplo (ficticios) y clave de sus usuarios. En Production se ignoran salvo con `Seed__Demo__PermitirEnProduccion=true`, que es solo para un despliegue de **demostración** (`render.yaml`); nunca con datos de clientes. |
 | `BaseDatos__MigrarAlIniciar` | — | `true` aplica migraciones y seed al arrancar. **Se ignora en Production.** |
 | `Jwt__Clave` | sí | Clave HMAC para firmar los JWT, mínimo 32 caracteres (`openssl rand -base64 48`). El API no arranca sin ella. |
 | `Jwt__MinutosAcceso`, `Jwt__DiasRefresh` | — | Vida del access token (15) y del refresh token (30 días). |
 | `Jwt__SegundosGraciaRotacion` | — | Gracia (30 s) para dos renovaciones simultáneas del mismo refresh (p. ej. dos pestañas). |
 | `Seguridad__IntentosAutenticacionPorMinuto` | — | Límite por IP para `/auth/login` y `/auth/refresh` (10). |
 | `Procesos__Habilitado`, `Procesos__IntervaloMinutos` | — | Proceso de cobros y notificaciones (`true`, cada 15 min). Con varias instancias, habilitarlo en **una sola**. |
-| `Mensajeria__Whatsapp`, `Mensajeria__Correo` | — | `Deshabilitado` (por defecto: no se envía ni se registra nada) o `Simulado` (desarrollo: queda como entregado sin salir del servidor). Aún no hay proveedor real. |
+| `Mensajeria__Whatsapp`, `Mensajeria__Correo` | — | `Deshabilitado` (por defecto: no se envía ni se registra nada) o `Simulado` (desarrollo y demo: queda como entregado sin salir del servidor). Aún no hay proveedor real. |
+| `Gps__DiasRetencion` | — | Días que se conservan las ubicaciones GPS (30; `0` = siempre). El proceso del servidor borra las más antiguas de todas las empresas: son posiciones de un vehículo con menores. |
 
 No se guardan secretos en el repo: en desarrollo `dotnet user-secrets` o `api/.env` (ignorado por git);
 en el hosting, sus variables de entorno.
 
 ## Desplegar
 
+**Render (Blueprint `render.yaml` en la raíz del repo `rutarola-api`)**: PostgreSQL gratuito + servicio web Docker
+(`api/Dockerfile`, contexto `api/`), health check `/health`, `Jwt__Clave` generada por Render y CORS para
+`https://rutarola.netlify.app`. Al crear el Blueprint, Render pide los secretos `sync: false`
+(`Seed__Admin__Password`, `Seed__SuperAdmin__Password`, `Seed__Demo__Password`). El plan gratuito no tiene
+"pre-deploy command": el contenedor corre `migrar` (migraciones + seed, idempotente) y luego el API
+(`dockerCommand`); con un plan pago, mover `migrar` a `preDeployCommand`. El servicio gratuito se duerme tras
+15 min sin uso (el primer pedido tarda ~1 min) y su Postgres gratuito vence a los 30 días: para algo estable,
+plan pago o Neon (`ConnectionStrings__RutaRola` = su URL).
+
+Otro hosting:
+
 1. Construir la imagen: `docker build -t rutarola-api ./api`.
 2. **Migrar (paso explícito, antes de cada versión):**
    `docker run --rm -e ConnectionStrings__RutaRola="…" -e Seed__Admin__Password="…" rutarola-api migrar`
-   (en Render o Railway: "pre-deploy command" `dotnet RutaRola.Api.dll migrar`). Es idempotente.
+   (o el "pre-deploy command" `dotnet RutaRola.Api.dll migrar` del hosting). Es idempotente.
 3. Arrancar el contenedor con las variables de entorno. Escucha en `$PORT`, confía en `X-Forwarded-For/Proto`
    del proxy del hosting y expone `GET /health` (200 si la BD responde, 503 si no) para el health check.
 4. En el frontend: `src/environments/environment.ts` → `apiUrl = https://<api>/api/v1` y `usarApi: true`,
-   y agregar el dominio de Netlify a `Cors__Origenes` si cambia.
+   y agregar el dominio de Netlify a `Cors__Origenes` si cambia. El frontend llama al API directo (no por un
+   proxy de Netlify) porque el hub SignalR necesita WebSocket.
+
+**Una sola instancia.** El proceso de cobros/notificaciones/retención (`Procesos__Habilitado`) y SignalR corren en
+la instancia del API. Para escalar a varias: dejar `Procesos__Habilitado=true` en una sola y agregar un backplane
+de SignalR (Redis con `AddStackExchangeRedis` o Azure SignalR Service); sin él, un aviso solo llega a los clientes
+conectados a la instancia que lo generó.
 
 ## Autenticación y permisos
 
@@ -116,6 +134,7 @@ en el hosting, sus variables de entorno.
 | `POST /api/v1/auth/refresh` `{refreshToken}` | Responde `tokens` nuevos; el refresh anterior deja de servir (rotación). Reusar uno ya rotado revoca todas las sesiones del usuario (posible robo). |
 | `POST /api/v1/auth/logout` `{refreshToken?}` | Revoca ese refresh y la sesión del access token, si viene. Responde 204 y es idempotente. |
 | `GET /api/v1/auth/me` | Sesión actual con los permisos vigentes. |
+| `PUT /api/v1/auth/contrasena` `{actual, nueva}` | Cambia la contraseña propia (cualquier rol): 422 `La contraseña actual no es correcta.` o si es igual, 400 si la nueva tiene menos de 6. Revoca las demás sesiones del usuario (la actual sigue); la auditoría registra `(cambiada)`. 204. |
 
 - **Access token:** JWT HS256 de 15 minutos con los claims `sub`, `sid` (sesión), `name`, `rol`, `id_empresa`, `id_empleado` / `id_acudiente` y un `permiso` por permiso.
   - Se envía como `Authorization: Bearer`.
@@ -177,9 +196,21 @@ por asignación **y fecha** (migración `Fase5EnCursoPorFecha`): uno que quedó 
 **Hub SignalR** `/hubs/recorridos` (protocolo JSON; el token va en `?access_token=` porque el WebSocket del
 navegador no envía encabezados, solo se lee en `/hubs` y los logs no registran la query string):
 `Seguir(recorridoId)` (mismo acceso que `gps/ultima`), `Dejar(recorridoId)`, `SeguirEmpresa()` (administrador).
-Eventos: `posicion` (`PosicionDto`) y `recorridoActualizado {recorridoId, fechaActualizacion}`. Los envía
-`IAvisosRecorrido` (`Api/TiempoReal`), que nunca hace fallar la petición. Con varias instancias del API hace
-falta un backplane (Redis o Azure SignalR); hoy es una sola instancia.
+Eventos: `posicion` (`PosicionDto`, a quien sigue el recorrido solo mientras está EN_CURSO, y siempre a la empresa)
+y `recorridoActualizado {recorridoId, fechaActualizacion, estado}`. Este último llega también SIN `Seguir`: cada
+conexión entra al conectarse a su grupo de empleado (`id_empleado`) y de acudiente (`id_acudiente`), y el aviso va
+al conductor, la monitora y los acudientes de los estudiantes del recorrido (rutas del día y portal se refrescan
+solos; un cliente puede recibirlo dos veces). `Seguir` rechaza al acudiente si el recorrido ya no está en curso.
+Los envía `IAvisosRecorrido` (`Api/TiempoReal`), que nunca hace fallar la petición. Con varias instancias del API
+hace falta un backplane (ver **Desplegar**).
+
+**Retención:** las lecturas de `gps_vehiculos` con más de `Gps:DiasRetencion` días (30) se borran en cada vuelta
+del proceso del servidor (`ProcesoComunicacion`, modo sistema, todas las empresas).
+
+**Parámetros de la empresa** (`ParametrosEmpresa`, scoped, lee `configuracion_sistema` una vez por petición y usa el
+valor por defecto si falta o está fuera de rango): `finanzas.dia_limite_pago` (5) para la fecha límite de las cuotas
+sin programación (reportes, portal, tablero, notificaciones) y `alertas.dias_vencimiento` (30) para documentos y
+licencias por vencer (conductores, tablero, notificaciones).
 
 ## Convenciones
 
@@ -338,3 +369,6 @@ Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
 7. ✅ Comunicación: notificaciones generadas por el servidor (bandeja por usuario), proceso periódico de
    recordatorios de cobro con registro de WhatsApp (canales simulados hasta conectar proveedor) y portal del
    acudiente; datos demo con fechas históricas; el frontend usa notificaciones y portal por HTTP.
+8. ✅ Integración final: GPS desde la Ruta del día y mapas (administrador, historial, acudiente) sobre el hub,
+   avisos por grupos de empleado/acudiente, retención GPS, parámetros de la empresa aplicados, cambio de
+   contraseña, plataforma de empresas en el frontend, URL de conexión del proveedor y blueprint de Render.

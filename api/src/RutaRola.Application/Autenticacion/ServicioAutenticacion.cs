@@ -135,6 +135,34 @@ public class ServicioAutenticacion(
         return ArmarSesion(usuario, titular, usuario.UltimoLogin ?? Ahora, await PermisosDeAsync(usuario.IdRol, ct));
     }
 
+    /// <summary>
+    /// Cambia la contraseña del usuario de la sesión: exige la actual, y revoca las demás sesiones (la
+    /// actual sigue abierta). La auditoría registra solo "(cambiada)".
+    /// </summary>
+    public async Task CambiarContrasenaAsync(Guid idUsuario, Guid? idSesion, SolicitudCambioContrasena solicitud, CancellationToken ct = default)
+    {
+        var usuario = await UsuariosSinFiltro().FirstOrDefaultAsync(u => u.Id == idUsuario, ct)
+            ?? throw new ErrorNegocio(MensajeSesionInvalida, CodigoError.NoAutenticado);
+        if (hasher.VerifyHashedPassword(usuario, usuario.PasswordHash, solicitud.Actual ?? "") == PasswordVerificationResult.Failed)
+        {
+            throw new ErrorNegocio("La contraseña actual no es correcta.", CodigoError.Validacion);
+        }
+        if (solicitud.Actual == solicitud.Nueva)
+        {
+            throw new ErrorNegocio("La nueva contraseña debe ser distinta de la actual.", CodigoError.Validacion);
+        }
+        usuario.PasswordHash = hasher.HashPassword(usuario, solicitud.Nueva!);
+        var otras = await db.SesionesUsuario.IgnoreQueryFilters([FiltrosConsulta.Empresa])
+            .Where(s => s.IdUsuario == idUsuario && !s.Revocado && s.Id != idSesion).ToListAsync(ct);
+        foreach (var s in otras)
+        {
+            s.Revocado = true;
+            s.FechaRevocacion = Ahora;
+        }
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Cambio de contraseña de {IdUsuario}; {Revocadas} sesiones revocadas", idUsuario, otras.Count);
+    }
+
     // ---------------------------------------------------------------------------------------------
 
     private IQueryable<Usuario> UsuariosSinFiltro() =>

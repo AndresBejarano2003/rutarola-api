@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using RutaRola.Application.Operacion;
 using RutaRola.Tests.Infraestructura;
 
@@ -171,5 +173,54 @@ public class GpsTests(BaseDatosPrueba bd)
         var (e, _) = await EnCursoAsync();
         var conToken = await e.ClienteConductor.PostAsync("/hubs/recorridos/negotiate?negotiateVersion=1", null);
         Assert.Equal(HttpStatusCode.OK, conToken.StatusCode);
+    }
+
+    [Fact]
+    public async Task El_acudiente_recibe_por_el_hub_solo_mientras_el_recorrido_esta_en_curso()
+    {
+        var (e, r) = await EnCursoAsync();
+        var acudiente = await bd.ClienteDeAsync(e.Acudiente.Usuario, "Clave-123");
+        await using var hub = await HubPrueba.ConectarAsync(bd, Token(acudiente));
+        Assert.Null(await hub.InvocarAsync("Seguir", r.Id));
+        Assert.Contains("No tienes permiso", await hub.InvocarAsync("SeguirEmpresa"));
+
+        await EnviarAsync(e.ClienteConductor, r.Id, Punto(DateTime.UtcNow, 2.7m));
+        Assert.Equal(2.7m, (await hub.EsperarAsync("posicion")).GetProperty("latitud").GetDecimal());
+
+        // Cambios del recorrido de su estudiante le llegan aunque no lo siga (grupo del acudiente).
+        await e.ClienteConductor.MarcarAsync(r.Id, "AUSENTE", e.Estudiantes[0].Id);
+        var aviso = await hub.EsperarAsync("recorridoActualizado");
+        Assert.Equal(r.Id, aviso.GetProperty("recorridoId").GetGuid());
+        Assert.Equal("EN_CURSO", aviso.GetProperty("estado").GetString());
+        (await e.ClienteConductor.PostAsJsonAsync($"/api/v1/recorridos/{r.Id}/finalizar", new { observaciones = "" }, ClienteApi.Json)).EnsureSuccessStatusCode();
+        // Puede llegar dos veces (grupo del recorrido y del acudiente): el cliente lo trata igual.
+        while ((await hub.EsperarAsync("recorridoActualizado")).GetProperty("estado").GetString() != "FINALIZADO") { }
+
+        // Finalizado: ya no puede seguirlo.
+        await using var tarde = await HubPrueba.ConectarAsync(bd, Token(acudiente));
+        Assert.NotNull(await tarde.InvocarAsync("Seguir", r.Id));
+    }
+
+    [Fact]
+    public async Task La_retencion_borra_las_lecturas_antiguas()
+    {
+        var (e, r) = await EnCursoAsync();
+        await EnviarAsync(e.ClienteConductor, r.Id, Punto(DateTime.UtcNow));
+        await using (var db = bd.Contexto(null, modoSistema: true))
+        {
+            db.GpsVehiculos.Add(new RutaRola.Domain.Operacion.GpsVehiculo
+            {
+                IdVehiculo = e.Vehiculo.Id, IdViaje = r.Id, Latitud = 1, Longitud = 1,
+                FechaRegistro = DateTime.UtcNow.AddDays(-RutaRola.Api.Procesos.ProcesoComunicacion.DiasRetencionGps - 1),
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var proceso = bd.Api.Services.GetServices<Microsoft.Extensions.Hosting.IHostedService>()
+            .OfType<RutaRola.Api.Procesos.ProcesoComunicacion>().Single();
+        await proceso.EjecutarAsync(CancellationToken.None);
+
+        await using var verificar = bd.Contexto(null, modoSistema: true);
+        Assert.Equal(1, await verificar.GpsVehiculos.CountAsync(g => g.IdViaje == r.Id));
     }
 }

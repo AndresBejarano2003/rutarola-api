@@ -33,12 +33,13 @@ public static class Catalogos
     public static int OrdenGrado(string grado) => Array.IndexOf(Grados, grado);
 
     /// <summary><c>VIGENTE | POR_VENCER | VENCIDA</c> (igual que <c>estadoVencimiento</c> del frontend).</summary>
-    public static string? EstadoVencimiento(DateOnly? vencimiento, DateOnly hoy) =>
+    /// <param name="diasAlerta">Parámetro <c>alertas.dias_vencimiento</c> de la empresa (<c>ParametrosEmpresa</c>).</param>
+    public static string? EstadoVencimiento(DateOnly? vencimiento, DateOnly hoy, int diasAlerta = DiasAlertaVencimiento) =>
         vencimiento switch
         {
             null => null,
             { } f when f < hoy => "VENCIDA",
-            { } f when f <= hoy.AddDays(DiasAlertaVencimiento) => "POR_VENCER",
+            { } f when f <= hoy.AddDays(diasAlerta) => "POR_VENCER",
             _ => "VIGENTE",
         };
 }

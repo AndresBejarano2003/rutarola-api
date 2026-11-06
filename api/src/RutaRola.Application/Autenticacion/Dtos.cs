@@ -4,6 +4,9 @@ public record SolicitudLogin(string? Usuario, string? Contrasena);
 
 public record SolicitudToken(string? RefreshToken);
 
+/// <summary>Cambio de la propia contraseña: la actual y la nueva (mínimo 6).</summary>
+public record SolicitudCambioContrasena(string? Actual, string? Nueva);
+
 /// <summary>El refresh token es opcional: también se revoca la sesión del access token, si viene.</summary>
 public record SolicitudCerrarSesion(string? RefreshToken);
 

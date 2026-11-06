@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using RutaRola.Application.Comun;
+using RutaRola.Application.Configuracion;
 using RutaRola.Application.Finanzas;
 using RutaRola.Domain.Comunicacion;
 using RutaRola.Domain.Enums;
@@ -20,7 +21,7 @@ public record NuevaNotificacion(
 /// vencer o vencidos, contratos por terminar o terminados, mora). Cada hecho tiene una <c>clave</c> y se
 /// notifica una sola vez por usuario, aunque la elimine (índice único usuario + clave).
 /// </summary>
-public class GeneradorNotificaciones(IBaseDatos db, ServicioReportes reportes, TimeProvider reloj)
+public class GeneradorNotificaciones(IBaseDatos db, ServicioReportes reportes, ParametrosEmpresa parametros, TimeProvider reloj)
 {
     public const int VentanaEventosDias = 30;
 
@@ -69,6 +70,7 @@ public class GeneradorNotificaciones(IBaseDatos db, ServicioReportes reportes, T
         var hoy = Fechas.Hoy(reloj);
         var desde = DateTime.SpecifyKind(hoy.AddDays(-VentanaEventosDias).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc) - Fechas.DesfaseColombia;
         var mesActual = Periodos.De(hoy);
+        var diasAlerta = await parametros.DiasAlertaVencimientoAsync(ct);
         var resultado = new List<NuevaNotificacion>();
 
         // Pagos recibidos
@@ -170,7 +172,7 @@ public class GeneradorNotificaciones(IBaseDatos db, ServicioReportes reportes, T
             }
             foreach (var d in v.Documentos.OrderBy(d => d.TipoDocumento))
             {
-                var estado = Catalogos.EstadoVencimiento(d.FechaVencimiento, hoy);
+                var estado = Catalogos.EstadoVencimiento(d.FechaVencimiento, hoy, diasAlerta);
                 if (estado is not ("POR_VENCER" or "VENCIDA"))
                 {
                     continue;
@@ -206,7 +208,7 @@ public class GeneradorNotificaciones(IBaseDatos db, ServicioReportes reportes, T
             {
                 continue;
             }
-            var estado = Catalogos.EstadoVencimiento(vence, hoy);
+            var estado = Catalogos.EstadoVencimiento(vence, hoy, diasAlerta);
             if (estado is not ("POR_VENCER" or "VENCIDA"))
             {
                 continue;

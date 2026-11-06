@@ -1,0 +1,59 @@
+# Despliegue del API en Render (Blueprint): https://dashboard.render.com → New → Blueprint → este repo.
+# Crea PostgreSQL + el servicio web Docker (api/Dockerfile). Los secretos marcados `sync: false` se
+# escriben en el panel de Render al crear el Blueprint; nunca van en este archivo.
+#
+# Migraciones: en Producción el API NUNCA migra al iniciar. El plan gratuito no tiene "pre-deploy
+# command", así que el contenedor ejecuta el paso explícito `migrar` (migraciones + datos base,
+# idempotente) y luego arranca el API. Con un plan pago, mover `migrar` a `preDeployCommand`.
+#
+# Demo: `Seed__Demo__Habilitado` + `Seed__Demo__PermitirEnProduccion` crean los datos ficticios de
+# ejemplo (una sola vez por sección). Quitar ambas variables en un despliegue real con datos de clientes.
+databases:
+  - name: rutarola-db
+    plan: free
+    databaseName: rutarola
+    user: rutarola
+    postgresMajorVersion: "17"
+
+services:
+  - type: web
+    name: rutarola-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    dockerCommand: sh -c "dotnet RutaRola.Api.dll migrar && exec dotnet RutaRola.Api.dll"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__RutaRola
+        fromDatabase:
+          name: rutarola-db
+          property: connectionString
+      - key: Jwt__Clave
+        generateValue: true
+      - key: Cors__Origenes
+        value: https://rutarola.netlify.app
+      - key: Seed__Admin__Password
+        sync: false
+      - key: Seed__SuperAdmin__Password
+        sync: false
+      - key: Seed__Demo__Habilitado
+        value: "true"
+      - key: Seed__Demo__PermitirEnProduccion
+        value: "true"
+      - key: Seed__Demo__Password
+        sync: false
+      # Sin proveedor real: los recordatorios quedan registrados como enviados (no salen mensajes).
+      - key: Mensajeria__Whatsapp
+        value: Simulado
+      - key: Mensajeria__Correo
+        value: Simulado
+      # Una sola instancia: el proceso de cobro/notificaciones y SignalR corren aquí (sin backplane).
+      - key: Procesos__Habilitado
+        value: "true"
+      - key: Gps__DiasRetencion
+        value: "30"

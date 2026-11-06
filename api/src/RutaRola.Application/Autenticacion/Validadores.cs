@@ -18,3 +18,14 @@ public class ValidadorSolicitudToken : AbstractValidator<SolicitudToken>
         RuleFor(x => x.RefreshToken).NotEmpty().WithMessage("Falta el refresh token.").MaximumLength(200);
     }
 }
+
+public class ValidadorSolicitudCambioContrasena : AbstractValidator<SolicitudCambioContrasena>
+{
+    public ValidadorSolicitudCambioContrasena()
+    {
+        RuleFor(x => x.Actual).NotEmpty().WithMessage("Ingresa tu contraseña actual.").MaximumLength(200);
+        RuleFor(x => x.Nueva).NotEmpty().WithMessage("Ingresa la nueva contraseña.")
+            .MinimumLength(6).WithMessage("La nueva contraseña debe tener al menos 6 caracteres.")
+            .MaximumLength(200).WithMessage("La nueva contraseña es demasiado larga.");
+    }
+}

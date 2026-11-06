@@ -41,7 +41,7 @@ public static class DependencyInjection
 
     public static void Configurar(DbContextOptionsBuilder opciones, string cadena) =>
         opciones
-            .UseNpgsql(cadena, npgsql => npgsql.MigrationsHistoryTable(TablaMigraciones).UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
+            .UseNpgsql(CadenaConexion.Normalizar(cadena), npgsql => npgsql.MigrationsHistoryTable(TablaMigraciones).UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
             .UseSnakeCaseNamingConvention()
             // Las tablas hijas tienen el mismo filtro de empresa que su padre (ver RutaRolaDbContext).
             .ConfigureWarnings(w => w.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning));

@@ -12,7 +12,8 @@ namespace RutaRola.Infrastructure.Persistencia.Seed;
 /// - permisos y roles base, con <c>roles_permisos</c> sincronizado con <see cref="Permisos.PorRol"/>;
 /// - empresa demo y su configuración por defecto;
 /// - administrador demo (<c>Seed:Admin:*</c>) y SuperAdmin opcional (<c>Seed:SuperAdmin:*</c>).
-/// - datos de ejemplo (<see cref="DatosDemo"/>) si <c>Seed:Demo:Habilitado</c> (solo Development/compose).
+/// - datos de ejemplo (<see cref="DatosDemo"/>) si <c>Seed:Demo:Habilitado</c> (Development/compose; en producción
+/// además exige <c>Seed:Demo:PermitirEnProduccion</c>, solo para un despliegue de demostración).
 /// Las contraseñas SOLO vienen de variables de entorno / user-secrets; si faltan, ese usuario no se crea.
 /// Nunca cambia la contraseña de un usuario que ya existe.
 /// </summary>

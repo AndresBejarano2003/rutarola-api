@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RutaRola.Application.Comun;
+using RutaRola.Application.Configuracion;
 using RutaRola.Application.Finanzas;
 using RutaRola.Application.Operacion;
 using RutaRola.Domain.Enums;
@@ -23,7 +24,7 @@ public record FacturaPortalDto(
     string PeriodoFin, decimal Total, decimal Pagado, decimal Vencido, string Estado, IReadOnlyList<CuotaPortalDto> Cuotas);
 
 /// <summary>Estado del estudiante hoy en un trayecto (lo que ve el acudiente).</summary>
-public record RecorridoHoyDto(Trayecto Trayecto, bool EnCurso, EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega);
+public record RecorridoHoyDto(Guid RecorridoId, Trayecto Trayecto, bool EnCurso, EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega);
 
 public record TransporteEstudianteDto(
     string Ruta, string Jornada, string Sector, string Vehiculo, string Conductor, string TelefonoConductor, string Monitora, string TelefonoMonitora);
@@ -53,7 +54,7 @@ public record PortalAcudienteDto(
 /// (colegio, horario del curso, ruta activa con su asignación vigente y recorrido de hoy), su estado de cuenta
 /// con las reglas de <c>calcularEstadoCuenta</c>, los recibos de sus facturas y sus cotizaciones. Solo lectura.
 /// </summary>
-public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, TimeProvider reloj)
+public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, ParametrosEmpresa parametros, TimeProvider reloj)
 {
     public async Task<PortalAcudienteDto> ObtenerAsync(CancellationToken ct = default)
     {
@@ -92,7 +93,7 @@ public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, TimeProvide
                             asignacion?.Monitora?.Telefono ?? ""),
                     paradas.Where(p => p.IdEstudiante == e.Id)
                         .OrderBy(p => p.Viaje.Trayecto) // RECOGIDA antes que ENTREGA
-                        .Select(p => new RecorridoHoyDto(p.Viaje.Trayecto, p.Viaje.Estado == EstadoViaje.EnCurso, p.Estado, p.HoraRecogida, p.HoraEntrega))
+                        .Select(p => new RecorridoHoyDto(p.IdViaje, p.Viaje.Trayecto, p.Viaje.Estado == EstadoViaje.EnCurso, p.Estado, p.HoraRecogida, p.HoraEntrega))
                         .ToList());
             })
             // Activos primero, luego por nombre.
@@ -104,7 +105,7 @@ public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, TimeProvide
         var recibos = await db.Pagos.AsNoTracking().Where(p => p.IdFactura != null && idsFacturas.Contains(p.IdFactura.Value)).ToListAsync(ct);
         var diaLimite = await db.ProgramacionesCobro.AsNoTracking().Where(p => idsFacturas.Contains(p.IdFactura))
             .ToDictionaryAsync(p => p.IdFactura, p => p.DiaLimitePago, ct);
-        var (facturasPortal, recibosPortal, resumen) = EstadoCuenta(facturas, recibos, diaLimite, hoy);
+        var (facturasPortal, recibosPortal, resumen) = EstadoCuenta(facturas, recibos, diaLimite, hoy, await parametros.DiaLimitePagoAsync(ct));
 
         var cotizaciones = await db.Cotizaciones.AsNoTracking().Include(c => c.Estudiantes)
             .Where(c => c.IdAcudiente == idAcudiente).OrderByDescending(c => c.Fecha).ToListAsync(ct);
@@ -135,7 +136,8 @@ public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, TimeProvide
     /// facturas anuladas no tienen cuotas por cobrar y los recibos anulados no cuentan.
     /// </summary>
     public static (IReadOnlyList<FacturaPortalDto> Facturas, IReadOnlyList<ReciboPortalDto> Recibos, ResumenCuentaDto Resumen) EstadoCuenta(
-        IReadOnlyList<Factura> facturas, IReadOnlyList<Pago> recibos, IReadOnlyDictionary<Guid, int> diaLimite, DateOnly hoy)
+        IReadOnlyList<Factura> facturas, IReadOnlyList<Pago> recibos, IReadOnlyDictionary<Guid, int> diaLimite, DateOnly hoy,
+        int diaLimitePredeterminado = Cobro.DiaLimitePredeterminado)
     {
         var mesActual = Periodos.De(hoy);
         var validos = recibos.Where(r => r.Estado == EstadoPago.Vigente && r.Periodo is not null)
@@ -149,7 +151,7 @@ public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, TimeProvide
                     : Periodos.Entre(f.PeriodoInicio, f.PeriodoFin).Select(p =>
                     {
                         var recibo = validos.GetValueOrDefault((f.Id, p));
-                        var limite = Cobro.FechaLimite(p, diaLimite.TryGetValue(f.Id, out var dia) ? dia : null);
+                        var limite = Cobro.FechaLimite(p, diaLimite.TryGetValue(f.Id, out var dia) ? dia : null, diaLimitePredeterminado);
                         var mora = hoy.DayNumber - limite.DayNumber;
                         var estado = recibo is not null ? EstadoCuota.Pagada
                             : p > mesActual ? EstadoCuota.Programada

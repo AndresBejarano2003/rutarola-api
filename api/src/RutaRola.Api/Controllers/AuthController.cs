@@ -45,5 +45,16 @@ public class AuthController(ServicioAutenticacion servicio, IContextoUsuario usu
     public Task<SesionDto> Me(CancellationToken ct) =>
         servicio.ObtenerSesionAsync(usuario.IdUsuario!.Value, ct);
 
+    /// <summary>Cambia la contraseña propia (exige la actual) y cierra las demás sesiones.</summary>
+    /// <response code="204">Contraseña cambiada.</response>
+    /// <response code="422">La contraseña actual no es correcta.</response>
+    [HttpPut("contrasena")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> CambiarContrasena(SolicitudCambioContrasena solicitud, CancellationToken ct)
+    {
+        await servicio.CambiarContrasenaAsync(usuario.IdUsuario!.Value, usuario.IdSesion, solicitud, ct);
+        return NoContent();
+    }
+
     private InfoCliente Cliente() => new(usuario.DireccionIp, Request.Headers.UserAgent.ToString());
 }
