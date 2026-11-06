@@ -129,9 +129,10 @@ internal class ViajeRutaConfig : IEntityTypeConfiguration<ViajeRuta>
         b.HasOne(x => x.IniciadoPor).WithMany().HasForeignKey(x => x.IdIniciadoPor);
         b.HasOne<Domain.Personas.Empleado>().WithMany().HasForeignKey(x => x.IdOrdenActualizadoPor);
         b.HasIndex(x => new { x.IdRuta, x.FechaViaje });
-        // Un recorrido por asignación + fecha + trayecto, y uno solo EN_CURSO por asignación.
+        // Un recorrido por asignación + fecha + trayecto, y uno solo EN_CURSO por asignación y fecha (uno que
+        // quedó abierto otro día no bloquea los siguientes: la Ruta del día solo muestra los de hoy).
         b.HasIndex(x => new { x.IdAsignacion, x.FechaViaje, x.Trayecto }).IsUnique();
-        b.HasIndex(x => x.IdAsignacion).IsUnique().HasFilter("estado = 'EN_CURSO'").HasDatabaseName("ix_viajes_ruta_en_curso");
+        b.HasIndex(x => new { x.IdAsignacion, x.FechaViaje }).IsUnique().HasFilter("estado = 'EN_CURSO'").HasDatabaseName("ix_viajes_ruta_en_curso");
     }
 }
 

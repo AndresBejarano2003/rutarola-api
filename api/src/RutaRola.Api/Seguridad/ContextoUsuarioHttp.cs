@@ -6,7 +6,12 @@ namespace RutaRola.Api.Seguridad;
 /// <summary>Lee el usuario, la empresa y el rol de los claims del JWT de la petición.</summary>
 public class ContextoUsuarioHttp(IHttpContextAccessor accesor) : IContextoUsuario
 {
-    private ClaimsPrincipal? Principal => accesor.HttpContext?.User;
+    private ClaimsPrincipal? explicito;
+
+    private ClaimsPrincipal? Principal => explicito ?? accesor.HttpContext?.User;
+
+    /// <summary>Fija el usuario cuando no hay petición HTTP en curso (invocaciones de SignalR).</summary>
+    public void Usar(ClaimsPrincipal? usuario) => explicito = usuario;
 
     public bool Autenticado => Principal?.Identity?.IsAuthenticated == true;
     public Guid? IdUsuario => LeerGuid(Reclamos.IdUsuario);

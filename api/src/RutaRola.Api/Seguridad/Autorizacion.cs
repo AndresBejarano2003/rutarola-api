@@ -49,6 +49,17 @@ public static class Autorizacion
                 };
                 o.Events = new JwtBearerEvents
                 {
+                    // Los WebSockets del navegador no envían encabezados: SignalR manda el token en la URL
+                    // (los logs de peticiones no registran la query string).
+                    OnMessageReceived = contexto =>
+                    {
+                        if (contexto.HttpContext.Request.Path.StartsWithSegments("/hubs")
+                            && contexto.Request.Query["access_token"] is { Count: > 0 } token)
+                        {
+                            contexto.Token = token;
+                        }
+                        return Task.CompletedTask;
+                    },
                     // 401/403 también en ProblemDetails con `mensaje`.
                     OnChallenge = async contexto =>
                     {

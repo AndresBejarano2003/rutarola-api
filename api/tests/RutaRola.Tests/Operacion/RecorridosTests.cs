@@ -79,6 +79,21 @@ public class RecorridosTests(BaseDatosPrueba bd)
     }
 
     [Fact]
+    public async Task Un_recorrido_que_quedo_abierto_otro_dia_no_bloquea_el_de_hoy()
+    {
+        var e = await bd.EscenarioAsync(estudiantes: 1);
+        var ayer = await (await e.ClienteConductor.IniciarAsync(e.Asignacion.Id)).LeerAsync<RecorridoDto>(HttpStatusCode.Created);
+        await using (var db = bd.Contexto(null, modoSistema: true))
+        {
+            await db.ViajesRuta.Where(v => v.Id == ayer.Id).ExecuteUpdateAsync(x => x.SetProperty(v => v.FechaViaje, DatosOperacion.Hoy.AddDays(-1)));
+        }
+
+        var hoy = await (await e.ClienteConductor.IniciarAsync(e.Asignacion.Id, "ENTREGA")).LeerAsync<RecorridoDto>(HttpStatusCode.Created);
+        Assert.NotEqual(ayer.Id, hoy.Id);
+        Assert.Equal(DatosOperacion.Hoy, hoy.Fecha);
+    }
+
+    [Fact]
     public async Task Solo_inicia_quien_tiene_la_ruta_asignada_y_con_estudiantes_activos()
     {
         var e = await bd.EscenarioAsync(estudiantes: 1);

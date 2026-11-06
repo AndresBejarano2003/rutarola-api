@@ -72,6 +72,46 @@ public class RecorridosController(ServicioRecorridos servicio, IAuthorizationSer
     public Task<RecorridoDto> Reordenar(Guid id, SolicitudOrdenParadas solicitud, CancellationToken ct) =>
         servicio.ReordenarAsync(id, solicitud, ct);
 
+    // ---------- GPS (fase 5) ----------
+
+    /// <summary>
+    /// Lote de lecturas del teléfono del conductor o la monitora (máximo 500). Las repetidas o fuera del
+    /// periodo del recorrido se descartan; se aceptan después de finalizar las tomadas antes del fin (sin señal).
+    /// </summary>
+    [HttpPost("{id:guid}/gps")]
+    [RequierePermiso(Permisos.GpsReportar)]
+    public Task<ResultadoLoteGps> RegistrarGps(Guid id, SolicitudLoteGps solicitud, [FromServices] ServicioGps gps, CancellationToken ct) =>
+        gps.RegistrarAsync(id, solicitud, ct);
+
+    /// <summary>Última posición (204 si aún no hay). El acudiente solo la ve mientras el recorrido de su estudiante está en curso.</summary>
+    [HttpGet("{id:guid}/gps/ultima")]
+    [ProducesResponseType<PosicionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<ActionResult<PosicionDto?>> UltimaPosicion(Guid id, [FromServices] ServicioGps gps, CancellationToken ct)
+    {
+        if (await AlcanceGpsDe.ResolverAsync(autorizacion, User) is not { } alcance)
+        {
+            return Forbid();
+        }
+        return await gps.UltimaAsync(id, alcance, ct) is { } posicion ? posicion : NoContent();
+    }
+
+    /// <summary>Trayecto en orden (administrador o personal del recorrido); <c>desde</c> trae solo lo nuevo.</summary>
+    [HttpGet("{id:guid}/gps")]
+    public async Task<ActionResult<IReadOnlyList<PosicionDto>>> Trayecto(Guid id, [FromQuery] DateTime? desde, [FromServices] ServicioGps gps, CancellationToken ct)
+    {
+        if (await AlcanceGpsDe.ResolverAsync(autorizacion, User) is not { } alcance || alcance == AlcanceGps.Acudiente)
+        {
+            return Forbid();
+        }
+        return Ok(await gps.TrayectoAsync(id, alcance, desde, ct));
+    }
+
+    /// <summary>Recorridos en curso de la empresa con su última posición (mapa del administrador).</summary>
+    [HttpGet("en-curso")]
+    [RequierePermiso(Permisos.RecorridosLeer)]
+    public Task<IReadOnlyList<PosicionRecorridoDto>> EnCurso([FromServices] ServicioGps gps, CancellationToken ct) => gps.EnCursoAsync(ct);
+
     [HttpPost("{id:guid}/finalizar")]
     [RequierePermiso(Permisos.RecorridosOperar)]
     public Task<RecorridoDto> Finalizar(Guid id, SolicitudFinalizarRecorrido solicitud, CancellationToken ct) =>

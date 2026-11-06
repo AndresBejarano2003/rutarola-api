@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<ServicioRutas>();
         services.AddScoped<ServicioAsignaciones>();
         services.AddScoped<ServicioRecorridos>();
+        services.AddScoped<ServicioGps>();
         return services;
     }
 }

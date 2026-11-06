@@ -155,7 +155,24 @@ Todos con el contrato CRUD (ver Convenciones) y solo para el administrador de la
 
 Cada cambio actualiza `fechaActualizacion` (el compañero sincroniza comparándola) y registra un evento
 (INICIO, CAMBIO_PARADA, REORDEN, FINALIZACION). El índice único (asignación, fecha, trayecto) evita dos
-recorridos iguales si ambos inician a la vez: el segundo recibe el existente.
+recorridos iguales si ambos inician a la vez: el segundo recibe el existente. Solo puede haber uno EN_CURSO
+por asignación **y fecha** (migración `Fase5EnCursoPorFecha`): uno que quedó abierto otro día no bloquea el de hoy.
+
+## GPS y tiempo real (fase 5)
+
+| Petición | Quién | Respuesta |
+|---|---|---|
+| `POST /recorridos/{id}/gps {posiciones:[{latitud, longitud, velocidad?, rumbo?, fecha}]}` | Conductor o monitora del recorrido (`gps.reportar`) | `{recibidas, descartadas, ultima}`. Máximo 500 por lote; latitud −90…90, longitud −180…180, velocidad 0…300 km/h, rumbo 0…360. Se descartan las repetidas (misma `fecha`) y las que caen fuera de inicio − 5 min … fin + 5 min (un lote sin señal llega bien después de finalizar). `fecha` en ISO UTC. |
+| `GET /recorridos/{id}/gps/ultima` | Administrador, personal del recorrido o acudiente de uno de sus estudiantes | Última posición, o 204. El acudiente solo mientras el recorrido está EN_CURSO. |
+| `GET /recorridos/{id}/gps?desde=` | Administrador o personal | Trayecto en orden (máx. 5000 puntos); `desde` trae solo lo nuevo. |
+| `GET /recorridos/en-curso` | Administrador (`recorridos.leer`) | Recorridos EN_CURSO con conteo de paradas y última posición (mapa). |
+
+**Hub SignalR** `/hubs/recorridos` (protocolo JSON; el token va en `?access_token=` porque el WebSocket del
+navegador no envía encabezados, solo se lee en `/hubs` y los logs no registran la query string):
+`Seguir(recorridoId)` (mismo acceso que `gps/ultima`), `Dejar(recorridoId)`, `SeguirEmpresa()` (administrador).
+Eventos: `posicion` (`PosicionDto`) y `recorridoActualizado {recorridoId, fechaActualizacion}`. Los envía
+`IAvisosRecorrido` (`Api/TiempoReal`), que nunca hace fallar la petición. Con varias instancias del API hace
+falta un backplane (Redis o Azure SignalR); hoy es una sola instancia.
 
 ## Convenciones
 
@@ -256,6 +273,7 @@ Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
    conductores, acudientes y estudiantes; auditoría; datos demo; el frontend usa estos módulos y el login por HTTP.
 4. ✅ Operación: rutas, asignaciones (fecha fin opcional), recorridos de la Ruta del día (inicio/unión, paradas, orden,
    finalizar, eventos) e historial; el frontend usa estos módulos por HTTP.
-5. GPS: lotes de posiciones y última posición (SignalR preparado).
+5. ✅ GPS: lotes de posiciones, última posición, trayecto, mapa de recorridos en curso y hub SignalR
+   (`posicion`, `recorridoActualizado`); un recorrido abierto de otro día ya no bloquea el de hoy.
 6. Finanzas: facturas, recibos, cotizaciones, gastos, reportes, tablero.
 7. Comunicación: notificaciones, programaciones/envíos, registro de WhatsApp, portal.

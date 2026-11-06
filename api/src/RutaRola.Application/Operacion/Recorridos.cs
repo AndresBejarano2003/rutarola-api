@@ -79,7 +79,7 @@ public class ValidadorFinalizarRecorrido : AbstractValidator<SolicitudFinalizarR
 /// El empleado sale SIEMPRE del token: un conductor o monitora solo ve y modifica los recorridos de sus
 /// asignaciones (datos de menores). El conductor y la monitora comparten el mismo recorrido.
 /// </summary>
-public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, TimeProvider reloj)
+public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAvisosRecorrido avisos, TimeProvider reloj)
 {
     private static readonly Dictionary<EstadoParada, EstadoParada[]> Transiciones = new()
     {
@@ -155,7 +155,7 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, TimePr
         {
             return (existente, false);
         }
-        if (await db.ViajesRuta.AnyAsync(v => v.IdAsignacion == asignacion.Id && v.Estado == EstadoViaje.EnCurso, ct))
+        if (await db.ViajesRuta.AnyAsync(v => v.IdAsignacion == asignacion.Id && v.FechaViaje == hoy && v.Estado == EstadoViaje.EnCurso, ct))
         {
             throw new ErrorNegocio($"Hay un recorrido en curso en {ruta}. Finalízalo antes de iniciar otro.", CodigoError.Duplicado);
         }
@@ -225,6 +225,7 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, TimePr
             }
             throw;
         }
+        await AvisarAsync(viaje, ct);
         return (await ObtenerAsync(viaje.Id, ct), true);
     }
 
@@ -407,8 +408,15 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, TimePr
         // Marca el recorrido como modificado aunque solo cambien sus paradas (el compañero lo detecta por la fecha).
         viaje.FechaActualizacion = Ahora;
         await db.SaveChangesAsync(ct);
+        await AvisarAsync(viaje, ct);
         return await ObtenerAsync(id, ct);
     }
+
+    /// <summary>Aviso en tiempo real al compañero (hoy sincroniza consultando; el hub lo hace inmediato).</summary>
+    private Task AvisarAsync(ViajeRuta viaje, CancellationToken ct) =>
+        contexto.IdEmpresa is { } empresa
+            ? avisos.RecorridoActualizadoAsync(empresa, viaje.Id, viaje.FechaActualizacion ?? viaje.FechaCreacion, ct)
+            : Task.CompletedTask;
 
     private async Task<RecorridoDto?> BuscarDeHoyAsync(Guid idAsignacion, DateOnly fecha, Trayecto trayecto, CancellationToken ct)
     {

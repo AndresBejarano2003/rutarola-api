@@ -1546,11 +1546,6 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.HasKey("Id")
                         .HasName("pk_viajes_ruta");
 
-                    b.HasIndex("IdAsignacion")
-                        .IsUnique()
-                        .HasDatabaseName("ix_viajes_ruta_en_curso")
-                        .HasFilter("estado = 'EN_CURSO'");
-
                     b.HasIndex("IdConductor")
                         .HasDatabaseName("ix_viajes_ruta_id_conductor");
 
@@ -1565,6 +1560,11 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
 
                     b.HasIndex("IdVehiculo")
                         .HasDatabaseName("ix_viajes_ruta_id_vehiculo");
+
+                    b.HasIndex("IdAsignacion", "FechaViaje")
+                        .IsUnique()
+                        .HasDatabaseName("ix_viajes_ruta_en_curso")
+                        .HasFilter("estado = 'EN_CURSO'");
 
                     b.HasIndex("IdRuta", "FechaViaje")
                         .HasDatabaseName("ix_viajes_ruta_id_ruta_fecha_viaje");

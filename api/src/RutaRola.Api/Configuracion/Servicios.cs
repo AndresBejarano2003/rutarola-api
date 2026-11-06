@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using RutaRola.Api.Errores;
 using RutaRola.Api.Seguridad;
+using RutaRola.Api.TiempoReal;
+using RutaRola.Application.Operacion;
 using RutaRola.Application;
 using RutaRola.Application.Comun;
 using RutaRola.Infrastructure;
@@ -23,7 +25,10 @@ public static class Servicios
         services.AgregarAplicacion();
         services.AgregarInfraestructura();
         services.AddHttpContextAccessor();
-        services.AddScoped<IContextoUsuario, ContextoUsuarioHttp>();
+        services.AddScoped<ContextoUsuarioHttp>();
+        services.AddScoped<IContextoUsuario>(sp => sp.GetRequiredService<ContextoUsuarioHttp>());
+        services.AddSignalR().AddJsonProtocol(o => ConfigurarJson(o.PayloadSerializerOptions));
+        services.AddSingleton<IAvisosRecorrido, AvisosRecorridoSignalR>();
         services.AgregarSeguridad(builder.Configuration);
 
         services.AddControllers(o =>
@@ -42,7 +47,8 @@ public static class Servicios
         services.AddCors(o => o.AddPolicy(PoliticaCors, politica => politica
             .WithOrigins(OrigenesCors(builder.Configuration))
             .AllowAnyHeader()
-            .AllowAnyMethod()));
+            .AllowAnyMethod()
+            .AllowCredentials())); // El cliente de SignalR negocia con credenciales.
 
         // Detrás del proxy del hosting: IP real del cliente (sesiones, auditoría) y esquema https.
         services.Configure<ForwardedHeadersOptions>(o =>
@@ -108,6 +114,7 @@ public static class Servicios
             },
         }).AllowAnonymous();
         app.MapControllers();
+        app.MapHub<RecorridosHub>("/hubs/recorridos");
         return app;
     }
 
