@@ -146,6 +146,11 @@ public class ServicioEstudiantes(IBaseDatos db) : ServicioCrud<Estudiante, Estud
         {
             return $"No se puede eliminar: está en la ruta {string.Join(", ", rutas)}. Quítalo de la ruta o cámbialo a Inactivo.";
         }
+        var recorridos = await Db.ParadasViaje.CountAsync(p => p.IdEstudiante == id, ct);
+        if (recorridos > 0)
+        {
+            return $"No se puede eliminar: aparece en {recorridos} recorrido(s). Cámbialo a Inactivo para conservar el historial.";
+        }
         var facturas = await Db.Facturas.CountAsync(f => f.IdEstudiante == id, ct);
         return facturas > 0
             ? $"No se puede eliminar: tiene {facturas} factura(s) registradas. Cámbialo a Inactivo para conservar el historial."

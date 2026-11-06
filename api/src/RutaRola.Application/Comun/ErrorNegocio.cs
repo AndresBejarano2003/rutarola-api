@@ -25,5 +25,5 @@ public class ErrorNegocio(string mensaje, CodigoError codigo) : Exception(mensaj
     public CodigoError Codigo { get; } = codigo;
 
     public static ErrorNegocio NoEncontrado(string entidad = "El registro") =>
-        new($"{entidad} no existe o fue eliminado.", CodigoError.NoEncontrado);
+        new($"{entidad} no existe o fue {(entidad.StartsWith("La ") ? "eliminada" : "eliminado")}.", CodigoError.NoEncontrado);
 }

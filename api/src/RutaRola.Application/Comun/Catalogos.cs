@@ -10,6 +10,21 @@ public static class Catalogos
 
     public static readonly string[] Jornadas = ["Mañana", "Tarde", "Única"];
 
+    /// <summary>Orden en que se muestran las rutas del día.</summary>
+    public static readonly string[] OrdenJornadas = ["Mañana", "Única", "Tarde", "Noche"];
+
+    private static readonly string[] NombresGrados =
+        ["Primero", "Segundo", "Tercero", "Cuarto", "Quinto", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo", "Once"];
+
+    /// <summary><c>7°</c> → <c>7° · Séptimo</c> (nombre del catálogo <c>GRADOS</c>).</summary>
+    public static string NombreGrado(string grado)
+    {
+        var orden = OrdenGrado(grado);
+        return orden >= 2 ? $"{grado} · {NombresGrados[orden - 2]}" : grado;
+    }
+
+    public static int OrdenJornada(string jornada) => Array.IndexOf(OrdenJornadas, jornada) is var i and >= 0 ? i : OrdenJornadas.Length;
+
     public static readonly string[] CategoriasLicencia = ["B1", "B2", "B3", "C1", "C2", "C3"];
 
     /// <summary>Días antes del vencimiento en que un documento o licencia está "por vencer".</summary>

@@ -98,7 +98,8 @@ public class AsignacionRuta : EntidadEmpresa
     public Guid? IdMonitora { get; set; }
     public Empleado? Monitora { get; set; }
     public DateOnly FechaInicio { get; set; }
-    public DateOnly FechaFin { get; set; }
+    /// <summary>Null = indefinida.</summary>
+    public DateOnly? FechaFin { get; set; }
     public string? Observaciones { get; set; }
     public bool Activo { get; set; } = true;
 }

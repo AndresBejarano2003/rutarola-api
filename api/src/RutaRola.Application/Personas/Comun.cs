@@ -122,7 +122,9 @@ public class ServicioAcceso(IBaseDatos db, IPasswordHasher<Usuario> hasher, ICon
         var nombreUsuario = Texto.Usuario(solicitud.Usuario);
         var actual = idUsuario is { } id ? await db.Usuarios.FirstOrDefaultAsync(u => u.Id == id, ct) : null;
         var idActual = actual?.Id ?? Guid.Empty;
-        if (await db.Usuarios.AnyAsync(u => u.Id != idActual && (u.NombreUsuario == nombreUsuario || u.Email == nombreUsuario), ct))
+        // El usuario es único en TODO el sistema: se busca también en las otras empresas.
+        if (await db.Usuarios.IgnoreQueryFilters([FiltrosConsulta.Empresa])
+                .AnyAsync(u => u.Id != idActual && (u.NombreUsuario == nombreUsuario || u.Email == nombreUsuario), ct))
         {
             throw new ErrorNegocio($"El usuario \"{solicitud.Usuario!.Trim()}\" ya está en uso. Elige otro.", CodigoError.Duplicado);
         }

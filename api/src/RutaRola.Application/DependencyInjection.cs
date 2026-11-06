@@ -23,6 +23,9 @@ public static class DependencyInjection
         services.AddScoped<ServicioColegios>();
         services.AddScoped<ServicioVehiculos>();
         services.AddScoped<ServicioConductores>();
+        services.AddScoped<ServicioRutas>();
+        services.AddScoped<ServicioAsignaciones>();
+        services.AddScoped<ServicioRecorridos>();
         return services;
     }
 }

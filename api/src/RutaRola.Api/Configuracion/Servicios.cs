@@ -69,6 +69,7 @@ public static class Servicios
         opciones.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseUpper, allowIntegerValues: false));
         opciones.Converters.Add(new ConvertidorHora());
         opciones.Converters.Add(new ConvertidorFechaOpcional());
+        opciones.Converters.Add(new ConvertidorIdOpcional());
     }
 
     /// <summary><c>Cors:Origenes</c> como lista (<c>Cors__Origenes__0</c>…) o como texto separado por comas.</summary>

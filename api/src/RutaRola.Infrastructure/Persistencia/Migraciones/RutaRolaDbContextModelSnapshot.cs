@@ -844,7 +844,7 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_creacion");
 
-                    b.Property<DateOnly>("FechaFin")
+                    b.Property<DateOnly?>("FechaFin")
                         .HasColumnType("date")
                         .HasColumnName("fecha_fin");
 

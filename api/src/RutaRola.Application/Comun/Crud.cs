@@ -68,7 +68,7 @@ public abstract class ServicioCrud<TEntidad, TDto, TSolicitud, TFiltros>(IBaseDa
         return new ListaPaginada<TDto>(items, total, paginacion.PaginaValida, paginacion.TamanoValido);
     }
 
-    public async Task<IReadOnlyList<Opcion>> OpcionesAsync(TFiltros filtros, CancellationToken ct = default)
+    public virtual async Task<IReadOnlyList<Opcion>> OpcionesAsync(TFiltros filtros, CancellationToken ct = default)
     {
         var registros = await Ordenar(Filtrar(Conjunto.AsNoTracking(), filtros)).ToListAsync(ct);
         return registros.Select(r => new Opcion(r.Id, Etiqueta(r))).ToList();

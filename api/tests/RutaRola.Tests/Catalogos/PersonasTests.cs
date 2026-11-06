@@ -65,7 +65,7 @@ public class PersonasTests(BaseDatosPrueba bd)
         Assert.Equal($"El usuario \"{usuario.ToUpperInvariant()}\" ya está en uso. Elige otro.", await acudiente.MensajeErrorAsync(HttpStatusCode.Conflict));
 
         var enOtraEmpresa = await otra.Cliente.PostAsJsonAsync("/api/v1/empleados", DatosCatalogos.Empleado(usuario), ClienteApi.Json);
-        Assert.Equal(HttpStatusCode.Conflict, enOtraEmpresa.StatusCode);
+        Assert.Equal($"El usuario \"{usuario}\" ya está en uso. Elige otro.", await enOtraEmpresa.MensajeErrorAsync(HttpStatusCode.Conflict));
 
         var admin2 = await admin.Cliente.PostAsJsonAsync("/api/v1/acudientes", DatosCatalogos.Acudiente(otra.Empresa.UsuarioAdmin), ClienteApi.Json);
         Assert.Equal(HttpStatusCode.Conflict, admin2.StatusCode);

@@ -28,9 +28,11 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
         var hoy = Fechas.Hoy(reloj);
         var colegios = Colegios(empresa.Id);
         db.Colegios.AddRange(colegios.Values);
-        db.Vehiculos.AddRange(Vehiculos(empresa.Id, hoy));
+        var vehiculos = Vehiculos(empresa.Id, hoy).ToList();
+        db.Vehiculos.AddRange(vehiculos);
 
-        foreach (var e in Empleados(empresa.Id, hoy))
+        var empleados = Empleados(empresa.Id, hoy).ToList();
+        foreach (var e in empleados)
         {
             e.IdUsuario = Usuario(empresa.Id, e, roles[e.TipoEmpleado == TipoEmpleado.Conductor ? Roles.Conductor : Roles.Monitora], contrasena);
             db.Empleados.Add(e);
@@ -43,12 +45,36 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
             db.Acudientes.Add(a);
         }
 
+        var estudiantes = new List<Estudiante>();
         foreach (var (estudiante, acudiente, colegio) in Estudiantes(empresa.Id))
         {
             estudiante.IdColegio = colegios[colegio].Id;
             estudiante.Acudientes.Add(new EstudianteAcudiente { IdEstudiante = estudiante.Id, IdAcudiente = acudientes[acudiente].Id, EsPrincipal = true });
             db.Estudiantes.Add(estudiante);
+            estudiantes.Add(estudiante);
         }
+
+        // Rutas y asignaciones del frontend (rut-1..4, asg-1..3; R-04 sin asignar). Índices base 1 como est-N, veh-N, emp-N.
+        Ruta Ruta(string codigo, string nombre, string colegio, string jornada, string sector, params int[] est) => new()
+        {
+            IdEmpresa = empresa.Id, Codigo = codigo, Nombre = nombre, IdColegio = colegios[colegio].Id, Jornada = jornada, Sector = sector,
+            Estudiantes = est.Select((n, i) => new RutaEstudiante { IdEstudiante = estudiantes[n - 1].Id, OrdenRecogida = i + 1 }).ToList(),
+        };
+        var rutas = new[]
+        {
+            Ruta("R-01", "Norte", "col-5", "Mañana", "Cándido, Las Granjas, Santa Inés", 1, 2),
+            Ruta("R-02", "Centro", "col-1", "Mañana", "Centro, Altico, Quebrada Seca", 3, 12),
+            Ruta("R-03", "Sur", "col-2", "Tarde", "Timanco, Los Mártires, Limonar", 4, 5),
+            Ruta("R-04", "Oriente", "col-3", "Única", "Ipanema, Calixto, Alberto Galindo", 6, 7),
+        };
+        db.Rutas.AddRange(rutas);
+        AsignacionRuta Asignacion(int ruta, int vehiculo, int conductor, int monitora) => new()
+        {
+            IdEmpresa = empresa.Id, IdRuta = rutas[ruta - 1].Id, IdVehiculo = vehiculos[vehiculo - 1].Id,
+            IdConductor = empleados[conductor - 1].Id, IdMonitora = empleados[monitora - 1].Id,
+            FechaInicio = new DateOnly(hoy.Year, 2, 2), // Fecha fin vacía = indefinida: la demo sigue vigente.
+        };
+        db.AsignacionesRuta.AddRange(Asignacion(1, 1, 1, 6), Asignacion(2, 2, 2, 7), Asignacion(3, 3, 4, 8));
         return true;
     }
 

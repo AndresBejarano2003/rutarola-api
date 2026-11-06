@@ -50,8 +50,8 @@ de la empresa "RutaRola Demo".
 
 **Datos de ejemplo (solo desarrollo):** con `Seed:Demo:Habilitado` (activo en `appsettings.Development.json`)
 y `Seed__Demo__Password` (`SEED_DEMO_PASSWORD` en `.env`), el seed crea una vez los mismos datos del modo
-local del frontend: 5 colegios de Neiva con sus cursos, 5 vehículos, 8 empleados, 8 acudientes y 12
-estudiantes. Los empleados y acudientes ingresan con inicial del nombre + primer apellido (`jcardenas`
+local del frontend: 5 colegios de Neiva con sus cursos, 5 vehículos, 8 empleados, 8 acudientes, 12
+estudiantes, 4 rutas (R-01…R-04) y 3 asignaciones (R-04 sin asignar; fecha fin vacía = indefinida). Los empleados y acudientes ingresan con inicial del nombre + primer apellido (`jcardenas`
 conductor, `ycharry` monitora, `mperez` acudiente…) y esa contraseña. En la Opción B:
 `dotnet user-secrets --project src/RutaRola.Api set "Seed:Demo:Password" "<clave>"`.
 
@@ -133,6 +133,29 @@ Todos con el contrato CRUD (ver Convenciones) y solo para el administrador de la
 | `/acudientes` | `texto`, `estado` | Documento único; credenciales del portal; no se elimina con estudiantes a cargo o facturas. |
 | `/estudiantes` | `texto`, `acudienteId`, `colegioId`, `grado`, `estado` | Documento único; colegio y acudiente de la empresa (404); el grado debe ser un curso activo del colegio (422); `acudienteId` es el principal de `estudiantes_acudientes`; no se elimina si está en una ruta o tiene facturas. |
 | `GET /conductores` | `texto`, `licencia` (VIGENTE, POR_VENCER, VENCIDA), `asignacion` (CON, SIN), `estado` | Solo lectura: empleados conductores + estado de la licencia (30 días) + asignación activa. |
+
+## Operación (fase 4)
+
+| Recurso | Filtros | Reglas |
+|---|---|---|
+| `/rutas` | `texto` (código, nombre, sector), `colegioId`, `jornada`, `estado`, `estudianteId` | Código único sin distinguir mayúsculas (409); `estudianteIds` en orden de recogida (`rutas_estudiantes.orden_recogida`), del colegio de la ruta (422) y sin otra ruta activa de la misma jornada (422); no se elimina con asignaciones. |
+| `/asignaciones` | `rutaId`, `vehiculoId`, `empleadoId` (conductor o monitora), `estado` | `fechaFin` y `monitoraId` vacíos = sin fin / sin monitora. Si queda activa: ruta, vehículo y personal activos; tipo de empleado correcto; capacidad; licencia y documentos sin vencer (422); una activa por ruta y nadie (ni el vehículo) en dos rutas de la misma jornada (409). No se elimina con recorridos. |
+
+**Recorridos** (`/recorridos`, tablas `viajes_ruta` / `paradas_viaje` / `eventos`). El empleado sale del token:
+
+| Petición | Permiso | Respuesta |
+|---|---|---|
+| `GET /recorridos/del-dia?fecha=` | `recorridos.operar` | Asignaciones activas y vigentes del empleado (conductor o monitora) con ruta activa, su compañero y los recorridos de la fecha. |
+| `POST /recorridos {asignacionId, trayecto}` | `recorridos.operar` | 201 con el snapshot (ruta, colegio, vehículo, personal y estudiantes activos con su acudiente principal; ENTREGA al revés). 200 con el existente si el compañero ya lo inició. 409 si otro trayecto está EN_CURSO; 422 si la ruta no es suya hoy o no tiene estudiantes activos. |
+| `PATCH /recorridos/{id}/paradas {estudianteIds, estado}` | `recorridos.operar` | Transiciones PENDIENTE → A_BORDO/AUSENTE, A_BORDO → ENTREGADO/PENDIENTE, ENTREGADO → A_BORDO, AUSENTE → PENDIENTE, con hora (422 si no se permite o ya finalizó). |
+| `PUT /recorridos/{id}/orden {estudianteIds}` | `recorridos.operar` | Solo la monitora (o el conductor sin monitora, 403); la lista debe ser EXACTAMENTE las paradas por visitar (409). Guarda `ordenActualizado`. |
+| `POST /recorridos/{id}/finalizar {observaciones}` | `recorridos.operar` | 422 si queda alguien a bordo o pendiente. |
+| `GET /recorridos/{id}` | `recorridos.leer` o `.operar` | El administrador ve cualquiera de su empresa; el empleado solo los suyos (403). |
+| `GET /recorridos?texto&desde&hasta&rutaId&trayecto&estado&novedad` | `recorridos.leer` | Historial paginado, del más reciente al más antiguo; `novedad` = AUSENCIAS u OBSERVACIONES. |
+
+Cada cambio actualiza `fechaActualizacion` (el compañero sincroniza comparándola) y registra un evento
+(INICIO, CAMBIO_PARADA, REORDEN, FINALIZACION). El índice único (asignación, fecha, trayecto) evita dos
+recorridos iguales si ambos inician a la vez: el segundo recibe el existente.
 
 ## Convenciones
 
@@ -231,7 +254,8 @@ Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
 2. ✅ Auth (JWT 15 min + refresh rotativo), permisos por policy, empresas y configuración, aislamiento A/B por HTTP, interceptor en Angular.
 3. ✅ Catálogos: colegios (+cursos), vehículos (+documentos), empleados (+credenciales y contrato), vista de
    conductores, acudientes y estudiantes; auditoría; datos demo; el frontend usa estos módulos y el login por HTTP.
-4. Operación: rutas, asignaciones, recorridos, paradas, eventos.
+4. ✅ Operación: rutas, asignaciones (fecha fin opcional), recorridos de la Ruta del día (inicio/unión, paradas, orden,
+   finalizar, eventos) e historial; el frontend usa estos módulos por HTTP.
 5. GPS: lotes de posiciones y última posición (SignalR preparado).
 6. Finanzas: facturas, recibos, cotizaciones, gastos, reportes, tablero.
 7. Comunicación: notificaciones, programaciones/envíos, registro de WhatsApp, portal.
