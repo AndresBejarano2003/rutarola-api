@@ -48,6 +48,13 @@ dotnet run --project src/RutaRola.Api            # http://localhost:8080/docs
 Usuario demo: `admin` (o `admin@rutarola.com`) con la clave de `Seed__Admin__Password`, rol AdminEmpresa
 de la empresa "RutaRola Demo".
 
+**Datos de ejemplo (solo desarrollo):** con `Seed:Demo:Habilitado` (activo en `appsettings.Development.json`)
+y `Seed__Demo__Password` (`SEED_DEMO_PASSWORD` en `.env`), el seed crea una vez los mismos datos del modo
+local del frontend: 5 colegios de Neiva con sus cursos, 5 vehículos, 8 empleados, 8 acudientes y 12
+estudiantes. Los empleados y acudientes ingresan con inicial del nombre + primer apellido (`jcardenas`
+conductor, `ycharry` monitora, `mperez` acudiente…) y esa contraseña. En la Opción B:
+`dotnet user-secrets --project src/RutaRola.Api set "Seed:Demo:Password" "<clave>"`.
+
 ### Comandos frecuentes
 
 ```bash
@@ -73,6 +80,7 @@ dotnet run --project src/RutaRola.Api -- migrar
 | `Seed__Admin__Usuario`, `Seed__Admin__Email` | — | Por defecto `admin` / `admin@rutarola.com`. |
 | `Seed__SuperAdmin__Password` | — | Si se define, se crea `superadmin` (plataforma, sin empresa). |
 | `Seed__Empresa__Nombre`, `Seed__Empresa__Nit` | — | Empresa demo (por defecto "RutaRola Demo", `900000001-1`). |
+| `Seed__Demo__Habilitado`, `Seed__Demo__Password` | — | Datos de ejemplo y clave de sus usuarios. **Nunca en producción.** |
 | `BaseDatos__MigrarAlIniciar` | — | `true` aplica migraciones y seed al arrancar. **Se ignora en Production.** |
 | `Jwt__Clave` | sí | Clave HMAC para firmar los JWT, mínimo 32 caracteres (`openssl rand -base64 48`). El API no arranca sin ella. |
 | `Jwt__MinutosAcceso`, `Jwt__DiasRefresh` | — | Vida del access token (15) y del refresh token (30 días). |
@@ -90,7 +98,8 @@ en el hosting, sus variables de entorno.
    (en Render o Railway: "pre-deploy command" `dotnet RutaRola.Api.dll migrar`). Es idempotente.
 3. Arrancar el contenedor con las variables de entorno. Escucha en `$PORT`, confía en `X-Forwarded-For/Proto`
    del proxy del hosting y expone `GET /health` (200 si la BD responde, 503 si no) para el health check.
-4. En Netlify, el frontend apunta al API con `environment.prod.ts → apiUrl = https://<api>/api/v1` (fase 2).
+4. En el frontend: `src/environments/environment.ts` → `apiUrl = https://<api>/api/v1` y `usarApi: true`,
+   y agregar el dominio de Netlify a `Cors__Origenes` si cambia.
 
 ## Autenticación y permisos
 
@@ -112,6 +121,19 @@ en el hosting, sus variables de entorno.
   - Cada empresa ve y edita la suya en `/api/v1/empresas/actual`.
   - Su configuración está en `GET/PUT /api/v1/configuracion/{clave}`.
 
+## Catálogos (fase 3)
+
+Todos con el contrato CRUD (ver Convenciones) y solo para el administrador de la empresa (`<modulo>.leer` / `<modulo>.gestionar`).
+
+| Recurso | Filtros | Reglas (mismos mensajes que el modo local) |
+|---|---|---|
+| `/colegios` | `texto` (razón social, NIT), `estado` | NIT único por empresa sin contar el dígito de verificación (409); cursos por grado con salida posterior a la entrada; no se elimina con estudiantes o rutas. |
+| `/vehiculos` | `texto` (placa, interno, marca, línea), `tipo`, `estado` | Placa (`ABC123`, se normaliza) y número interno únicos (409); los cuatro vencimientos son filas de `documentos_vehiculo`; no se elimina con asignaciones. |
+| `/empleados` | `texto` (nombre, documento), `tipoEmpleado`, `estado` | Documento único; licencia obligatoria para conductores; contrato adjunto; credenciales; no se elimina con asignaciones. |
+| `/acudientes` | `texto`, `estado` | Documento único; credenciales del portal; no se elimina con estudiantes a cargo o facturas. |
+| `/estudiantes` | `texto`, `acudienteId`, `colegioId`, `grado`, `estado` | Documento único; colegio y acudiente de la empresa (404); el grado debe ser un curso activo del colegio (422); `acudienteId` es el principal de `estudiantes_acudientes`; no se elimina si está en una ruta o tiene facturas. |
+| `GET /conductores` | `texto`, `licencia` (VIGENTE, POR_VENCER, VENCIDA), `asignacion` (CON, SIN), `estado` | Solo lectura: empleados conductores + estado de la licencia (30 días) + asignación activa. |
+
 ## Convenciones
 
 - **Rutas:** `/api/v1/<recurso-en-plural-y-en-español>` en minúsculas (`/api/v1/estudiantes`,
@@ -119,12 +141,27 @@ en el hosting, sus variables de entorno.
 - **Contrato del frontend:** cada `RutaRolaApp/src/app/**/<plural>-http.ts` documenta el recurso, los filtros y
   las reglas 409/422. El API los respeta para que el frontend pase a modo HTTP cambiando solo
   `core/repositorios.ts`.
-  - CRUD: `GET /x?filtros&pagina&tamano` → `{ items, total, pagina, tamano }`, `GET /x/{id}`, `POST`,
-    `PUT /x/{id}`, `DELETE /x/{id}` y `GET /x/opciones?filtros` → `[{ id, nombre }]`.
+  - CRUD: `GET /x?filtros&pagina&tamano` → `{ items, total, pagina, tamano }`, `GET /x/{id}`, `POST` (201),
+    `PUT /x/{id}`, `DELETE /x/{id}` (204), `GET /x/opciones?filtros` → `[{ id, nombre }]` y
+    `GET /x/{id}/motivo-no-eliminar` → `{ motivo }` (null si se puede eliminar).
+  - Se implementa con `ServicioCrud<TEntidad, TDto, TSolicitud, TFiltros>` (Application/Comun/Crud.cs: filtrar,
+    ordenar, mapear, `AplicarAsync` con las reglas, `MotivoNoEliminarAsync`) y `ControladorCrud` en el API. Los
+    permisos se declaran con `[PermisosCrud(Permisos.XLeer, Permisos.XGestionar)]` (GET → leer; POST/PUT/DELETE → gestionar).
+  - `tamano` acepta números enormes (el frontend pide `Number.MAX_SAFE_INTEGER` para "todo") y se acota a 1000.
 - **DTOs siempre:** nunca se devuelve una entidad de EF. Los nombres de los DTOs son los del frontend
   (`acudienteId`, `valorContratacion`, `vencimientoSoat`…), aunque la columna se llame distinto.
 - **JSON:** camelCase; enums como texto `UPPER_SNAKE` (`EN_CURSO`, `A_BORDO`); fechas `YYYY-MM-DD`; horas `HH:mm`;
   periodos `YYYY-MM`; booleanos de estado como `"ACTIVO"`/`"INACTIVO"`; ids UUID como texto.
+  - Como los formularios del frontend, los textos opcionales vacíos van como `""` (no `null`) en ambos sentidos, y
+    una fecha opcional vacía es `""` (`ConvertidorFechaOpcional`).
+- **Adjuntos** (contrato del empleado…): `{ nombre, tipo, tamano, url }`. Al guardar, `url` en data URL (base64)
+  reemplaza el archivo; otra `url` lo conserva; `null` lo quita. Solo PDF o imagen, máximo 2 MB, en `archivos.contenido`.
+  Los listados devuelven `url` vacía; el detalle (`GET /x/{id}`) trae el data URL.
+- **Credenciales de empleados y acudientes:** `usuario` + `contrasena` crean o actualizan su fila de `usuarios` (rol
+  Conductor/Monitora según `tipoEmpleado`, o Acudiente). El usuario es único en todo el sistema (también frente a
+  correos de ingreso) → 409 `El usuario "x" ya está en uso. Elige otro.`; la contraseña es obligatoria al crear,
+  vacía al editar = se conserva, nunca se devuelve y cambiarla cierra las sesiones abiertas. Eliminar a la persona
+  libera el usuario.
 - **Búsquedas por texto:** sin tildes ni mayúsculas, como `normalizar()` del frontend.
   - Se escriben `FuncionesBd.SinTildes(columna).Contains(Busqueda.Normalizar(texto))`.
   - En SQL es la función `f_sin_tildes` (extensión `unaccent`, creada en la migración `Fase2Autenticacion`).
@@ -158,6 +195,10 @@ en el hosting, sus variables de entorno.
   - Contraseñas con `PasswordHasher` de ASP.NET Core Identity.
   - Refresh tokens: solo su hash en `sesiones_usuario`.
   - El log de peticiones no registra query strings ni cuerpos (datos de menores).
+- **Auditoría:** `RutaRolaDbContext` registra en `auditoria` cada creación, cambio y eliminación de estudiantes
+  (y su vínculo con acudientes), acudientes, empleados, usuarios, pagos y facturas: empresa, usuario, IP, valores
+  anteriores y nuevos (solo los campos que cambiaron) en jsonb. Nunca guarda el hash de la contraseña (solo
+  `"contrasena": "(cambiada)"`) ni el contenido de archivos; los cambios que solo tocan `ultimo_login` no se registran.
 
 ## Diferencias con el modelo de Lucidchart (`docs/modelo-bd-rutarola.json`)
 
@@ -188,7 +229,8 @@ Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
 
 1. ✅ Base: solución, entidades (36 tablas), configuraciones, migración `Inicial`, docker-compose, seed, health, errores, logs, OpenAPI.
 2. ✅ Auth (JWT 15 min + refresh rotativo), permisos por policy, empresas y configuración, aislamiento A/B por HTTP, interceptor en Angular.
-3. Catálogos: colegios, vehículos, empleados/conductores, acudientes, estudiantes (+ auditoría).
+3. ✅ Catálogos: colegios (+cursos), vehículos (+documentos), empleados (+credenciales y contrato), vista de
+   conductores, acudientes y estudiantes; auditoría; datos demo; el frontend usa estos módulos y el login por HTTP.
 4. Operación: rutas, asignaciones, recorridos, paradas, eventos.
 5. GPS: lotes de posiciones y última posición (SignalR preparado).
 6. Finanzas: facturas, recibos, cotizaciones, gastos, reportes, tablero.

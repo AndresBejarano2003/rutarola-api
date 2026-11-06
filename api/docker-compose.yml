@@ -30,6 +30,8 @@ services:
       Jwt__Clave: ${JWT_CLAVE:?Define JWT_CLAVE en api/.env (mínimo 32 caracteres)}
       Seed__Admin__Password: ${SEED_ADMIN_PASSWORD:-}
       Seed__SuperAdmin__Password: ${SEED_SUPERADMIN_PASSWORD:-}
+      # Datos de ejemplo (colegios, vehículos, personas) con usuarios demo jcardenas, mperez…
+      Seed__Demo__Password: ${SEED_DEMO_PASSWORD:-}
     ports:
       - "8080:8080"
 

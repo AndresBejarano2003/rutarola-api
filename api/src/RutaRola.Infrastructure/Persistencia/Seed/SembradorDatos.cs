@@ -12,6 +12,7 @@ namespace RutaRola.Infrastructure.Persistencia.Seed;
 /// - permisos y roles base, con <c>roles_permisos</c> sincronizado con <see cref="Permisos.PorRol"/>;
 /// - empresa demo y su configuración por defecto;
 /// - administrador demo (<c>Seed:Admin:*</c>) y SuperAdmin opcional (<c>Seed:SuperAdmin:*</c>).
+/// - datos de ejemplo (<see cref="DatosDemo"/>) si <c>Seed:Demo:Habilitado</c> (solo Development/compose).
 /// Las contraseñas SOLO vienen de variables de entorno / user-secrets; si faltan, ese usuario no se crea.
 /// Nunca cambia la contraseña de un usuario que ya existe.
 /// </summary>
@@ -19,6 +20,7 @@ public class SembradorDatos(
     RutaRolaDbContext db,
     IPasswordHasher<Usuario> hasher,
     IConfiguration configuracion,
+    TimeProvider reloj,
     ILogger<SembradorDatos> logger)
 {
     private static readonly Dictionary<string, string> DescripcionRoles = new()
@@ -37,7 +39,26 @@ public class SembradorDatos(
         var empresa = await SembrarEmpresaDemoAsync(ct);
         await SembrarUsuarioAsync("Admin", roles[Roles.AdminEmpresa], empresa.Id, "Administrador demo", ct);
         await SembrarUsuarioAsync("SuperAdmin", roles[Roles.SuperAdmin], null, "Super administrador", ct);
+        await SembrarDemoAsync(empresa, roles, ct);
         await db.SaveChangesAsync(ct);
+    }
+
+    private async Task SembrarDemoAsync(Empresa empresa, IReadOnlyDictionary<string, Rol> roles, CancellationToken ct)
+    {
+        var seccion = configuracion.GetSection("Seed:Demo");
+        if (!seccion.GetValue("Habilitado", false))
+        {
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(seccion["Password"]))
+        {
+            logger.LogWarning("No se crearon los datos demo: falta Seed__Demo__Password (variable de entorno o user-secrets).");
+            return;
+        }
+        if (await new DatosDemo(db, hasher, reloj).SembrarAsync(empresa, roles, seccion["Password"]!, ct))
+        {
+            logger.LogInformation("Datos demo creados en {Empresa}", empresa.Nombre);
+        }
     }
 
     private async Task<Dictionary<string, Rol>> SembrarRolesYPermisosAsync(CancellationToken ct)

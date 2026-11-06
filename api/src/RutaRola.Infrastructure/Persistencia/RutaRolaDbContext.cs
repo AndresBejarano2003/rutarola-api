@@ -1,10 +1,14 @@
 using System.Linq.Expressions;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using RutaRola.Application.Comun;
 using RutaRola.Domain.Comun;
 using RutaRola.Domain.Comunicacion;
+using RutaRola.Domain.Enums;
 using RutaRola.Domain.Finanzas;
 using RutaRola.Domain.Operacion;
 using RutaRola.Domain.Personas;
@@ -165,6 +169,90 @@ public class RutaRolaDbContext(
     private void PrepararCambios()
     {
         var ahora = reloj.GetUtcNow().UtcDateTime;
+        AsignarEmpresaYFechas(ahora);
+        RegistrarAuditoria(ahora);
+    }
+
+    /// <summary>Tablas cuyas creaciones, cambios y eliminaciones quedan en <c>auditoria</c>.</summary>
+    private static readonly HashSet<Type> Auditadas =
+        [typeof(Estudiante), typeof(EstudianteAcudiente), typeof(Acudiente), typeof(Empleado), typeof(Usuario), typeof(Pago), typeof(Factura)];
+
+    /// <summary>Campos que no se copian a la auditoría (técnicos o secretos).</summary>
+    private static readonly HashSet<string> NoAuditados =
+        [nameof(Entidad.FechaCreacion), nameof(Entidad.FechaActualizacion), nameof(Usuario.UltimoLogin), nameof(Usuario.PasswordHash), "Version"];
+
+    private static readonly JsonSerializerOptions JsonAuditoria = new()
+    {
+        DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseUpper) },
+    };
+
+    private void RegistrarAuditoria(DateTime ahora)
+    {
+        var registros = new List<Auditoria>();
+        foreach (var entrada in ChangeTracker.Entries())
+        {
+            if (entrada.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                || !Auditadas.Contains(entrada.Metadata.ClrType))
+            {
+                continue;
+            }
+
+            var campos = entrada.Properties.Where(p => !NoAuditados.Contains(p.Metadata.Name)).ToList();
+            var claveCambiada = entrada.State == EntityState.Modified
+                && entrada.Properties.Any(p => p.Metadata.Name == nameof(Usuario.PasswordHash) && p.IsModified && !Equals(p.OriginalValue, p.CurrentValue));
+            if (entrada.State == EntityState.Modified)
+            {
+                campos = campos.Where(p => p.IsModified && !Equals(p.OriginalValue, p.CurrentValue)).ToList();
+                if (campos.Count == 0 && !claveCambiada)
+                {
+                    continue; // p. ej. solo cambió ultimo_login.
+                }
+            }
+
+            var anterior = entrada.State == EntityState.Added ? null : Valores(campos, original: true);
+            var nuevo = entrada.State == EntityState.Deleted ? null : Valores(campos, original: false);
+            if (claveCambiada)
+            {
+                nuevo!["contrasena"] = "(cambiada)";
+            }
+
+            registros.Add(new Auditoria
+            {
+                IdEmpresa = entrada.Entity switch
+                {
+                    IEntidadEmpresa e => e.IdEmpresa,
+                    Usuario u => u.IdEmpresa,
+                    _ => contexto.IdEmpresa,
+                },
+                IdUsuario = contexto.IdUsuario,
+                Accion = entrada.State switch
+                {
+                    EntityState.Added => AccionAuditoria.Crear,
+                    EntityState.Deleted => AccionAuditoria.Eliminar,
+                    _ => AccionAuditoria.Actualizar,
+                },
+                TablaAfectada = entrada.Metadata.GetTableName() ?? entrada.Metadata.ClrType.Name,
+                IdRegistro = entrada.Entity switch
+                {
+                    Entidad e => e.Id,
+                    EstudianteAcudiente ea => ea.IdEstudiante,
+                    _ => Guid.Empty,
+                },
+                ValorAnterior = anterior is null ? null : JsonSerializer.Serialize(anterior, JsonAuditoria),
+                ValorNuevo = nuevo is null ? null : JsonSerializer.Serialize(nuevo, JsonAuditoria),
+                FechaAccion = ahora,
+                DireccionIp = contexto.DireccionIp,
+            });
+        }
+        Auditoria.AddRange(registros);
+    }
+
+    private static Dictionary<string, object?> Valores(IEnumerable<PropertyEntry> campos, bool original) =>
+        campos.ToDictionary(p => p.Metadata.Name, p => original ? p.OriginalValue : p.CurrentValue);
+
+    private void AsignarEmpresaYFechas(DateTime ahora)
+    {
 
         foreach (var entrada in ChangeTracker.Entries())
         {

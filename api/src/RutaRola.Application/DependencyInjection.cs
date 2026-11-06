@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using RutaRola.Application.Autenticacion;
 using RutaRola.Application.Configuracion;
 using RutaRola.Application.Empresas;
+using RutaRola.Application.Operacion;
+using RutaRola.Application.Personas;
 
 namespace RutaRola.Application;
 
@@ -14,6 +16,13 @@ public static class DependencyInjection
         services.AddScoped<ServicioAutenticacion>();
         services.AddScoped<ServicioEmpresas>();
         services.AddScoped<ServicioConfiguracion>();
+        services.AddScoped<ServicioAcceso>();
+        services.AddScoped<ServicioEmpleados>();
+        services.AddScoped<ServicioAcudientes>();
+        services.AddScoped<ServicioEstudiantes>();
+        services.AddScoped<ServicioColegios>();
+        services.AddScoped<ServicioVehiculos>();
+        services.AddScoped<ServicioConductores>();
         return services;
     }
 }
