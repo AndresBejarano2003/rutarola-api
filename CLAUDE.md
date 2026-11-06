@@ -6,7 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 RutaRola is a school-transport management system (students, guardians, employees, finance, routes/vehicles). The UI and domain vocabulary are in Spanish — keep new routes, labels, and file names in Spanish to match.
 
-- `RutaRolaApp/` — Angular 21 frontend with its **own git repo** (`RutaRolaApp/.git`, GitHub → Netlify, https://rutarola.netlify.app). The root `RutaRola/` repo versions `api/`, `docs/` and docs, and ignores `RutaRolaApp/`. Never commit (in either repo) until the user asks.
+- **Two git repos.**
+  - `RutaRolaApp/` is the Angular 21 frontend, GitHub **`rutarola-web`** (`RutaRolaApp/.git`, `main` deploys to Netlify, https://rutarola.netlify.app). API integration work goes on a feature branch, never directly on `main`.
+  - The root `RutaRola/` folder is GitHub **`rutarola-api`**. It versions `api/`, `docs/`, `assets/` and these docs, and ignores `RutaRolaApp/`.
+  - Commit each to its own repo. During the backend phases, commit per verified phase; otherwise only when the user asks. Never push.
 - `api/` — ASP.NET Core backend (.NET 10 + PostgreSQL). See **Backend** below and `api/README.md`.
 - `db/` — unused: the schema lives in the EF Core migrations.
 - `docs/`, `assets/` — design docs (Apple Pages files), logos, UI images.
