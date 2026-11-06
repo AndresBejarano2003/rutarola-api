@@ -1,0 +1,13 @@
+# El frontend tiene su propio repositorio (GitHub → Netlify)
+RutaRolaApp/
+
+.DS_Store
+.vscode/
+.idea/
+
+# .NET
+bin/
+obj/
+*.user
+TestResults/
+api/.env

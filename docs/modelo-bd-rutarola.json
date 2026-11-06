@@ -1,0 +1,3165 @@
+{
+    "id": "3ed5a6e1-17c1-4c4d-8bb2-5b4d2e5cbaa1",
+    "title": "Modelo relacional BD RutaRola",
+    "product": "lucidchart",
+    "pages": [
+        {
+            "id": "0_0",
+            "title": "Página 1",
+            "index": 0,
+            "items": {
+                "shapes": [
+                    {
+                        "id": "hJdDZnKnoBIY",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "facturas"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_factura PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_estudiante FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "numero_factura"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "valor_total"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "fecha_emision"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "DATE"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "fecha_vencimiento"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "DATE"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field9",
+                                "text": "url_pdf"
+                            },
+                            {
+                                "label": "Type9",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "fJdDLbQ0Aedw",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "empresas"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_empresa PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "nombre"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "nit"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "direccion"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "ciudad"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "telefono"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "email"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "logo_url"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field9",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type9",
+                                "text": "BIT"
+                            },
+                            {
+                                "label": "Field10",
+                                "text": "fecha_creacion"
+                            },
+                            {
+                                "label": "Type10",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "fJdDSezoTyAQ",
+                        "class": "RectangleContainerBlock",
+                        "textAreas": [
+                            {
+                                "label": "FloatingTitle",
+                                "text": "Diagrama ERD de Base de Datos Escolar"
+                            },
+                            {
+                                "label": "Text",
+                                "text": ""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [],
+                        "contains": {
+                            "shapes": [
+                                "fJdDLbQ0Aedw",
+                                "fJdDS.KS~lbU",
+                                "fJdDaOZKpgc~",
+                                "gJdDCUozXDX~",
+                                "gJdDG2xYl7QF",
+                                "gJdDQ4qhiz7P",
+                                "gJdDR9ky1zNM",
+                                "gJdDUe-M6KbO",
+                                "gJdDWGD5f707",
+                                "gJdDWmKRwAWf",
+                                "gJdD_P-gvJfM",
+                                "gJdDhFe0V-x0",
+                                "gJdDlleQOqeF",
+                                "gJdDok4zgp_i",
+                                "gJdDzQNV-0BH",
+                                "hJdD1V2.YSHk",
+                                "hJdDBPNO81zO",
+                                "hJdDFX-SqH_q",
+                                "hJdDLIXA8hTG",
+                                "hJdDWIRued6C",
+                                "hJdDX9BE3NrN",
+                                "hJdDZnKnoBIY",
+                                "hJdD_9..g~V7",
+                                "hJdDefSBm1fb",
+                                "hJdDgfKgOneN",
+                                "hJdDmFDCo3F0",
+                                "hJdDt4UIJm7S"
+                            ],
+                            "lines": [
+                                "hJdD-F-AmT_n",
+                                "hJdD.8WbaVNP",
+                                "hJdD24TGMRSM",
+                                "hJdD8FtYW9RM",
+                                "hJdD9j3d.u~a",
+                                "hJdDB~8_RbS1",
+                                "hJdDDRQvx8dg",
+                                "hJdDDt-Fqm5I",
+                                "hJdDEtsRzBRB",
+                                "hJdDGYb_54Gk",
+                                "hJdDHj3smcV3",
+                                "hJdDIyKqAZ6H",
+                                "hJdDJiRF0c3b",
+                                "hJdDM3tDPztB",
+                                "hJdDPiLQZTyO",
+                                "hJdDQ3y8ZHkd",
+                                "hJdDSpAmpUG6",
+                                "hJdDT-d_kgz4",
+                                "hJdDUFC1IKh0",
+                                "hJdDUm.48FMF",
+                                "hJdDWZ7.Xs-b",
+                                "hJdDXkT~BPkH",
+                                "hJdD_RBiDiqR",
+                                "hJdDb9MJtq16",
+                                "hJdDbKlTbDQa",
+                                "hJdDbcyEJkqg",
+                                "hJdDc9PAHZ7~",
+                                "hJdDhTekoeir",
+                                "hJdDinycGka8",
+                                "hJdDjeik.cQs",
+                                "hJdDpPu-EegV",
+                                "hJdDsguS65UZ",
+                                "hJdDulBOLq9P",
+                                "hJdDvT87ZAKg",
+                                "hJdDvdRvr9J-",
+                                "hJdDvnRx29uI",
+                                "hJdDxyUr92Ly",
+                                "hJdD~RC9S0yI"
+                            ],
+                            "groups": []
+                        }
+                    },
+                    {
+                        "id": "gJdDWGD5f707",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "viajes_ruta"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_viaje PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_ruta FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "fecha_viaje"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "DATE"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "id_conductor"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "id_vehiculo"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "hora_inicio"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "DATETIME"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "hora_fin"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "DATETIME"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdDR9ky1zNM",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "paradas_viaje"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_parada PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_viaje FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_estudiante FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "orden_recogida"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "hora_recogida"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "DATETIME"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "hora_entrega"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "DATETIME"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "foto_url"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field9",
+                                "text": "notas"
+                            },
+                            {
+                                "label": "Type9",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdDCUozXDX~",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "roles_permisos"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_rol_permiso PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_rol FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_permiso FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdDt4UIJm7S",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "gps_vehiculos"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_gps PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_vehiculo FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_viaje FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "latitud"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "longitud"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "velocidad"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "direccion"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "fecha_registro"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdDQ4qhiz7P",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "rutas"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_ruta PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_vehiculo FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "id_conductor FK"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "nombre"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "tipo_ruta"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "hora_inicio_manana"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "TIME"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "hora_inicio_tarde"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "TIME"
+                            },
+                            {
+                                "label": "Field9",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type9",
+                                "text": "BIT"
+                            },
+                            {
+                                "label": "Field10",
+                                "text": "fecha_creacion"
+                            },
+                            {
+                                "label": "Type10",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdDG2xYl7QF",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "colegios"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_colegio PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "nombre"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "direccion"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "latitud"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "longitud"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "telefono"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "persona_contacto"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdD1V2.YSHk",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "mensajes_whatsapp"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_mensaje PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_estudiante FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_acudiente FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "telefono"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "mensaje"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "fecha_envio"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "DATETIME"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "respuesta"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdDgfKgOneN",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "facturas_detalle"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_detalle PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_factura FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "descripcion"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "cantidad"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "precio_unitario"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "total"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "DECIMAL"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "fJdDS.KS~lbU",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "roles"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_rol PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "nombre"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "descripcion"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdDFX-SqH_q",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "eventos"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_evento PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_viaje FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "tipo_evento"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "descripcion"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "fecha_evento"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdD_P-gvJfM",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "vehiculos"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_vehiculo PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "placa"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "marca"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "modelo"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "anio"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "capacidad"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "color"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field9",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type9",
+                                "text": "BIT"
+                            },
+                            {
+                                "label": "Field10",
+                                "text": "fecha_creacion"
+                            },
+                            {
+                                "label": "Type10",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdDok4zgp_i",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "usuarios"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_usuario PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_rol FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "nombre"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "email"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "telefono"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "password_hash"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "BIT"
+                            },
+                            {
+                                "label": "Field9",
+                                "text": "ultimo_login"
+                            },
+                            {
+                                "label": "Type9",
+                                "text": "DATETIME"
+                            },
+                            {
+                                "label": "Field10",
+                                "text": "fecha_creacion"
+                            },
+                            {
+                                "label": "Type10",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdDzQNV-0BH",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "conductores"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_conductor PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_usuario FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "numero_licencia"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "fecha_vencimiento_licencia"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "DATE"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "telefono"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "BIT"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "fecha_creacion"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdDBPNO81zO",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "configuracion_sistema"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_configuracion PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "clave"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "valor"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdDmFDCo3F0",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "notificaciones"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_notificacion PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_usuario FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "titulo"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "mensaje"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "tipo"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "fecha_creacion"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdDX9BE3NrN",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "archivos"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_archivo PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "tipo_archivo"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "url_archivo"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "subido_por"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "fecha_creacion"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdDWmKRwAWf",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "estudiantes"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_estudiante PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_acudiente FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "id_colegio FK"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "nombres"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "apellidos"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "fecha_nacimiento"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "DATE"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "direccion"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field9",
+                                "text": "latitud"
+                            },
+                            {
+                                "label": "Type9",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field10",
+                                "text": "longitud"
+                            },
+                            {
+                                "label": "Type10",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field11",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type11",
+                                "text": "BIT"
+                            },
+                            {
+                                "label": "Field12",
+                                "text": "fecha_creacion"
+                            },
+                            {
+                                "label": "Type12",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdDlleQOqeF",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "documentos_vehiculo"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_documento PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_vehiculo FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "tipo_documento"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "numero_documento"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "fecha_vencimiento"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "DATE"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "url_archivo"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdDLIXA8hTG",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "gastos"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_gasto PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_vehiculo FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "categoria"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "descripcion"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "valor"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "fecha_gasto"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "DATE"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "creado_por"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "INT"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdDUe-M6KbO",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "rutas_estudiantes"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_ruta_estudiante PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_ruta FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_estudiante FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "orden_recogida"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "hora_recogida_estimada"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "TIME"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "hora_llegada_estimada"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "TIME"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "BIT"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdD_9..g~V7",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "sesiones_usuario"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_sesion PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_usuario FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "token"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "direccion_ip"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "dispositivo"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "fecha_creacion"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "DATETIME"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "fecha_expiracion"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdDWIRued6C",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "auditoria"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_auditoria PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_usuario FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "accion"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "tabla_afectada"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "id_registro"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "valor_anterior"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "valor_nuevo"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "fecha_accion"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "DATETIME"
+                            },
+                            {
+                                "label": "Field9",
+                                "text": "direccion_ip"
+                            },
+                            {
+                                "label": "Type9",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "fJdDaOZKpgc~",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "permisos"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_permiso PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "nombre"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "descripcion"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gJdDhFe0V-x0",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "acudientes"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_acudiente PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "nombre"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "telefono"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "email"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "direccion"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "parentesco"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "fecha_creacion"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "DATETIME"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    },
+                    {
+                        "id": "hJdDefSBm1fb",
+                        "class": "ERDEntityBlock3",
+                        "textAreas": [
+                            {
+                                "label": "Name",
+                                "text": "pagos"
+                            },
+                            {
+                                "label": "Field1",
+                                "text": "id_pago PK"
+                            },
+                            {
+                                "label": "Type1",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field2",
+                                "text": "id_empresa FK"
+                            },
+                            {
+                                "label": "Type2",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field3",
+                                "text": "id_estudiante FK"
+                            },
+                            {
+                                "label": "Type3",
+                                "text": "INT"
+                            },
+                            {
+                                "label": "Field4",
+                                "text": "valor"
+                            },
+                            {
+                                "label": "Type4",
+                                "text": "DECIMAL"
+                            },
+                            {
+                                "label": "Field5",
+                                "text": "fecha_pago"
+                            },
+                            {
+                                "label": "Type5",
+                                "text": "DATE"
+                            },
+                            {
+                                "label": "Field6",
+                                "text": "metodo_pago"
+                            },
+                            {
+                                "label": "Type6",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field7",
+                                "text": "estado"
+                            },
+                            {
+                                "label": "Type7",
+                                "text": "NVARCHAR"
+                            },
+                            {
+                                "label": "Field8",
+                                "text": "numero_referencia"
+                            },
+                            {
+                                "label": "Type8",
+                                "text": "NVARCHAR"
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": [
+                            {
+                                "collectionId": null,
+                                "data": [
+                                    {
+                                        "key": "SpreadsheetRowParentKey",
+                                        "value": "ROW"
+                                    },
+                                    {
+                                        "key": "SpreadsheetColumnParentKey",
+                                        "value": "COLUMN"
+                                    }
+                                ],
+                                "primaryKeyValue": "\"192d0e9f-2f5a-4032-9f03-59bbf1ea5891\""
+                            }
+                        ]
+                    }
+                ],
+                "lines": [
+                    {
+                        "id": "hJdDSpAmpUG6",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDS.KS~lbU"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDCUozXDX~"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_rol\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDvdRvr9J-",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdD_P-gvJfM"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDLIXA8hTG"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_vehiculo\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDUm.48FMF",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDzQNV-0BH"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDM3tDPztB",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDZnKnoBIY"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDWZ7.Xs-b",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDWmKRwAWf"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDZnKnoBIY"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_estudiante\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDbKlTbDQa",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDWmKRwAWf"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDR9ky1zNM"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_estudiante\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDsguS65UZ",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDok4zgp_i"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDWIRued6C"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_usuario\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDB~8_RbS1",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDWmKRwAWf"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDefSBm1fb"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_estudiante\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDhTekoeir",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDefSBm1fb"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDjeik.cQs",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDhFe0V-x0"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdD1V2.YSHk"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_acudiente\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDUFC1IKh0",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDG2xYl7QF"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDWmKRwAWf"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_colegio\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDulBOLq9P",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDok4zgp_i"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDzQNV-0BH"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_usuario\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdD~RC9S0yI",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDhFe0V-x0"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDWmKRwAWf"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_acudiente\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDPiLQZTyO",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "hJdDZnKnoBIY"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDgfKgOneN"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_factura\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDinycGka8",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDQ4qhiz7P"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDb9MJtq16",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDWmKRwAWf"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdD1V2.YSHk"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_estudiante\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDQ3y8ZHkd",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDLIXA8hTG"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDpPu-EegV",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDok4zgp_i"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDc9PAHZ7~",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDWGD5f707"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDR9ky1zNM"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_viaje\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdD_RBiDiqR",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDok4zgp_i"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDmFDCo3F0"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_usuario\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDDt-Fqm5I",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDWmKRwAWf"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdD-F-AmT_n",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdD_P-gvJfM"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDQ4qhiz7P"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_vehiculo\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDIyKqAZ6H",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdD_P-gvJfM"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDt4UIJm7S"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_vehiculo\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDJiRF0c3b",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDQ4qhiz7P"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDWGD5f707"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_ruta\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDGYb_54Gk",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDWmKRwAWf"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDUe-M6KbO"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_estudiante\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDXkT~BPkH",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDWGD5f707"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDt4UIJm7S"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_viaje\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDvnRx29uI",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDBPNO81zO"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDEtsRzBRB",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDzQNV-0BH"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDQ4qhiz7P"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_conductor\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdD8FtYW9RM",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDhFe0V-x0"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDHj3smcV3",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDaOZKpgc~"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDCUozXDX~"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_permiso\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDbcyEJkqg",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDok4zgp_i"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdD_9..g~V7"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_usuario\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdD24TGMRSM",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDQ4qhiz7P"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDUe-M6KbO"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_ruta\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdD.8WbaVNP",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDX9BE3NrN"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdD9j3d.u~a",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdDWGD5f707"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "hJdDFX-SqH_q"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_viaje\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDxyUr92Ly",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDS.KS~lbU"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDok4zgp_i"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_rol\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDvT87ZAKg",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdD_P-gvJfM"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDDRQvx8dg",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "gJdD_P-gvJfM"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDlleQOqeF"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_vehiculo\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    },
+                    {
+                        "id": "hJdDT-d_kgz4",
+                        "endpoint1": {
+                            "style": "CFN ERD Exactly One Arrow",
+                            "connectedTo": "fJdDLbQ0Aedw"
+                        },
+                        "endpoint2": {
+                            "style": "CFN ERD Zero Or More Arrow",
+                            "connectedTo": "gJdDG2xYl7QF"
+                        },
+                        "textAreas": [
+                            {
+                                "label": "t0",
+                                "text": "\"id_empresa\""
+                            }
+                        ],
+                        "customData": [],
+                        "linkedData": []
+                    }
+                ],
+                "groups": [],
+                "layers": []
+            },
+            "customData": [],
+            "linkedData": []
+        }
+    ],
+    "data": {
+        "collections": []
+    },
+    "accountId": 150099716
+}
