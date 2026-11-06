@@ -2256,6 +2256,12 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("character varying(128)")
                         .HasColumnName("token_hash");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id")
                         .HasName("pk_sesiones_usuario");
 

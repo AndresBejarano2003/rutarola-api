@@ -27,6 +27,7 @@ services:
       PORT: 8080
       ConnectionStrings__RutaRola: Host=db;Port=5432;Database=rutarola;Username=rutarola;Password=${POSTGRES_PASSWORD}
       BaseDatos__MigrarAlIniciar: "true"
+      Jwt__Clave: ${JWT_CLAVE:?Define JWT_CLAVE en api/.env (mínimo 32 caracteres)}
       Seed__Admin__Password: ${SEED_ADMIN_PASSWORD:-}
       Seed__SuperAdmin__Password: ${SEED_SUPERADMIN_PASSWORD:-}
     ports:

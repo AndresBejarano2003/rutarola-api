@@ -27,6 +27,7 @@ public class FabricaDisenio : IDesignTimeDbContextFactory<RutaRolaDbContext>
         public string? Rol => null;
         public Guid? IdEmpleado => null;
         public Guid? IdAcudiente => null;
+        public Guid? IdSesion => null;
         public string? DireccionIp => null;
     }
 }

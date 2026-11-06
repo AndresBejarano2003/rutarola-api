@@ -43,7 +43,7 @@ public static class Observabilidad
     /// <summary>Documentación interactiva en <c>/docs</c> (solo fuera de producción).</summary>
     public static WebApplication MapScalarApiReferenceRutaRola(this WebApplication app)
     {
-        app.MapScalarApiReference("/docs", o => o.WithTitle("RutaRola API"));
+        app.MapScalarApiReference("/docs", o => o.WithTitle("RutaRola API")).AllowAnonymous();
         return app;
     }
 }

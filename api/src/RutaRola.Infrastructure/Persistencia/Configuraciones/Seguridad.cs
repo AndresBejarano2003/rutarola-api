@@ -80,6 +80,7 @@ internal class SesionUsuarioConfig : IEntityTypeConfiguration<SesionUsuario>
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id_sesion").ValueGeneratedNever();
         b.Property(x => x.TokenHash).HasMaxLength(128);
+        b.Property(x => x.Version).IsRowVersion();
         b.Property(x => x.DireccionIp).HasMaxLength(45);
         b.Property(x => x.Dispositivo).HasMaxLength(300);
         b.HasIndex(x => x.TokenHash).IsUnique();

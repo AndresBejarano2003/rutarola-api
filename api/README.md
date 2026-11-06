@@ -41,6 +41,7 @@ cd api
 docker compose up -d db
 dotnet user-secrets --project src/RutaRola.Api set "ConnectionStrings:RutaRola" "Host=localhost;Port=5432;Database=rutarola;Username=rutarola;Password=<POSTGRES_PASSWORD de .env>"
 dotnet user-secrets --project src/RutaRola.Api set "Seed:Admin:Password" "<clave del admin demo>"
+dotnet user-secrets --project src/RutaRola.Api set "Jwt:Clave" "$(openssl rand -base64 48)"
 dotnet run --project src/RutaRola.Api            # http://localhost:5080/docs
 ```
 
@@ -73,7 +74,10 @@ dotnet run --project src/RutaRola.Api -- migrar
 | `Seed__SuperAdmin__Password` | — | Si se define, se crea `superadmin` (plataforma, sin empresa). |
 | `Seed__Empresa__Nombre`, `Seed__Empresa__Nit` | — | Empresa demo (por defecto "RutaRola Demo", `900000001-1`). |
 | `BaseDatos__MigrarAlIniciar` | — | `true` aplica migraciones y seed al arrancar. **Se ignora en Production.** |
-| `Jwt__*` | fase 2 | Clave y vida de los tokens (se documenta en la fase 2). |
+| `Jwt__Clave` | sí | Clave HMAC para firmar los JWT, mínimo 32 caracteres (`openssl rand -base64 48`). El API no arranca sin ella. |
+| `Jwt__MinutosAcceso`, `Jwt__DiasRefresh` | — | Vida del access token (15) y del refresh token (30 días). |
+| `Jwt__SegundosGraciaRotacion` | — | Gracia (30 s) para dos renovaciones simultáneas del mismo refresh (p. ej. dos pestañas). |
+| `Seguridad__IntentosAutenticacionPorMinuto` | — | Límite por IP para `/auth/login` y `/auth/refresh` (10). |
 
 No se guardan secretos en el repo: en desarrollo `dotnet user-secrets` o `api/.env` (ignorado por git);
 en el hosting, sus variables de entorno.
@@ -88,6 +92,26 @@ en el hosting, sus variables de entorno.
    del proxy del hosting y expone `GET /health` (200 si la BD responde, 503 si no) para el health check.
 4. En Netlify, el frontend apunta al API con `environment.prod.ts → apiUrl = https://<api>/api/v1` (fase 2).
 
+## Autenticación y permisos
+
+| Endpoint | Descripción |
+|---|---|
+| `POST /api/v1/auth/login` `{usuario, contrasena}` | `usuario` = usuario de ingreso **o** correo. Responde `{ sesion, tokens }`: `sesion` tiene la forma de `Sesion` del frontend (`rol` ADMINISTRADOR, CONDUCTOR, MONITORA, ACUDIENTE o SUPER_ADMIN; `empleadoId`/`acudienteId`; `empresa`; `permisos`). 401 `Usuario o contraseña incorrectos.`; 403 si el usuario, la empresa o la persona vinculada están inactivos. |
+| `POST /api/v1/auth/refresh` `{refreshToken}` | Responde `tokens` nuevos; el refresh anterior deja de servir (rotación). Reusar uno ya rotado revoca todas las sesiones del usuario (posible robo). |
+| `POST /api/v1/auth/logout` `{refreshToken?}` | Revoca ese refresh y la sesión del access token, si viene. Responde 204 y es idempotente. |
+| `GET /api/v1/auth/me` | Sesión actual con los permisos vigentes. |
+
+- **Access token:** JWT HS256 de 15 minutos con los claims `sub`, `sid` (sesión), `name`, `rol`, `id_empresa`, `id_empleado` / `id_acudiente` y un `permiso` por permiso.
+  - Se envía como `Authorization: Bearer`.
+  - Al cerrar sesión, el access token sigue vivo hasta que expira (máximo 15 min).
+- **Refresh token:** 256 bits aleatorios. En `sesiones_usuario` se guarda solo su SHA-256, con IP, dispositivo y vencimiento.
+- **Seguro por defecto:** todo endpoint exige sesión (fallback policy) salvo `[AllowAnonymous]`: login, refresh, logout, `/health` y la documentación.
+  - Un 401 o 403 también llega como ProblemDetails con `mensaje`.
+- **Permisos:** cada permiso de `Domain/Seguridad/Catalogo.cs` es una policy y se exige con `[RequierePermiso(Permisos.X)]`. Los permisos de cada rol están en `Permisos.PorRol`.
+- **Plataforma:** el SuperAdmin (sin empresa) crea empresas con `POST /api/v1/empresas`, con su configuración por defecto y, opcionalmente, su primer `administrador`.
+  - Cada empresa ve y edita la suya en `/api/v1/empresas/actual`.
+  - Su configuración está en `GET/PUT /api/v1/configuracion/{clave}`.
+
 ## Convenciones
 
 - **Rutas:** `/api/v1/<recurso-en-plural-y-en-español>` en minúsculas (`/api/v1/estudiantes`,
@@ -101,6 +125,11 @@ en el hosting, sus variables de entorno.
   (`acudienteId`, `valorContratacion`, `vencimientoSoat`…), aunque la columna se llame distinto.
 - **JSON:** camelCase; enums como texto `UPPER_SNAKE` (`EN_CURSO`, `A_BORDO`); fechas `YYYY-MM-DD`; horas `HH:mm`;
   periodos `YYYY-MM`; booleanos de estado como `"ACTIVO"`/`"INACTIVO"`; ids UUID como texto.
+- **Búsquedas por texto:** sin tildes ni mayúsculas, como `normalizar()` del frontend.
+  - Se escriben `FuncionesBd.SinTildes(columna).Contains(Busqueda.Normalizar(texto))`.
+  - En SQL es la función `f_sin_tildes` (extensión `unaccent`, creada en la migración `Fase2Autenticacion`).
+- **Validación:** un `AbstractValidator<T>` por solicitud. Lo aplica `FiltroValidacion` a todo argumento de una acción; no hace falta llamarlo a mano.
+  - `WithMessage` va justo después de la regla a la que aplica.
 - **Errores:** ProblemDetails (`application/problem+json`) con `mensaje` en español (el frontend lo muestra tal
   cual), `traceId` y `errores` por campo en las validaciones.
   - 400: validación (FluentValidation).
@@ -158,7 +187,7 @@ Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
 ## Fases
 
 1. ✅ Base: solución, entidades (36 tablas), configuraciones, migración `Inicial`, docker-compose, seed, health, errores, logs, OpenAPI.
-2. Auth (JWT 15 min + refresh rotativo), permisos por policy, multiempresa por HTTP + interceptor en Angular.
+2. ✅ Auth (JWT 15 min + refresh rotativo), permisos por policy, empresas y configuración, aislamiento A/B por HTTP, interceptor en Angular.
 3. Catálogos: colegios, vehículos, empleados/conductores, acudientes, estudiantes (+ auditoría).
 4. Operación: rutas, asignaciones, recorridos, paradas, eventos.
 5. GPS: lotes de posiciones y última posición (SignalR preparado).

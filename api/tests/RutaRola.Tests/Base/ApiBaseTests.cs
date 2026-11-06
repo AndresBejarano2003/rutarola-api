@@ -24,9 +24,17 @@ public class ApiBaseTests(BaseDatosPrueba bd)
     }
 
     [Fact]
-    public async Task Los_errores_son_ProblemDetails_con_mensaje_en_espanol()
+    public async Task Sin_sesion_toda_ruta_responde_401_aunque_no_exista()
     {
         var respuesta = await bd.Api.CreateClient().GetAsync("/api/v1/no-existe");
+        Assert.Equal("Debes iniciar sesión para continuar.", await respuesta.MensajeErrorAsync(HttpStatusCode.Unauthorized));
+    }
+
+    [Fact]
+    public async Task Los_errores_son_ProblemDetails_con_mensaje_en_espanol()
+    {
+        var cliente = await bd.ClienteDeAsync("admin", BaseDatosPrueba.ContrasenaAdmin);
+        var respuesta = await cliente.GetAsync("/api/v1/no-existe");
 
         Assert.Equal(HttpStatusCode.NotFound, respuesta.StatusCode);
         Assert.Equal("application/problem+json", respuesta.Content.Headers.ContentType?.MediaType);

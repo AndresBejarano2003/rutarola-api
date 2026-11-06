@@ -205,12 +205,20 @@ Conventions:
   - `UsarModoSistema()` is only for the seed and server jobs.
   - The filter does NOT stop *referencing* a foreign id: services must load every referenced id (`colegioId`, `acudienteId`…) through the filtered context and return 404 when it is missing.
   - Every new module needs isolation tests (A cannot read or modify B).
+- **Auth**:
+  - `POST /api/v1/auth/login` → `{sesion, tokens}`; `sesion` mirrors the frontend `Sesion` (+ `empresa`, `permisos`). `/auth/refresh` rotates the refresh token (reuse of a rotated one revokes all of the user's sessions); `/auth/logout`; `/auth/me`.
+  - JWT HS256, 15 min, claims in `Application/Comun/Reclamos.cs`. The fallback policy requires authentication everywhere; public endpoints need `[AllowAnonymous]`. Protect actions with `[RequierePermiso(Permisos.X)]`.
+  - `/auth/login` and `/auth/refresh` are rate-limited per IP. `Jwt__Clave` (≥ 32 chars) is mandatory.
+- **Services**: live in `Application/<Modulo>/` and use `IBaseDatos` (implemented by `RutaRolaDbContext`), never the concrete context.
+  - Every request DTO has an `AbstractValidator`, applied automatically by `FiltroValidacion`. Put `WithMessage` right after the rule it applies to.
+  - Text search: `FuncionesBd.SinTildes(col).Contains(Busqueda.Normalizar(texto))` (SQL `f_sin_tildes`, unaccent).
+  - Platform operations (SuperAdmin) use `IgnoreQueryFilters([FiltrosConsulta.Empresa])` / `UsarModoSistema()` explicitly.
 - **Roles/permissions**:
   - Roles are SuperAdmin, AdminEmpresa (sent as `ADMINISTRADOR` in the frontend `Sesion`), Conductor, Monitora and Acudiente.
   - Permissions `modulo.accion` live in `Domain/Seguridad/Catalogo.cs` (`Permisos`, `Permisos.PorRol`). The seed syncs `permisos`/`roles_permisos`; each permission is an authorization policy.
   - Login is by `usuario` (unique across the system, lowercase) or email. Passwords use the Identity `PasswordHasher`; refresh tokens are stored hashed.
 - **Deletes**: `DELETE` removes physically only when nothing references the row; otherwise 409 with `{mensaje}`. Setting a record to INACTIVO is the logical delete.
-- **Secrets**: never in the repo. Use `dotnet user-secrets` (UserSecretsId in `RutaRola.Api.csproj`), `api/.env` (git-ignored) or hosting env vars: `ConnectionStrings__RutaRola`, `Seed__Admin__Password`, `Cors__Origenes` (comma-separated).
+- **Secrets**: never in the repo. Use `dotnet user-secrets` (UserSecretsId in `RutaRola.Api.csproj`), `api/.env` (git-ignored) or hosting env vars: `ConnectionStrings__RutaRola`, `Jwt__Clave`, `Seed__Admin__Password`, `Cors__Origenes` (comma-separated).
 - **Migrations**: never applied automatically in Production. Use the `migrar` command. `BaseDatos:MigrarAlIniciar` (Development, compose) is ignored in Production.
 - **Minors' data**: request logs omit query strings and bodies; do not log DTOs with student data.
 

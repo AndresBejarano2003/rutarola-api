@@ -13,5 +13,6 @@ public interface IContextoUsuario
     string? Rol { get; }
     Guid? IdEmpleado { get; }
     Guid? IdAcudiente { get; }
+    Guid? IdSesion { get; }
     string? DireccionIp { get; }
 }

@@ -37,9 +37,11 @@ public class BaseDatosTests(BaseDatosPrueba bd)
     }
 
     [Fact]
-    public async Task Sin_contrasena_de_seed_no_se_crea_el_superadmin()
+    public async Task El_superadmin_se_crea_sin_empresa_cuando_hay_contrasena_de_seed()
     {
         await using var db = bd.Contexto(null, modoSistema: true);
-        Assert.False(await db.Usuarios.AnyAsync(u => u.NombreUsuario == "superadmin"));
+        var superAdmin = await db.Usuarios.Include(u => u.Rol).SingleAsync(u => u.NombreUsuario == "superadmin");
+        Assert.Null(superAdmin.IdEmpresa);
+        Assert.Equal(Roles.SuperAdmin, superAdmin.Rol.Nombre);
     }
 }

@@ -14,6 +14,7 @@ public class ContextoUsuarioHttp(IHttpContextAccessor accesor) : IContextoUsuari
     public string? Rol => Autenticado ? Principal?.FindFirstValue(Reclamos.Rol) : null;
     public Guid? IdEmpleado => LeerGuid(Reclamos.IdEmpleado);
     public Guid? IdAcudiente => LeerGuid(Reclamos.IdAcudiente);
+    public Guid? IdSesion => LeerGuid(Reclamos.IdSesion);
     public string? DireccionIp => accesor.HttpContext?.Connection.RemoteIpAddress?.ToString();
 
     private Guid? LeerGuid(string claim) =>

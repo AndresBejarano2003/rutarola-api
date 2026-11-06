@@ -17,6 +17,8 @@ namespace RutaRola.Tests.Infraestructura;
 public sealed class BaseDatosPrueba : IAsyncLifetime
 {
     public const string ContrasenaAdmin = "Prueba-Admin-123";
+    public const string ContrasenaSuperAdmin = "Prueba-Super-123";
+    public const string ClaveJwt = "clave-de-pruebas-solo-para-tests-0123456789abcdef";
 
     private readonly PostgreSqlContainer contenedor = new PostgreSqlBuilder("postgres:17-alpine").Build();
 
@@ -28,12 +30,23 @@ public sealed class BaseDatosPrueba : IAsyncLifetime
         await contenedor.StartAsync();
         Api = new WebApplicationFactory<Program>().WithWebHostBuilder(web =>
         {
-            web.UseEnvironment("Testing");
-            web.UseSetting($"ConnectionStrings:{DependencyInjection.NombreConexion}", CadenaConexion);
-            web.UseSetting("Seed:Admin:Password", ContrasenaAdmin);
-            web.UseSetting("BaseDatos:MigrarAlIniciar", "false");
+            Configurar(web);
         });
         await BaseDatos.MigrarYSembrarAsync(Api.Services);
+    }
+
+    /// <summary>Configuración común de las pruebas (sobrescribible en una fábrica derivada).</summary>
+    public void Configurar(Microsoft.AspNetCore.Hosting.IWebHostBuilder web)
+    {
+        web.UseEnvironment("Testing");
+        web.UseSetting($"ConnectionStrings:{DependencyInjection.NombreConexion}", CadenaConexion);
+        web.UseSetting("Seed:Admin:Password", ContrasenaAdmin);
+        web.UseSetting("Seed:SuperAdmin:Password", ContrasenaSuperAdmin);
+        web.UseSetting("BaseDatos:MigrarAlIniciar", "false");
+        web.UseSetting("Jwt:Clave", ClaveJwt);
+        // Sin gracia: reusar un refresh rotado se trata siempre como robo (comportamiento determinista).
+        web.UseSetting("Jwt:SegundosGraciaRotacion", "0");
+        web.UseSetting("Seguridad:IntentosAutenticacionPorMinuto", "10000");
     }
 
     public async Task DisposeAsync()
@@ -69,6 +82,7 @@ public sealed class BaseDatosPrueba : IAsyncLifetime
         public string? Rol => null;
         public Guid? IdEmpleado => null;
         public Guid? IdAcudiente => null;
+        public Guid? IdSesion => null;
         public string? DireccionIp => null;
     }
 }

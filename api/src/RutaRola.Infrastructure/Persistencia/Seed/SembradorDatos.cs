@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using RutaRola.Application.Configuracion;
 using RutaRola.Domain.Seguridad;
 
 namespace RutaRola.Infrastructure.Persistencia.Seed;
@@ -27,13 +28,6 @@ public class SembradorDatos(
         [Roles.Conductor] = "Ruta del día: recorridos asignados y GPS",
         [Roles.Monitora] = "Ruta del día: recorridos asignados y orden de visita",
         [Roles.Acudiente] = "Portal del acudiente: solo sus estudiantes (lectura)",
-    };
-
-    /// <summary>Configuración inicial de cada empresa (claves de <c>configuracion_sistema</c>).</summary>
-    public static readonly IReadOnlyDictionary<string, string> ConfiguracionPorDefecto = new Dictionary<string, string>
-    {
-        ["finanzas.dia_limite_pago"] = "5",
-        ["alertas.dias_vencimiento"] = "30",
     };
 
     public async Task SembrarAsync(CancellationToken ct = default)
@@ -99,9 +93,9 @@ public class SembradorDatos(
         }
 
         var claves = await db.ConfiguracionSistema.Where(c => c.IdEmpresa == empresa.Id).Select(c => c.Clave).ToListAsync(ct);
-        foreach (var (clave, valor) in ConfiguracionPorDefecto.Where(c => !claves.Contains(c.Key)))
+        foreach (var parametro in CatalogoConfiguracion.Parametros.Where(p => !claves.Contains(p.Clave)))
         {
-            db.ConfiguracionSistema.Add(new ConfiguracionSistema { IdEmpresa = empresa.Id, Clave = clave, Valor = valor });
+            db.ConfiguracionSistema.Add(new ConfiguracionSistema { IdEmpresa = empresa.Id, Clave = parametro.Clave, Valor = parametro.ValorPorDefecto });
         }
         return empresa;
     }

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using RutaRola.Api.Errores;
 using RutaRola.Api.Seguridad;
+using RutaRola.Application;
 using RutaRola.Application.Comun;
 using RutaRola.Infrastructure;
 using RutaRola.Infrastructure.Persistencia;
@@ -19,11 +20,19 @@ public static class Servicios
     {
         var services = builder.Services;
 
+        services.AgregarAplicacion();
         services.AgregarInfraestructura();
         services.AddHttpContextAccessor();
         services.AddScoped<IContextoUsuario, ContextoUsuarioHttp>();
+        services.AgregarSeguridad(builder.Configuration);
 
-        services.AddControllers().AddJsonOptions(o => ConfigurarJson(o.JsonSerializerOptions));
+        services.AddControllers(o =>
+            {
+                o.Filters.Add<FiltroValidacion>();
+                // Los campos obligatorios los valida FluentValidation (mensajes en español), no el model binding.
+                o.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+            })
+            .AddJsonOptions(o => ConfigurarJson(o.JsonSerializerOptions));
         services.ConfigureHttpJsonOptions(o => ConfigurarJson(o.SerializerOptions));
         services.AddRouting(o => o.LowercaseUrls = true);
 
@@ -45,13 +54,7 @@ public static class Servicios
 
         services.AddHealthChecks().AddDbContextCheck<RutaRolaDbContext>("base_datos");
 
-        services.AddOpenApi("v1", o => o.AddDocumentTransformer((documento, _, _) =>
-        {
-            documento.Info.Title = "RutaRola API";
-            documento.Info.Version = "v1";
-            documento.Info.Description = "API de RutaRola: transporte escolar multiempresa. Rutas bajo /api/v1.";
-            return Task.CompletedTask;
-        }));
+        services.AddOpenApi("v1", o => o.AddDocumentTransformer<DocumentoOpenApi>());
 
         return builder;
     }
@@ -82,10 +85,13 @@ public static class Servicios
         app.UseStatusCodePages();
         app.UseSerilogRequestLoggingRutaRola();
         app.UseCors(PoliticaCors);
+        app.UseAuthentication();
+        app.UseRateLimiter();
+        app.UseAuthorization();
 
         if (!app.Environment.IsProduction())
         {
-            app.MapOpenApi();
+            app.MapOpenApi().AllowAnonymous();
             app.MapScalarApiReferenceRutaRola();
         }
 
@@ -98,7 +104,7 @@ public static class Servicios
                 [HealthStatus.Degraded] = StatusCodes.Status200OK,
                 [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
             },
-        });
+        }).AllowAnonymous();
         app.MapControllers();
         return app;
     }

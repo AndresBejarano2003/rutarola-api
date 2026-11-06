@@ -8,6 +8,17 @@ public static class Roles
     public const string Conductor = "Conductor";
     public const string Monitora = "Monitora";
     public const string Acudiente = "Acudiente";
+
+    /// <summary>Rol como lo espera el frontend (<c>RolUsuario</c> en <c>core/auth.ts</c>).</summary>
+    public static string CodigoSesion(string rol) => rol switch
+    {
+        AdminEmpresa => "ADMINISTRADOR",
+        Conductor => "CONDUCTOR",
+        Monitora => "MONITORA",
+        Acudiente => "ACUDIENTE",
+        SuperAdmin => "SUPER_ADMIN",
+        _ => rol.ToUpperInvariant(),
+    };
 }
 
 /// <summary>

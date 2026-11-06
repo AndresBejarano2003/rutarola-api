@@ -21,9 +21,9 @@ namespace RutaRola.Infrastructure.Persistencia;
 public class RutaRolaDbContext(
     DbContextOptions<RutaRolaDbContext> options,
     IContextoUsuario contexto,
-    TimeProvider reloj) : DbContext(options)
+    TimeProvider reloj) : DbContext(options), IBaseDatos
 {
-    public const string FiltroEmpresa = "Empresa";
+    public const string FiltroEmpresa = FiltrosConsulta.Empresa;
 
     /// <summary>Empresa del token; <see cref="Guid.Empty"/> si no hay (no coincide con ningún registro).</summary>
     public Guid IdEmpresaActual => contexto.IdEmpresa ?? Guid.Empty;
@@ -84,6 +84,8 @@ public class RutaRolaDbContext(
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RutaRolaDbContext).Assembly);
+        // Creada en la migración Fase2Autenticacion (extensión unaccent).
+        modelBuilder.HasDbFunction(typeof(FuncionesBd).GetMethod(nameof(FuncionesBd.SinTildes))!).HasName("f_sin_tildes").HasSchema("public");
 
         foreach (var tipo in modelBuilder.Model.GetEntityTypes())
         {

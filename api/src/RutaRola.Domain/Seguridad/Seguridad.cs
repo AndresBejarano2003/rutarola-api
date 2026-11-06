@@ -75,6 +75,8 @@ public class SesionUsuario
     public DateTime? FechaRevocacion { get; set; }
     /// <summary>Sesión que la reemplazó al rotar (para detectar reuso de un token ya rotado).</summary>
     public Guid? IdReemplazadaPor { get; set; }
+    /// <summary>Concurrencia optimista (xmin): dos renovaciones simultáneas del mismo token, solo una gana.</summary>
+    public uint Version { get; set; }
 }
 
 public class Auditoria
