@@ -163,6 +163,8 @@ public class ParadaViaje
     public DateTime? HoraRecogida { get; set; }
     /// <summary>Cuándo se entregó (colegio en recogida, casa en entrega).</summary>
     public DateTime? HoraEntrega { get; set; }
+    /// <summary>Solo si <see cref="Estado"/> es AUSENTE (null = sin motivo).</summary>
+    public MotivoAusencia? MotivoAusencia { get; set; }
     public string? FotoUrl { get; set; }
     public string? Notas { get; set; }
 

@@ -71,9 +71,29 @@ public class GpsTests(BaseDatosPrueba bd)
         Assert.True((await Errores(new { posiciones = Array.Empty<object>() })).TryGetProperty("posiciones", out _));
         var fuera = await Errores(new { posiciones = new[] { new { latitud = 95, longitud = -200, velocidad = 400, rumbo = 400, fecha = DateTime.UtcNow } } });
         Assert.Equal(["posiciones[0].latitud", "posiciones[0].longitud", "posiciones[0].rumbo", "posiciones[0].velocidad"], fuera.EnumerateObject().Select(p => p.Name).Order());
-        var muchas = Enumerable.Range(0, 501).Select(i => Punto(DateTime.UtcNow.AddMilliseconds(-i * 500))).ToArray();
+        var base0 = DateTime.UtcNow;
+        var muchas = Enumerable.Range(0, 501).Select(i => Punto(base0.AddMilliseconds(-i * 500))).ToArray();
         Assert.True((await Errores(new { posiciones = muchas })).TryGetProperty("posiciones", out _));
-        Assert.Equal(500, (await EnviarAsync(e.ClienteConductor, r.Id, muchas[..500])).Recibidas);
+        // 500 lecturas cada 0,5 s: se acepta el lote, pero solo se guarda una cada SeparacionMinima (4 s).
+        var lote = await EnviarAsync(e.ClienteConductor, r.Id, muchas[..500]);
+        Assert.Equal((63, 437), (lote.Recibidas, lote.Descartadas));
+    }
+
+    [Fact]
+    public async Task Conductor_y_monitora_reportan_a_la_vez_sin_duplicar_la_ubicacion()
+    {
+        var (e, r) = await EnCursoAsync();
+        var t = DateTime.UtcNow.AddSeconds(-60);
+
+        Assert.Equal(1, (await EnviarAsync(e.ClienteConductor, r.Id, Punto(t, 1m))).Recibidas);
+        // La monitora toma la misma ubicación 2 s después: sobra. 10 s después, sí cuenta.
+        var monitora = await EnviarAsync(e.ClienteMonitora!, r.Id, Punto(t.AddSeconds(2), 1.1m), Punto(t.AddSeconds(10), 2m));
+        Assert.Equal((1, 1), (monitora.Recibidas, monitora.Descartadas));
+        // El teléfono de la monitora se apaga: el conductor sigue y la ubicación se mantiene al día.
+        Assert.Equal(2, (await EnviarAsync(e.ClienteConductor, r.Id, Punto(t.AddSeconds(20), 3m), Punto(t.AddSeconds(30), 4m))).Recibidas);
+
+        var trayecto = await (await e.Admin.Cliente.GetAsync($"/api/v1/recorridos/{r.Id}/gps")).LeerAsync<List<PosicionDto>>();
+        Assert.Equal([1m, 2m, 3m, 4m], trayecto.Select(p => p.Latitud));
     }
 
     [Fact]

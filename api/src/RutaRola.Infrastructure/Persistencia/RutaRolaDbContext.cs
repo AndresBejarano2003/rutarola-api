@@ -13,6 +13,8 @@ using RutaRola.Domain.Finanzas;
 using RutaRola.Domain.Operacion;
 using RutaRola.Domain.Personas;
 using RutaRola.Domain.Seguridad;
+using RutaRola.Domain.Soporte;
+using RutaRola.Domain.Suscripciones;
 
 namespace RutaRola.Infrastructure.Persistencia;
 
@@ -78,6 +80,12 @@ public class RutaRolaDbContext(
     public DbSet<Notificacion> Notificaciones => Set<Notificacion>();
     public DbSet<MensajeWhatsapp> MensajesWhatsapp => Set<MensajeWhatsapp>();
     public DbSet<Archivo> Archivos => Set<Archivo>();
+    public DbSet<TicketSoporte> TicketsSoporte => Set<TicketSoporte>();
+    public DbSet<EventoTicket> EventosTicket => Set<EventoTicket>();
+    public DbSet<ReunionTicket> ReunionesTicket => Set<ReunionTicket>();
+    public DbSet<AdjuntoTicket> AdjuntosTicket => Set<AdjuntoTicket>();
+    public DbSet<Suscripcion> Suscripciones => Set<Suscripcion>();
+    public DbSet<PagoSuscripcion> PagosSuscripcion => Set<PagoSuscripcion>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -142,6 +150,9 @@ public class RutaRolaDbContext(
         modelBuilder.Entity<EnvioProgramacion>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Programacion.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<Notificacion>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Usuario.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<MensajeWhatsapp>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Acudiente.IdEmpresa == IdEmpresaActual);
+        modelBuilder.Entity<EventoTicket>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Ticket.IdEmpresa == IdEmpresaActual);
+        modelBuilder.Entity<ReunionTicket>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Ticket.IdEmpresa == IdEmpresaActual);
+        modelBuilder.Entity<AdjuntoTicket>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Ticket.IdEmpresa == IdEmpresaActual);
     }
 
     private void FiltrarPorEmpresa<T>(ModelBuilder modelBuilder) where T : class, IEntidadEmpresa

@@ -7,4 +7,8 @@ public static class TextoEnum
         Texto.Opcional(texto) is { } valor && Enum.TryParse<T>(valor.Replace("_", ""), ignoreCase: true, out var resultado)
             ? resultado
             : null;
+
+    /// <summary>Como lo escribe el JSON: <c>EnCurso</c> → <c>EN_CURSO</c>.</summary>
+    public static string Escribir<T>(T valor) where T : struct, Enum =>
+        System.Text.Json.JsonNamingPolicy.SnakeCaseUpper.ConvertName(valor.ToString());
 }

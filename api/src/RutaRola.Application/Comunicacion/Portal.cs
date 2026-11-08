@@ -24,7 +24,9 @@ public record FacturaPortalDto(
     string PeriodoFin, decimal Total, decimal Pagado, decimal Vencido, string Estado, IReadOnlyList<CuotaPortalDto> Cuotas);
 
 /// <summary>Estado del estudiante hoy en un trayecto (lo que ve el acudiente).</summary>
-public record RecorridoHoyDto(Guid RecorridoId, Trayecto Trayecto, bool EnCurso, EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega);
+/// <summary><c>motivoAusencia</c>: <c>NO_ASISTE</c> | <c>POR_SU_CUENTA</c> | <c>""</c> (como en <c>ParadaDto</c>).</summary>
+public record RecorridoHoyDto(
+    Guid RecorridoId, Trayecto Trayecto, bool EnCurso, EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega, string MotivoAusencia);
 
 public record TransporteEstudianteDto(
     string Ruta, string Jornada, string Sector, string Vehiculo, string Conductor, string TelefonoConductor, string Monitora, string TelefonoMonitora);
@@ -93,7 +95,8 @@ public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, ParametrosE
                             asignacion?.Monitora?.Telefono ?? ""),
                     paradas.Where(p => p.IdEstudiante == e.Id)
                         .OrderBy(p => p.Viaje.Trayecto) // RECOGIDA antes que ENTREGA
-                        .Select(p => new RecorridoHoyDto(p.IdViaje, p.Viaje.Trayecto, p.Viaje.Estado == EstadoViaje.EnCurso, p.Estado, p.HoraRecogida, p.HoraEntrega))
+                        .Select(p => new RecorridoHoyDto(p.IdViaje, p.Viaje.Trayecto, p.Viaje.Estado == EstadoViaje.EnCurso, p.Estado, p.HoraRecogida, p.HoraEntrega,
+                            ServicioRecorridos.TextoMotivo(p.MotivoAusencia)))
                         .ToList());
             })
             // Activos primero, luego por nombre.

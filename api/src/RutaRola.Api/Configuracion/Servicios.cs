@@ -31,6 +31,10 @@ public static class Servicios
         services.AddSignalR().AddJsonProtocol(o => ConfigurarJson(o.PayloadSerializerOptions));
         services.AddSingleton<IAvisosRecorrido, AvisosRecorridoSignalR>();
         services.AddHostedService<ProcesoComunicacion>();
+        services.AddOptions<RutaRola.Application.Soporte.OpcionesSoporte>()
+            .Bind(builder.Configuration.GetSection(RutaRola.Application.Soporte.OpcionesSoporte.Seccion));
+        services.AddOptions<RutaRola.Application.Suscripciones.OpcionesWompi>()
+            .Bind(builder.Configuration.GetSection(RutaRola.Application.Suscripciones.OpcionesWompi.Seccion));
         services.AgregarSeguridad(builder.Configuration);
 
         services.AddControllers(o =>

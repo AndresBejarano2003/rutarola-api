@@ -23,6 +23,17 @@ public class AuthController(ServicioAutenticacion servicio, IContextoUsuario usu
     public Task<RespuestaLogin> Login(SolicitudLogin solicitud, CancellationToken ct) =>
         servicio.IniciarSesionAsync(solicitud, Cliente(), ct);
 
+    /// <summary>Registro público de una empresa con su administrador: arranca con la prueba gratuita y deja la sesión iniciada.</summary>
+    /// <response code="201">Sesión y tokens del administrador nuevo.</response>
+    /// <response code="409">El NIT, el usuario o el correo ya están registrados.</response>
+    [HttpPost("registro")]
+    [AllowAnonymous]
+    [EnableRateLimiting(Autorizacion.PoliticaLimiteAutenticacion)]
+    [ProducesResponseType<RespuestaLogin>(StatusCodes.Status201Created)]
+    public async Task<IActionResult> Registro(
+        RutaRola.Application.Empresas.SolicitudRegistro solicitud, [FromServices] RutaRola.Application.Empresas.ServicioRegistro registro, CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, await registro.RegistrarAsync(solicitud, Cliente(), ct));
+
     /// <summary>Cambia el refresh token por un par nuevo (el anterior deja de servir).</summary>
     [HttpPost("refresh")]
     [AllowAnonymous]

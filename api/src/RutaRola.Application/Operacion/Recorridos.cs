@@ -6,10 +6,13 @@ using RutaRola.Domain.Operacion;
 
 namespace RutaRola.Application.Operacion;
 
-/// <summary>Estudiante del recorrido, con los datos como estaban al iniciar (<c>Parada</c> del frontend).</summary>
+/// <summary>
+/// Estudiante del recorrido, con los datos como estaban al iniciar (<c>Parada</c> del frontend).
+/// <c>motivoAusencia</c>: <c>NO_ASISTE</c> | <c>POR_SU_CUENTA</c> | <c>""</c>.
+/// </summary>
 public record ParadaDto(
     Guid EstudianteId, string Estudiante, string Grado, string Direccion, string Acudiente, string TelefonoAcudiente,
-    EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega);
+    EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega, string MotivoAusencia);
 
 public record CambioOrdenDto(Guid EmpleadoId, string Nombre, DateTime Hora);
 
@@ -33,7 +36,8 @@ public record RutaAsignadaDto(
 
 public record SolicitudIniciarRecorrido(Guid? AsignacionId, Trayecto? Trayecto);
 
-public record SolicitudMarcarParadas(IReadOnlyList<Guid>? EstudianteIds, EstadoParada? Estado);
+/// <summary><c>motivoAusencia</c> solo con <c>estado</c> AUSENTE (NO_ASISTE solo en la recogida).</summary>
+public record SolicitudMarcarParadas(IReadOnlyList<Guid>? EstudianteIds, EstadoParada? Estado, MotivoAusencia? MotivoAusencia = null);
 
 public record SolicitudOrdenParadas(IReadOnlyList<Guid>? EstudianteIds);
 
@@ -59,6 +63,8 @@ public class ValidadorMarcarParadas : AbstractValidator<SolicitudMarcarParadas>
     {
         RuleFor(x => x.EstudianteIds).NotEmpty().WithMessage("Indica a qué estudiantes aplica el cambio.");
         RuleFor(x => x.Estado).NotNull().WithMessage("Indica el nuevo estado.");
+        RuleFor(x => x.MotivoAusencia).Null().When(x => x.Estado != EstadoParada.Ausente)
+            .WithMessage("El motivo solo aplica cuando el estudiante no viaja.");
     }
 }
 
@@ -94,6 +100,15 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
         EstadoParada.Pendiente => "Pendiente",
         EstadoParada.ABordo => "A bordo",
         EstadoParada.Entregado => "Entregado",
+        _ => "No asistió",
+    };
+
+    /// <summary>Igual que <c>nombreAusencia</c> del frontend (<c>recorrido.ts</c>).</summary>
+    public static string NombreAusencia(MotivoAusencia? motivo, Trayecto trayecto) => (motivo, trayecto) switch
+    {
+        (Domain.Enums.MotivoAusencia.NoAsiste, _) => "No asiste hoy al colegio",
+        (Domain.Enums.MotivoAusencia.PorSuCuenta, Trayecto.Recogida) => "Va al colegio por su cuenta",
+        (_, Trayecto.Entrega) => "No viaja en la ruta",
         _ => "No asistió",
     };
 
@@ -174,6 +189,16 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
             enRuta.Reverse(); // La entrega recorre la ruta al revés.
         }
 
+        // Quien en la recogida de hoy quedó como "No asiste hoy" no está en el colegio: la entrega lo trae como ausente
+        // (se puede deshacer si sí llegó).
+        var noAsisten = trayecto == Trayecto.Entrega
+            ? (await db.ViajesRuta.AsNoTracking()
+                .Where(v => v.IdAsignacion == asignacion.Id && v.FechaViaje == hoy && v.Trayecto == Trayecto.Recogida)
+                .SelectMany(v => v.Paradas)
+                .Where(p => p.Estado == EstadoParada.Ausente && p.MotivoAusencia == Domain.Enums.MotivoAusencia.NoAsiste)
+                .Select(p => p.IdEstudiante).ToListAsync(ct)).ToHashSet()
+            : [];
+
         var ahora = Ahora;
         var viaje = new ViajeRuta
         {
@@ -206,6 +231,8 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
                     Direccion = e.Direccion,
                     NombreAcudiente = acudiente?.NombreCompleto,
                     TelefonoAcudiente = acudiente?.Telefono,
+                    Estado = noAsisten.Contains(e.Id) ? EstadoParada.Ausente : EstadoParada.Pendiente,
+                    MotivoAusencia = noAsisten.Contains(e.Id) ? Domain.Enums.MotivoAusencia.NoAsiste : null,
                 };
             }).ToList(),
         };
@@ -239,7 +266,18 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
                 throw new ErrorNegocio("El estudiante no hace parte de este recorrido.", CodigoError.NoEncontrado);
             }
             var estado = s.Estado!.Value;
+            var motivo = estado == EstadoParada.Ausente ? s.MotivoAusencia : null;
+            if (motivo == Domain.Enums.MotivoAusencia.NoAsiste && viaje.Trayecto != Trayecto.Recogida)
+            {
+                throw new ErrorNegocio("\"No asiste hoy\" se marca en la recogida. En la entrega usa \"No viaja\".", CodigoError.Validacion);
+            }
             var ahora = Ahora;
+            // Ya ausente con otro motivo: solo se corrige el motivo.
+            foreach (var p in paradas.Where(p => p.Estado == estado && estado == EstadoParada.Ausente && p.MotivoAusencia != motivo))
+            {
+                p.MotivoAusencia = motivo;
+                viaje.Eventos.Add(Evento(TipoEvento.CambioParada, $"{p.NombreEstudiante}: {NombreAusencia(motivo, viaje.Trayecto)}."));
+            }
             foreach (var p in paradas.Where(p => p.Estado != estado))
             {
                 if (!Transiciones[p.Estado].Contains(estado))
@@ -263,7 +301,9 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
                         break;
                 }
                 p.Estado = estado;
-                viaje.Eventos.Add(Evento(TipoEvento.CambioParada, $"{p.NombreEstudiante}: {NombreEstado(estado)}."));
+                p.MotivoAusencia = motivo;
+                viaje.Eventos.Add(Evento(TipoEvento.CambioParada,
+                    $"{p.NombreEstudiante}: {(estado == EstadoParada.Ausente ? NombreAusencia(motivo, viaje.Trayecto) : NombreEstado(estado))}."));
             }
         }, ct);
 
@@ -443,6 +483,14 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
     private Evento Evento(TipoEvento tipo, string descripcion) =>
         new() { TipoEvento = tipo, Descripcion = descripcion, IdUsuario = contexto.IdUsuario, FechaEvento = Ahora };
 
+    /// <summary>Igual que el JSON de los enums (<c>NoAsiste</c> → <c>NO_ASISTE</c>); sin motivo = <c>""</c>.</summary>
+    public static string TextoMotivo(MotivoAusencia? motivo) => motivo switch
+    {
+        Domain.Enums.MotivoAusencia.NoAsiste => "NO_ASISTE",
+        Domain.Enums.MotivoAusencia.PorSuCuenta => "POR_SU_CUENTA",
+        _ => "",
+    };
+
     private static ResumenRecorridoDto Resumir(ViajeRuta v) => new(v.Id, v.Trayecto, v.Estado, v.HoraInicio, v.HoraFin, Contar(v.Paradas));
 
     private static ConteoParadasDto Contar(IReadOnlyCollection<ParadaViaje> paradas) => new(
@@ -458,7 +506,7 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
         v.NombreMonitora ?? "",
         v.Paradas.OrderBy(p => p.OrdenRecogida).Select(p => new ParadaDto(
             p.IdEstudiante, p.NombreEstudiante, p.Grado, p.Direccion, p.NombreAcudiente ?? "", p.TelefonoAcudiente ?? "",
-            p.Estado, p.HoraRecogida, p.HoraEntrega)).ToList(),
+            p.Estado, p.HoraRecogida, p.HoraEntrega, TextoMotivo(p.MotivoAusencia))).ToList(),
         v.HoraInicio, v.HoraFin, v.IdIniciadoPor?.ToString() ?? "",
         v.IdOrdenActualizadoPor is { } quien && v.FechaOrdenActualizado is { } hora
             ? new CambioOrdenDto(quien, v.NombreOrdenActualizadoPor ?? "", hora)

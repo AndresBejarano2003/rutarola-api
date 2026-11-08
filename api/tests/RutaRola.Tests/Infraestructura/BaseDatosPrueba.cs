@@ -51,7 +51,14 @@ public sealed class BaseDatosPrueba : IAsyncLifetime
         // Sin gracia: reusar un refresh rotado se trata siempre como robo (comportamiento determinista).
         web.UseSetting("Jwt:SegundosGraciaRotacion", "0");
         web.UseSetting("Seguridad:IntentosAutenticacionPorMinuto", "10000");
+        // Wompi de prueba: firma el checkout y valida eventos (sin llamar al API de Wompi).
+        web.UseSetting("Wompi:LlavePublica", "pub_test_prueba");
+        web.UseSetting("Wompi:SecretoIntegridad", SecretoIntegridadWompi);
+        web.UseSetting("Wompi:SecretoEventos", SecretoEventosWompi);
     }
+
+    public const string SecretoIntegridadWompi = "test_integrity_prueba";
+    public const string SecretoEventosWompi = "test_events_prueba";
 
     public async Task DisposeAsync()
     {

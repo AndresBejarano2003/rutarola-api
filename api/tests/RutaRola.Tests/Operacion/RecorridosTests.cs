@@ -171,6 +171,38 @@ public class RecorridosTests(BaseDatosPrueba bd)
     }
 
     [Fact]
+    public async Task Quien_no_asiste_al_colegio_en_la_recogida_llega_ausente_a_la_entrega()
+    {
+        var e = await bd.EscenarioAsync();
+        var c = e.ClienteConductor;
+        var r = await (await c.IniciarAsync(e.Asignacion.Id)).LeerAsync<RecorridoDto>(HttpStatusCode.Created);
+        var (juan, valentina, samuel) = (e.Estudiantes[0].Id, e.Estudiantes[1].Id, e.Estudiantes[2].Id);
+        Task<HttpResponseMessage> Ausente(Guid recorrido, Guid estudiante, string? motivoAusencia, string estado = "AUSENTE") =>
+            c.PatchAsJsonAsync($"/api/v1/recorridos/{recorrido}/paradas", new { estudianteIds = new[] { estudiante }, estado, motivoAusencia }, ClienteApi.Json);
+
+        // Juan no va al colegio hoy; a Valentina la lleva su acudiente (sí asiste); Samuel viaja.
+        (await Ausente(r.Id, juan, "NO_ASISTE")).EnsureSuccessStatusCode();
+        var marcado = await (await Ausente(r.Id, valentina, "POR_SU_CUENTA")).LeerAsync<RecorridoDto>();
+        Assert.Equal(["NO_ASISTE", "POR_SU_CUENTA", ""], marcado.Paradas.Select(p => p.MotivoAusencia));
+        Assert.Equal(HttpStatusCode.BadRequest, (await Ausente(r.Id, samuel, "NO_ASISTE", "A_BORDO")).StatusCode);
+        await c.MarcarAsync(r.Id, "A_BORDO", samuel);
+        await c.MarcarAsync(r.Id, "ENTREGADO", samuel);
+        (await c.PostAsJsonAsync($"/api/v1/recorridos/{r.Id}/finalizar", new { observaciones = "" }, ClienteApi.Json)).EnsureSuccessStatusCode();
+
+        var entrega = await (await c.IniciarAsync(e.Asignacion.Id, "ENTREGA")).LeerAsync<RecorridoDto>(HttpStatusCode.Created);
+        var porId = entrega.Paradas.ToDictionary(p => p.EstudianteId);
+        Assert.Equal((EstadoParada.Ausente, "NO_ASISTE"), (porId[juan].Estado, porId[juan].MotivoAusencia));
+        Assert.Equal((EstadoParada.Pendiente, ""), (porId[valentina].Estado, porId[valentina].MotivoAusencia));
+        Assert.Equal(EstadoParada.Pendiente, porId[samuel].Estado);
+
+        // "No asiste hoy" es de la recogida; en la entrega es "No viaja". Si Juan sí llegó, se deshace.
+        Assert.Equal("\"No asiste hoy\" se marca en la recogida. En la entrega usa \"No viaja\".",
+            await (await Ausente(entrega.Id, valentina, "NO_ASISTE")).MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
+        var deshecho = await c.MarcarAsync(entrega.Id, "PENDIENTE", juan);
+        Assert.Equal((EstadoParada.Pendiente, ""), (deshecho.Paradas.First(p => p.EstudianteId == juan).Estado, deshecho.Paradas.First(p => p.EstudianteId == juan).MotivoAusencia));
+    }
+
+    [Fact]
     public async Task Solo_la_monitora_reordena_las_paradas_por_visitar()
     {
         var e = await bd.EscenarioAsync();

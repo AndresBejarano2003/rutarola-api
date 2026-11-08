@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, ServiceLifetime.Singleton);
         services.AddScoped<ServicioAutenticacion>();
         services.AddScoped<ServicioEmpresas>();
+        services.AddScoped<ServicioAdministradoresEmpresa>();
         services.AddScoped<ServicioConfiguracion>();
         services.AddScoped<ParametrosEmpresa>();
         services.AddScoped<ServicioAcceso>();
@@ -42,6 +43,10 @@ public static class DependencyInjection
         services.AddScoped<ServicioCobros>();
         services.AddScoped<ServicioPortal>();
         services.AddScoped<ServicioMensajesWhatsapp>();
+        services.AddScoped<Soporte.AvisosSoporte>();
+        services.AddScoped<Soporte.ServicioSoporte>();
+        services.AddScoped<Suscripciones.ServicioSuscripcion>();
+        services.AddScoped<Empresas.ServicioRegistro>();
         return services;
     }
 }

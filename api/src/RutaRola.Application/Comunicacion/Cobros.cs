@@ -38,11 +38,17 @@ public interface ICanalCorreo
 /// plantilla EN USO con las variables de <c>VARIABLES_MENSAJE</c>. Los mensajes de WhatsApp quedan en
 /// <c>mensajes_whatsapp</c>.
 /// </summary>
-public class ServicioCobros(IBaseDatos db, ICanalWhatsapp whatsapp, ICanalCorreo correo, TimeProvider reloj)
+public class ServicioCobros(
+    IBaseDatos db, ICanalWhatsapp whatsapp, ICanalCorreo correo, TimeProvider reloj, Suscripciones.ServicioSuscripcion suscripcion)
 {
     public async Task<int> EnviarRecordatoriosAsync(CancellationToken ct = default)
     {
         if (!whatsapp.Habilitado && !correo.Habilitado)
+        {
+            return 0;
+        }
+        // Los recordatorios automáticos están incluidos desde el plan Esencial.
+        if (!await suscripcion.TieneFuncionAsync(Suscripciones.FuncionPlan.Recordatorios, ct))
         {
             return 0;
         }

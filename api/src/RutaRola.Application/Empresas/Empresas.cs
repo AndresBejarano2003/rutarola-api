@@ -98,6 +98,8 @@ public class ServicioEmpresas(IBaseDatos db, IPasswordHasher<Usuario> hasher)
         var empresa = new Empresa();
         Aplicar(empresa, solicitud);
         db.Empresas.Add(empresa);
+        // Toda empresa nueva arranca con la prueba gratuita (Suscripciones/CatalogoPlanes).
+        db.Suscripciones.Add(Suscripciones.ServicioSuscripcion.Prueba(empresa.Id, DateTime.UtcNow));
         foreach (var parametro in CatalogoConfiguracion.Parametros)
         {
             db.ConfiguracionSistema.Add(new ConfiguracionSistema { IdEmpresa = empresa.Id, Clave = parametro.Clave, Valor = parametro.ValorPorDefecto });

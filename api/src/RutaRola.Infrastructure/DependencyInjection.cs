@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<SembradorDatos>();
         services.AddSingleton<ICanalWhatsapp, CanalWhatsappServidor>();
         services.AddSingleton<ICanalCorreo, CanalCorreoServidor>();
+        services.AddSingleton<RutaRola.Application.Suscripciones.IPasarelaPagos, Pagos.PasarelaWompi>();
         return services;
     }
 

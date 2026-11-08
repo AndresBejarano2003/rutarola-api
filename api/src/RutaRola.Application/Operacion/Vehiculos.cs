@@ -52,7 +52,7 @@ public class ValidadorSolicitudVehiculo : AbstractValidator<SolicitudVehiculo>
 }
 
 /// <summary>Vehículos con sus documentos. Placa y número interno únicos; no se elimina si tiene asignaciones.</summary>
-public class ServicioVehiculos(IBaseDatos db) : ServicioCrud<Vehiculo, VehiculoDto, SolicitudVehiculo, FiltrosVehiculo>(db)
+public class ServicioVehiculos(IBaseDatos db, Suscripciones.ServicioSuscripcion suscripcion) : ServicioCrud<Vehiculo, VehiculoDto, SolicitudVehiculo, FiltrosVehiculo>(db)
 {
     protected override string Entidad => "El vehículo";
     protected override DbSet<Vehiculo> Conjunto => Db.Vehiculos;
@@ -124,6 +124,11 @@ public class ServicioVehiculos(IBaseDatos db) : ServicioCrud<Vehiculo, VehiculoD
         v.Anio = s.Modelo!.Value;
         v.Color = Texto.Opcional(s.Color);
         v.Capacidad = s.Capacidad!.Value;
+        // Activar uno más no puede superar el límite del plan (los ya activos se conservan).
+        if (EstadoRegistro.EsActivo(s.Estado) && (nuevo || !v.Activo))
+        {
+            await suscripcion.ValidarVehiculoAsync(nuevo ? null : v.Id, ct);
+        }
         v.Activo = EstadoRegistro.EsActivo(s.Estado);
         v.Observaciones = Texto.Opcional(s.Observaciones);
 

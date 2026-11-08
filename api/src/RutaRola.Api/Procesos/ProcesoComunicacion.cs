@@ -2,6 +2,7 @@ using System.Security.Claims;
 using RutaRola.Api.Seguridad;
 using RutaRola.Application.Comun;
 using RutaRola.Application.Comunicacion;
+using RutaRola.Application.Soporte;
 using Microsoft.EntityFrameworkCore;
 
 namespace RutaRola.Api.Procesos;
@@ -9,7 +10,8 @@ namespace RutaRola.Api.Procesos;
 /// <summary>
 /// Proceso del servidor que corre cada <c>Procesos:IntervaloMinutos</c> (15 por defecto) para cada empresa
 /// activa: envía los recordatorios de cobro (<see cref="ServicioCobros"/>) y genera las notificaciones
-/// (<see cref="GeneradorNotificaciones"/>) y borra las lecturas GPS vencidas (<c>Gps:DiasRetencion</c>), aunque nadie tenga la app abierta. Cada empresa corre en su
+/// (<see cref="GeneradorNotificaciones"/>), borra las lecturas GPS vencidas (<c>Gps:DiasRetencion</c>) y cierra los tickets
+/// resueltos sin respuesta (<see cref="ReglasTicket.DiasCierreAutomatico"/> días), aunque nadie tenga la app abierta. Cada empresa corre en su
 /// propio scope con el filtro de empresa normal (un contexto con solo su <c>id_empresa</c>), así que un
 /// error o un dato de una no afecta a las demás. Con varias instancias del API, dejar
 /// <c>Procesos:Habilitado</c> en una sola (el índice único de envíos evita duplicados si coinciden).
@@ -61,6 +63,20 @@ public sealed class ProcesoComunicacion(IServiceScopeFactory scopes, IConfigurat
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Proceso de comunicación: falló la retención GPS");
+        }
+
+        try
+        {
+            using var scope = scopes.CreateScope();
+            var cerrados = await scope.ServiceProvider.GetRequiredService<ServicioSoporte>().CerrarResueltosAsync(ct);
+            if (cerrados > 0)
+            {
+                logger.LogInformation("Soporte: {Cerrados} ticket(s) resuelto(s) cerrado(s) automáticamente", cerrados);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Proceso de comunicación: falló el cierre automático de tickets");
         }
 
         foreach (var empresa in empresas)

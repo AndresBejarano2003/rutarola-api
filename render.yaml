@@ -50,8 +50,16 @@ services:
       # Sin proveedor real: los recordatorios quedan registrados como enviados (no salen mensajes).
       - key: Mensajeria__Whatsapp
         value: Simulado
+      # PAUSADO hasta configurar Brevo y Wompi (pasos en api/README.md): el correo queda simulado (no sale) y,
+      # sin llaves de Wompi, el pago en línea está deshabilitado: el plan se solicita por Soporte y lo activa
+      # la plataforma en Empresas › Plan. Para activarlos: Mensajeria__Correo=Brevo + Correo__Brevo__ApiKey,
+      # Correo__Remitente, Soporte__CorreoEquipo; y Wompi__LlavePublica, Wompi__SecretoIntegridad, Wompi__SecretoEventos.
       - key: Mensajeria__Correo
         value: Simulado
+      - key: Soporte__UrlFrontend
+        value: https://rutarola.netlify.app
+      - key: Wompi__UrlRetorno
+        value: https://rutarola.netlify.app
       # Una sola instancia: el proceso de cobro/notificaciones y SignalR corren aquí (sin backplane).
       - key: Procesos__Habilitado
         value: "true"

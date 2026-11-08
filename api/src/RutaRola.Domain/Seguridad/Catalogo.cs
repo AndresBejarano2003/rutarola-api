@@ -71,6 +71,12 @@ public static class Permisos
     public const string MensajesLeer = "mensajes.leer";
     public const string MensajesGestionar = "mensajes.gestionar";
 
+    public const string SoporteSolicitar = "soporte.solicitar";
+    public const string SoporteGestionar = "soporte.gestionar";
+
+    public const string SuscripcionLeer = "suscripcion.leer";
+    public const string SuscripcionGestionar = "suscripcion.gestionar";
+
     public static readonly IReadOnlyDictionary<string, string> Descripciones = new Dictionary<string, string>
     {
         [EmpresasGestionar] = "Crear y administrar empresas de transporte (plataforma)",
@@ -112,6 +118,10 @@ public static class Permisos
         [NotificacionesPropias] = "Gestionar sus propias notificaciones",
         [MensajesLeer] = "Ver el registro de mensajes de WhatsApp",
         [MensajesGestionar] = "Registrar mensajes de WhatsApp",
+        [SoporteSolicitar] = "Crear y seguir solicitudes de soporte de la empresa",
+        [SoporteGestionar] = "Atender los tickets de soporte de todas las empresas (plataforma)",
+        [SuscripcionLeer] = "Ver el plan de la empresa y sus pagos",
+        [SuscripcionGestionar] = "Pagar o cambiar el plan de la empresa",
     };
 
     public static IEnumerable<string> Todos => Descripciones.Keys;
@@ -122,9 +132,9 @@ public static class Permisos
     public static readonly IReadOnlyDictionary<string, IReadOnlyCollection<string>> PorRol =
         new Dictionary<string, IReadOnlyCollection<string>>
         {
-            [Roles.SuperAdmin] = [EmpresasGestionar, UsuariosLeer, UsuariosGestionar, AuditoriaLeer, NotificacionesPropias],
+            [Roles.SuperAdmin] = [EmpresasGestionar, UsuariosLeer, UsuariosGestionar, AuditoriaLeer, NotificacionesPropias, SoporteGestionar],
             [Roles.AdminEmpresa] = Descripciones.Keys
-                .Where(p => p is not EmpresasGestionar and not RecorridosOperar and not GpsReportar and not PortalConsultar)
+                .Where(p => p is not EmpresasGestionar and not RecorridosOperar and not GpsReportar and not PortalConsultar and not SoporteGestionar)
                 .ToArray(),
             [Roles.Conductor] = Operativos,
             [Roles.Monitora] = Operativos,

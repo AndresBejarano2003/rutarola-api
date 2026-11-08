@@ -92,7 +92,15 @@ dotnet run --project src/RutaRola.Api -- migrar
 | `Jwt__SegundosGraciaRotacion` | — | Gracia (30 s) para dos renovaciones simultáneas del mismo refresh (p. ej. dos pestañas). |
 | `Seguridad__IntentosAutenticacionPorMinuto` | — | Límite por IP para `/auth/login` y `/auth/refresh` (10). |
 | `Procesos__Habilitado`, `Procesos__IntervaloMinutos` | — | Proceso de cobros y notificaciones (`true`, cada 15 min). Con varias instancias, habilitarlo en **una sola**. |
-| `Mensajeria__Whatsapp`, `Mensajeria__Correo` | — | `Deshabilitado` (por defecto: no se envía ni se registra nada) o `Simulado` (desarrollo y demo: queda como entregado sin salir del servidor). Aún no hay proveedor real. |
+| `Mensajeria__Whatsapp` | — | `Deshabilitado` (por defecto: no se envía ni se registra nada) o `Simulado` (desarrollo y demo: queda como entregado sin salir del servidor). Aún no hay proveedor real de WhatsApp. |
+| `Mensajeria__Correo` | — | `Deshabilitado`, `Simulado`, `Brevo` (API HTTPS, la de producción: el plan gratis de Render bloquea los puertos SMTP) o `Smtp`. Si falta un ajuste del proveedor elegido, el canal queda deshabilitado y se registra un error. |
+| `Correo__Remitente`, `Correo__NombreRemitente` | con correo real | Dirección verificada en el proveedor y nombre visible (`RutaRola`). |
+| `Correo__Brevo__ApiKey` | con `Brevo` | Llave API de Brevo (SMTP & API › API Keys). |
+| `Correo__Smtp__Servidor`, `__Puerto`, `__Usuario`, `__Clave`, `__Ssl` | con `Smtp` | Puerto 587 y STARTTLS por defecto. |
+| `Soporte__CorreoEquipo` | — | Correo del equipo que recibe los tickets nuevos y las respuestas; vacío = todos los SuperAdmin activos. |
+| `Soporte__UrlFrontend` | — | Base de los enlaces de los correos (`https://rutarola.netlify.app`). |
+| `Wompi__LlavePublica`, `Wompi__SecretoIntegridad`, `Wompi__SecretoEventos` | para cobrar en línea | Llaves de Wompi (Desarrolladores). `pub_test_…` usa el sandbox, `pub_prod_…` producción. Sin llave pública o secreto de integridad, `POST /suscripcion/pagos` responde 422. |
+| `Wompi__UrlRetorno` | — | Frontend al que vuelve el navegador después de pagar (`https://rutarola.netlify.app`). |
 | `Gps__DiasRetencion` | — | Días que se conservan las ubicaciones GPS (30; `0` = siempre). El proceso del servidor borra las más antiguas de todas las empresas: son posiciones de un vehículo con menores. |
 
 No se guardan secretos en el repo: en desarrollo `dotnet user-secrets` o `api/.env` (ignorado por git);
@@ -172,8 +180,8 @@ Todos con el contrato CRUD (ver Convenciones) y solo para el administrador de la
 | Petición | Permiso | Respuesta |
 |---|---|---|
 | `GET /recorridos/del-dia?fecha=` | `recorridos.operar` | Asignaciones activas y vigentes del empleado (conductor o monitora) con ruta activa, su compañero y los recorridos de la fecha. |
-| `POST /recorridos {asignacionId, trayecto}` | `recorridos.operar` | 201 con el snapshot (ruta, colegio, vehículo, personal y estudiantes activos con su acudiente principal; ENTREGA al revés). 200 con el existente si el compañero ya lo inició. 409 si otro trayecto está EN_CURSO; 422 si la ruta no es suya hoy o no tiene estudiantes activos. |
-| `PATCH /recorridos/{id}/paradas {estudianteIds, estado}` | `recorridos.operar` | Transiciones PENDIENTE → A_BORDO/AUSENTE, A_BORDO → ENTREGADO/PENDIENTE, ENTREGADO → A_BORDO, AUSENTE → PENDIENTE, con hora (422 si no se permite o ya finalizó). |
+| `POST /recorridos {asignacionId, trayecto}` | `recorridos.operar` | 201 con el snapshot (ruta, colegio, vehículo, personal y estudiantes activos con su acudiente principal; ENTREGA al revés, y en ella AUSENTE + `NO_ASISTE` quien en la recogida de hoy quedó "No asiste hoy"). 200 con el existente si el compañero ya lo inició. 409 si otro trayecto está EN_CURSO; 422 si la ruta no es suya hoy o no tiene estudiantes activos. |
+| `PATCH /recorridos/{id}/paradas {estudianteIds, estado, motivoAusencia?}` | `recorridos.operar` | Transiciones PENDIENTE → A_BORDO/AUSENTE, A_BORDO → ENTREGADO/PENDIENTE, ENTREGADO → A_BORDO, AUSENTE → PENDIENTE, con hora (422 si no se permite o ya finalizó). `motivoAusencia` solo con AUSENTE (400 si no): `NO_ASISTE` (no va al colegio; solo en la recogida, 422 en la entrega) o `POR_SU_CUENTA` (sí asiste, no viaja en ese trayecto); marcar AUSENTE a quien ya lo está corrige el motivo. Las paradas lo devuelven como `""` cuando no hay. |
 | `PUT /recorridos/{id}/orden {estudianteIds}` | `recorridos.operar` | Solo la monitora (o el conductor sin monitora, 403); la lista debe ser EXACTAMENTE las paradas por visitar (409). Guarda `ordenActualizado`. |
 | `POST /recorridos/{id}/finalizar {observaciones}` | `recorridos.operar` | 422 si queda alguien a bordo o pendiente. |
 | `GET /recorridos/{id}` | `recorridos.leer` o `.operar` | El administrador ve cualquiera de su empresa; el empleado solo los suyos (403). |
@@ -188,7 +196,7 @@ por asignación **y fecha** (migración `Fase5EnCursoPorFecha`): uno que quedó 
 
 | Petición | Quién | Respuesta |
 |---|---|---|
-| `POST /recorridos/{id}/gps {posiciones:[{latitud, longitud, velocidad?, rumbo?, fecha}]}` | Conductor o monitora del recorrido (`gps.reportar`) | `{recibidas, descartadas, ultima}`. Máximo 500 por lote; latitud −90…90, longitud −180…180, velocidad 0…300 km/h, rumbo 0…360. Se descartan las repetidas (misma `fecha`) y las que caen fuera de inicio − 5 min … fin + 5 min (un lote sin señal llega bien después de finalizar). `fecha` en ISO UTC. |
+| `POST /recorridos/{id}/gps {posiciones:[{latitud, longitud, velocidad?, rumbo?, fecha}]}` | Conductor o monitora del recorrido (`gps.reportar`) | `{recibidas, descartadas, ultima}`. Máximo 500 por lote; latitud −90…90, longitud −180…180, velocidad 0…300 km/h, rumbo 0…360. Reportan los DOS teléfonos (conductor y monitora) para que la ubicación siga al día si uno se apaga: se descarta la lectura a menos de 4 s de otra ya guardada del recorrido (`SeparacionMinima`; incluye las repetidas) y las que caen fuera de inicio − 5 min … fin + 5 min (un lote sin señal llega bien después de finalizar). `fecha` en ISO UTC. |
 | `GET /recorridos/{id}/gps/ultima` | Administrador, personal del recorrido o acudiente de uno de sus estudiantes | Última posición, o 204. El acudiente solo mientras el recorrido está EN_CURSO. |
 | `GET /recorridos/{id}/gps?desde=` | Administrador o personal | Trayecto en orden (máx. 5000 puntos); `desde` trae solo lo nuevo. |
 | `GET /recorridos/en-curso` | Administrador (`recorridos.leer`) | Recorridos EN_CURSO con conteo de paradas y última posición (mapa). |
@@ -324,9 +332,61 @@ variables (`{acudiente}`, `{estudiante}`, `{factura}`, `{mes}`, `{valor}`, `{fec
 o si el proveedor falla, queda FALLIDO (no se reintenta ese mes; la campana lo avisa). Los WhatsApp quedan en
 `mensajes_whatsapp`. Los logs nunca incluyen el texto ni el destinatario.
 
-**Pendiente:** el proveedor real de WhatsApp (WhatsApp Business) y de correo: se conectan implementando
-`ICanalWhatsapp` / `ICanalCorreo` en `Infrastructure/Mensajeria`. Tampoco hay aún avisos al acudiente de los
+**Correo** (`CanalCorreoServidor`): `Mensajeria:Correo` = `Brevo` (`POST https://api.brevo.com/v3/smtp/email`) o
+`Smtp` (System.Net.Mail). Nunca se registran el destinatario ni el texto.
+
+**Pendiente:** el proveedor real de WhatsApp (WhatsApp Business): se conecta implementando `ICanalWhatsapp` en
+`Infrastructure/Mensajeria`. Tampoco hay aún avisos al acudiente de los
 eventos del recorrido (recogido, entregado, no asistió).
+
+## Soporte (tickets)
+
+| Petición | Permiso | Respuesta |
+|---|---|---|
+| `GET /soporte/tickets?estado&pagina&tamano`, `GET /soporte/tickets/{id}` | `soporte.solicitar` (AdminEmpresa) | Tickets de su empresa con historial público, reuniones y adjuntos (nunca notas internas). |
+| `POST /soporte/tickets` | `soporte.solicitar` | 201. Consecutivo global `SOP-0001`; tipo, módulo, prioridad (no CRÍTICA), asunto 5–120, descripción 20–2000, ≤ 3 adjuntos de 1 MB. |
+| `POST /soporte/tickets/{id}/comentarios`, `…/validacion {funciona, comentario}`, `…/confirmacion {calificacion 1–5}`, `…/reapertura`, `…/cancelacion` | `soporte.solicitar` | El ticket actualizado. Responder en ESPERANDO_CLIENTE lo devuelve a EN_REVISION. 422 si la acción no aplica al estado. |
+| `GET /plataforma/tickets?texto&estado&empresaId&prioridad&tipo&responsableId&vencidos`, `GET …/resumen`, `GET …/responsables`, `GET …/{id}` | `soporte.gestionar` (SuperAdmin) | Bandeja de todas las empresas, tarjetas de resumen y detalle con notas internas. |
+| `POST /plataforma/tickets/{id}/estado {estado, comentario}`, `…/respuestas {texto, interna, adjuntos}`, `PUT …/asignacion {responsableId, prioridad}`, `POST …/reuniones`, `PUT …/reuniones/{idReunion}` | `soporte.gestionar` | Transiciones de `ReglasTicket` (422 si no se permite o falta el comentario). Una reunión VIRTUAL exige enlace; REALIZADA exige acta. |
+| `GET …/adjuntos/{idAdjunto}` (ambos lados) | igual que el ticket | El archivo. |
+
+Tablas `tickets_soporte`, `eventos_ticket`, `reuniones_ticket`, `adjuntos_ticket` (en cascada desde el ticket,
+filtradas por su empresa). Flujo: NUEVO → EN_REVISION → EN_PROCESO → EN_QA → EN_PRUEBAS → VALIDACION_CLIENTE →
+RESUELTO → CERRADO, más ESPERANDO_CLIENTE, retrocesos, RECHAZADO y CANCELADO. ERROR y MEJORA solo se resuelven
+desde VALIDACION_CLIENTE. SLA desde la creación: crítica 8 h, alta 24 h, media 72 h, baja 7 días. `AvisosSoporte`
+envía correo al equipo y al solicitante, y una notificación de campana por cada respuesta pública, sin hacer
+fallar la petición. `ProcesoComunicacion` cierra los RESUELTO con más de 7 días.
+
+**Administradores de empresa** (`empresas.gestionar`): `GET/POST /empresas/{id}/administradores`,
+`PUT …/{idUsuario}` (contraseña vacía = conservar), `PUT …/{idUsuario}/contrasena {nueva}` (204). Cambiar la
+contraseña o inactivar revoca sus sesiones.
+
+## Planes y suscripciones
+
+| Petición | Permiso | Respuesta |
+|---|---|---|
+| `GET /suscripcion/planes` | anónimo | Catálogo de `CatalogoPlanes` (precios COP con IVA, anual = 10 mensualidades, límites, funciones). |
+| `GET /suscripcion`, `GET /suscripcion/pagos` | `suscripcion.leer` | Plan, estado (PRUEBA/ACTIVA/GRATIS), días restantes, límites y uso; historial de pagos. |
+| `POST /suscripcion/pagos {plan, periodo}` | `suscripcion.gestionar` | 201 `{referencia, url}`: pago PENDIENTE y URL firmada del Web Checkout (integridad = SHA256(ref + centavos + moneda + secreto)). 422 sin llaves. |
+| `POST /suscripcion/pagos/{referencia}/verificacion {idTransaccion}` | `suscripcion.gestionar` | Consulta la transacción en Wompi y la aplica si está aprobada. |
+| `POST /pagos/wompi/eventos` | anónimo | Evento `transaction.updated`; checksum con `Wompi:SecretoEventos` (401 si no coincide). Valor y moneda deben coincidir con el pago. Idempotente. |
+| `GET/PUT /empresas/{id}/suscripcion`, `GET /empresas/{id}/suscripcion/pagos` | `empresas.gestionar` | Ajuste manual de la plataforma (plan, estado, vencimiento futuro, nota). |
+| `POST /auth/registro {empresa, administrador, aceptaTerminos}` | anónimo (límite por IP) | 201 `{sesion, tokens}`: crea empresa, administrador y prueba. 409 NIT/usuario/correo en uso. |
+
+Tablas `suscripciones` (una por empresa) y `pagos_suscripcion` (`referencia` única). Toda empresa nueva recibe 3
+meses de Profesional (`PRUEBA`); al vencer sin pago pasa a GRATIS sin perder datos. Solo Wompi activa un plan
+(evento firmado o consulta del servidor), nunca el navegador. Pagar durante la prueba suma los días que quedan;
+renovar el mismo plan extiende; cambiar de plan empieza hoy. Límites: crear o activar vehículos y estudiantes por
+encima del plan → 422; lotes GPS sin `GPS_EN_VIVO` → 422; sin `RECORDATORIOS` el proceso no envía cobros. Una
+empresa sin fila cuenta como prueba Profesional. La migración `Suscripciones` dio 3 meses de prueba a las
+empresas existentes.
+
+**Estado actual: Wompi y Brevo PAUSADOS.** `render.yaml` deja `Mensajeria__Correo=Simulado` y sin llaves de
+Wompi: `pagosEnLinea` = false, el frontend ofrece "Solicitar por Soporte" y la plataforma activa el plan en
+Empresas › Plan (`PUT /empresas/{id}/suscripcion`).
+
+**Configurar Wompi (cuando se active):** llaves del sandbox en las variables `Wompi__*` y, en el panel de Wompi (Desarrolladores ›
+URL de eventos), `https://rutarola-api.onrender.com/api/v1/pagos/wompi/eventos`.
 
 ## Diferencias con el modelo de Lucidchart (`docs/modelo-bd-rutarola.json`)
 
@@ -372,3 +432,5 @@ Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
 8. ✅ Integración final: GPS desde la Ruta del día y mapas (administrador, historial, acudiente) sobre el hub,
    avisos por grupos de empleado/acudiente, retención GPS, parámetros de la empresa aplicados, cambio de
    contraseña, plataforma de empresas en el frontend, URL de conexión del proveedor y blueprint de Render.
+9. ✅ Soporte y planes: tickets con flujo de QA/pruebas/validación, reuniones y correo (Brevo/SMTP); administradores
+   de cada empresa desde la plataforma; planes con prueba de 3 meses, límites, pago con Wompi y registro público.

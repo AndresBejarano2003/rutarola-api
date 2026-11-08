@@ -79,16 +79,24 @@ public enum AlcanceGps
 
 /// <summary>
 /// Posiciones GPS de los recorridos (tabla <c>gps_vehiculos</c>, filtrada por la empresa del vehículo).
-/// Solo el conductor o la monitora del recorrido reportan; la ubicación de un vehículo con menores
+/// Reportan el conductor Y la monitora del recorrido (los dos teléfonos, para que la ubicación siga al día
+/// si uno se apaga); las lecturas casi simultáneas se descartan (<see cref="SeparacionMinima"/>); la ubicación de un vehículo con menores
 /// solo la ven el administrador, el personal del recorrido y los acudientes de sus estudiantes
 /// mientras el recorrido está en curso.
 /// </summary>
-public class ServicioGps(IBaseDatos db, IContextoUsuario contexto, IAvisosRecorrido avisos, TimeProvider reloj)
+public class ServicioGps(
+    IBaseDatos db, IContextoUsuario contexto, IAvisosRecorrido avisos, TimeProvider reloj, Suscripciones.ServicioSuscripcion suscripcion)
 {
     /// <summary>Tolerancia del reloj del teléfono frente al inicio del recorrido y a la hora del servidor.</summary>
     public static readonly TimeSpan Tolerancia = TimeSpan.FromMinutes(5);
 
     public const int MaximoTrayecto = 5000;
+
+    /// <summary>
+    /// Separación mínima entre lecturas guardadas de un recorrido. El teléfono toma una cada 5 s o más
+    /// (<c>lecturaUtil</c>); con dos teléfonos en el vehículo se guarda la primera que llega de cada ventana.
+    /// </summary>
+    public static readonly TimeSpan SeparacionMinima = TimeSpan.FromSeconds(4);
 
     private const string NoEncontrado = "El recorrido no existe o no pertenece a tus rutas.";
 
@@ -104,6 +112,10 @@ public class ServicioGps(IBaseDatos db, IContextoUsuario contexto, IAvisosRecorr
         {
             throw new ErrorNegocio("El recorrido aún no ha iniciado.", CodigoError.Validacion);
         }
+        if (!await suscripcion.TieneFuncionAsync(Suscripciones.FuncionPlan.GpsEnVivo, ct))
+        {
+            throw new ErrorNegocio("El GPS en vivo está incluido desde el plan Profesional.", CodigoError.Validacion);
+        }
 
         // Se aceptan lecturas entre el inicio y el fin (las de un teléfono sin señal llegan después de finalizar).
         var ahora = reloj.GetUtcNow().UtcDateTime;
@@ -116,12 +128,22 @@ public class ServicioGps(IBaseDatos db, IContextoUsuario contexto, IAvisosRecorr
             .ToList();
         if (validas.Count > 0)
         {
-            var minimo = validas.Min(p => p.Fecha!.Value);
-            var maximo = validas.Max(p => p.Fecha!.Value);
-            var existentes = (await db.GpsVehiculos.AsNoTracking()
+            // Conductor y monitora pueden reportar a la vez (cualquiera de los dos mantiene la ubicación al día):
+            // una lectura a menos de SeparacionMinima de otra ya guardada del recorrido sobra (misma ubicación).
+            var minimo = validas.Min(p => p.Fecha!.Value) - SeparacionMinima;
+            var maximo = validas.Max(p => p.Fecha!.Value) + SeparacionMinima;
+            var tomadas = await db.GpsVehiculos.AsNoTracking()
                 .Where(g => g.IdViaje == viaje.Id && g.FechaRegistro >= minimo && g.FechaRegistro <= maximo)
-                .Select(g => g.FechaRegistro).ToListAsync(ct)).ToHashSet();
-            validas.RemoveAll(p => existentes.Contains(p.Fecha!.Value));
+                .Select(g => g.FechaRegistro).ToListAsync(ct);
+            var aceptadas = new List<LecturaGps>();
+            foreach (var p in validas.OrderBy(p => p.Fecha))
+            {
+                var fecha = p.Fecha!.Value;
+                if (tomadas.Any(t => (t - fecha).Duration() < SeparacionMinima)) continue;
+                aceptadas.Add(p);
+                tomadas.Add(fecha);
+            }
+            validas = aceptadas;
         }
 
         if (validas.Count > 0)

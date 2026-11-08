@@ -4,6 +4,8 @@ using RutaRola.Domain.Finanzas;
 using RutaRola.Domain.Operacion;
 using RutaRola.Domain.Personas;
 using RutaRola.Domain.Seguridad;
+using RutaRola.Domain.Soporte;
+using RutaRola.Domain.Suscripciones;
 
 namespace RutaRola.Application.Comun;
 
@@ -48,6 +50,12 @@ public interface IBaseDatos
     DbSet<Notificacion> Notificaciones { get; }
     DbSet<MensajeWhatsapp> MensajesWhatsapp { get; }
     DbSet<Archivo> Archivos { get; }
+    DbSet<TicketSoporte> TicketsSoporte { get; }
+    DbSet<EventoTicket> EventosTicket { get; }
+    DbSet<ReunionTicket> ReunionesTicket { get; }
+    DbSet<AdjuntoTicket> AdjuntosTicket { get; }
+    DbSet<Suscripcion> Suscripciones { get; }
+    DbSet<PagoSuscripcion> PagosSuscripcion { get; }
 
     /// <summary>Empresa del token (o <see cref="Guid.Empty"/>).</summary>
     Guid IdEmpresaActual { get; }
