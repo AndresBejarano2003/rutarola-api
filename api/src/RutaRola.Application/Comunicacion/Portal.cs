@@ -24,18 +24,23 @@ public record FacturaPortalDto(
     string PeriodoFin, decimal Total, decimal Pagado, decimal Vencido, string Estado, IReadOnlyList<CuotaPortalDto> Cuotas);
 
 /// <summary>Estado del estudiante hoy en un trayecto (lo que ve el acudiente).</summary>
-/// <summary><c>motivoAusencia</c>: <c>NO_ASISTE</c> | <c>POR_SU_CUENTA</c> | <c>""</c> (como en <c>ParadaDto</c>).</summary>
+/// <summary>
+/// <c>motivoAusencia</c>: <c>NO_ASISTE</c> | <c>POR_SU_CUENTA</c> | <c>""</c> (como en <c>ParadaDto</c>).
+/// <c>horaInicio</c>: cuando el conductor o la monitora iniciaron el trayecto (se ve aunque la empresa no comparta la ubicación).
+/// </summary>
 public record RecorridoHoyDto(
-    Guid RecorridoId, Trayecto Trayecto, bool EnCurso, EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega, string MotivoAusencia);
+    Guid RecorridoId, Trayecto Trayecto, bool EnCurso, EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega, string MotivoAusencia,
+    DateTime? HoraInicio);
 
 public record TransporteEstudianteDto(
-    string Ruta, string Jornada, string Sector, string Vehiculo, string Conductor, string TelefonoConductor, string Monitora, string TelefonoMonitora);
+    string Ruta, string Jornada, string Sector, string Vehiculo, string Conductor, string TelefonoConductor, string Monitora, string TelefonoMonitora,
+    string FotoConductor, string FotoMonitora);
 
 public record HorarioDto(TimeOnly Entrada, TimeOnly Salida);
 
 public record EstudiantePortalDto(
     Guid Id, string Nombre, string Iniciales, string Grado, string Jornada, string Direccion, string Colegio, string DireccionColegio,
-    HorarioDto? Horario, string Estado, TransporteEstudianteDto? Transporte, IReadOnlyList<RecorridoHoyDto> Hoy);
+    HorarioDto? Horario, string Estado, TransporteEstudianteDto? Transporte, IReadOnlyList<RecorridoHoyDto> Hoy, string Foto);
 
 public record CotizacionPortalDto(
     Guid Id, string Numero, DateOnly Fecha, IReadOnlyList<string> Estudiantes, decimal ValorPorEstudiante, decimal ValorTotal, EstadoCotizacion Estado);
@@ -49,7 +54,8 @@ public record AcudientePortalDto(string Nombre, string Telefono, string Correo, 
 /// <summary><c>PortalAcudiente</c> del frontend (<c>portal/portal.ts</c>).</summary>
 public record PortalAcudienteDto(
     AcudientePortalDto Acudiente, IReadOnlyList<EstudiantePortalDto> Estudiantes, IReadOnlyList<FacturaPortalDto> Facturas,
-    IReadOnlyList<ReciboPortalDto> Recibos, IReadOnlyList<CotizacionPortalDto> Cotizaciones, ResumenCuentaDto Resumen);
+    IReadOnlyList<ReciboPortalDto> Recibos, IReadOnlyList<CotizacionPortalDto> Cotizaciones, ResumenCuentaDto Resumen,
+    bool UbicacionEnVivo);
 
 /// <summary>
 /// Portal del acudiente del token (nunca de un parámetro), igual que <c>PortalLocal</c>: solo SUS estudiantes
@@ -92,12 +98,13 @@ public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, ParametrosE
                         : new TransporteEstudianteDto(
                             ServicioRutas.Etiquetar(ruta), ruta.Jornada, ruta.Sector ?? "", asignacion?.Vehiculo.Placa ?? "",
                             asignacion?.Conductor.NombreCompleto ?? "", asignacion?.Conductor.Telefono ?? "", asignacion?.Monitora?.NombreCompleto ?? "",
-                            asignacion?.Monitora?.Telefono ?? ""),
+                            asignacion?.Monitora?.Telefono ?? "", asignacion?.Conductor.Foto ?? "", asignacion?.Monitora?.Foto ?? ""),
                     paradas.Where(p => p.IdEstudiante == e.Id)
                         .OrderBy(p => p.Viaje.Trayecto) // RECOGIDA antes que ENTREGA
                         .Select(p => new RecorridoHoyDto(p.IdViaje, p.Viaje.Trayecto, p.Viaje.Estado == EstadoViaje.EnCurso, p.Estado, p.HoraRecogida, p.HoraEntrega,
-                            ServicioRecorridos.TextoMotivo(p.MotivoAusencia)))
-                        .ToList());
+                            ServicioRecorridos.TextoMotivo(p.MotivoAusencia), p.Viaje.HoraInicio))
+                        .ToList(),
+                    e.Foto ?? "");
             })
             // Activos primero, luego por nombre.
             .OrderBy(e => e.Estado, StringComparer.Ordinal).ThenBy(e => e.Nombre, StringComparer.CurrentCulture)
@@ -119,7 +126,8 @@ public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, ParametrosE
             cotizaciones.Select(c => new CotizacionPortalDto(
                 c.Id, c.Numero, c.Fecha, c.Estudiantes.OrderBy(e => e.Orden).Select(e => e.Nombre).ToList(), c.ValorPorEstudiante, c.ValorTotal,
                 c.Estado)).ToList(),
-            resumen);
+            resumen,
+            await parametros.AcudientesVenUbicacionAsync(ct));
     }
 
     private static string Iniciales(string nombre, string apellido) =>

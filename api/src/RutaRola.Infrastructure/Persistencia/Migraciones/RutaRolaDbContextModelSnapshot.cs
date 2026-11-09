@@ -1612,6 +1612,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_creacion");
 
+                    b.Property<string>("Foto")
+                        .HasColumnType("text")
+                        .HasColumnName("foto");
+
                     b.Property<Guid>("IdEmpresa")
                         .HasColumnType("uuid")
                         .HasColumnName("id_empresa");
@@ -1725,6 +1729,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Property<DateOnly?>("FechaVencimientoLicencia")
                         .HasColumnType("date")
                         .HasColumnName("fecha_vencimiento_licencia");
+
+                    b.Property<string>("Foto")
+                        .HasColumnType("text")
+                        .HasColumnName("foto");
 
                     b.Property<Guid?>("IdArchivoContrato")
                         .HasColumnType("uuid")
@@ -1844,6 +1852,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Property<DateOnly>("FechaNacimiento")
                         .HasColumnType("date")
                         .HasColumnName("fecha_nacimiento");
+
+                    b.Property<string>("Foto")
+                        .HasColumnType("text")
+                        .HasColumnName("foto");
 
                     b.Property<string>("Grado")
                         .IsRequired()
@@ -2308,6 +2320,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Property<DateTime>("FechaCreacion")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_creacion");
+
+                    b.Property<string>("Foto")
+                        .HasColumnType("text")
+                        .HasColumnName("foto");
 
                     b.Property<Guid?>("IdEmpresa")
                         .HasColumnType("uuid")

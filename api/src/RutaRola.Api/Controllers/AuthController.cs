@@ -11,7 +11,7 @@ namespace RutaRola.Api.Controllers;
 /// Sesión: access token JWT (15 min) + refresh token rotativo (un solo uso). El frontend renueva con
 /// <c>/auth/refresh</c> cuando recibe 401 y, si falla, vuelve al login.
 /// </summary>
-public class AuthController(ServicioAutenticacion servicio, IContextoUsuario usuario) : ControladorApi
+public class AuthController(ServicioAutenticacion servicio, ServicioPerfil perfil, IContextoUsuario usuario) : ControladorApi
 {
     /// <summary>Inicia sesión con el usuario (o correo) y la contraseña.</summary>
     /// <response code="200">Sesión y tokens.</response>
@@ -55,6 +55,16 @@ public class AuthController(ServicioAutenticacion servicio, IContextoUsuario usu
     [HttpGet("me")]
     public Task<SesionDto> Me(CancellationToken ct) =>
         servicio.ObtenerSesionAsync(usuario.IdUsuario!.Value, ct);
+
+    /// <summary>Datos de contacto y foto propios (Mi cuenta), de cualquier rol.</summary>
+    [HttpGet("perfil")]
+    public Task<PerfilDto> Perfil(CancellationToken ct) => perfil.ObtenerAsync(ct);
+
+    /// <summary>Actualiza los datos propios y devuelve la sesión con la foto y el nombre nuevos.</summary>
+    /// <response code="409">El correo ya lo usa otro usuario (administrador).</response>
+    /// <response code="422">Falta el teléfono (conductor, monitora, acudiente) o el nombre (administrador).</response>
+    [HttpPut("perfil")]
+    public Task<SesionDto> ActualizarPerfil(SolicitudPerfil solicitud, CancellationToken ct) => perfil.ActualizarAsync(solicitud, ct);
 
     /// <summary>Cambia la contraseña propia (exige la actual) y cierra las demás sesiones.</summary>
     /// <response code="204">Contraseña cambiada.</response>

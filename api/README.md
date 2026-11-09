@@ -153,7 +153,9 @@ conectados a la instancia que lo generó.
 - **Permisos:** cada permiso de `Domain/Seguridad/Catalogo.cs` es una policy y se exige con `[RequierePermiso(Permisos.X)]`. Los permisos de cada rol están en `Permisos.PorRol`.
 - **Plataforma:** el SuperAdmin (sin empresa) crea empresas con `POST /api/v1/empresas`, con su configuración por defecto y, opcionalmente, su primer `administrador`.
   - Cada empresa ve y edita la suya en `/api/v1/empresas/actual`.
-  - Su configuración está en `GET/PUT /api/v1/configuracion/{clave}`.
+  - Su configuración está en `GET/PUT /api/v1/configuracion/{clave}`: `finanzas.dia_limite_pago` (1–31), `alertas.dias_vencimiento` (1–120) y `gps.acudientes_ven_ubicacion` (0/1, por defecto 1). Con 0, el acudiente no ve la ubicación (403 en `gps/ultima` y en `Seguir`; su grupo del hub `recorrido:{id}:acudientes` deja de recibir `posicion`) y el portal trae `ubicacionEnVivo: false`; `RecorridoHoy.horaInicio` sigue llegando.
+- **Mi cuenta:** `GET /api/v1/auth/perfil` → `{usuario, rol, nombre, editaNombre, correo, telefono, foto}` y `PUT /api/v1/auth/perfil {nombre, correo, telefono, foto}` → la sesión actualizada (`ServicioPerfil`, cualquier rol, el usuario sale del token). Administrador/SuperAdmin: fila de `usuarios` (nombre obligatorio, correo único → 409). Conductor, monitora y acudiente: su empleado o acudiente (teléfono obligatorio → 422; el nombre no cambia).
+- **Fotos:** columna `foto` (text, data URL) en `estudiantes`, `acudientes`, `empleados` y `usuarios` (migración `FotosYUbicacionAcudientes`). `Comun/Fotos.cs` valida JPG/PNG/WebP en base64 de hasta 400 000 caracteres (el frontend las reduce a 256 px); `""` = sin foto. Se devuelven en listados y detalle para el avatar de las tablas, y en la sesión (`imagen`). La auditoría nunca copia la imagen: anota `"foto": "(cambiada)"`.
 
 ## Catálogos (fase 3)
 
@@ -183,6 +185,7 @@ Todos con el contrato CRUD (ver Convenciones) y solo para el administrador de la
 | `POST /recorridos {asignacionId, trayecto}` | `recorridos.operar` | 201 con el snapshot (ruta, colegio, vehículo, personal y estudiantes activos con su acudiente principal; ENTREGA al revés, y en ella AUSENTE + `NO_ASISTE` quien en la recogida de hoy quedó "No asiste hoy"). 200 con el existente si el compañero ya lo inició. 409 si otro trayecto está EN_CURSO; 422 si la ruta no es suya hoy o no tiene estudiantes activos. |
 | `PATCH /recorridos/{id}/paradas {estudianteIds, estado, motivoAusencia?}` | `recorridos.operar` | Transiciones PENDIENTE → A_BORDO/AUSENTE, A_BORDO → ENTREGADO/PENDIENTE, ENTREGADO → A_BORDO, AUSENTE → PENDIENTE, con hora (422 si no se permite o ya finalizó). `motivoAusencia` solo con AUSENTE (400 si no): `NO_ASISTE` (no va al colegio; solo en la recogida, 422 en la entrega) o `POR_SU_CUENTA` (sí asiste, no viaja en ese trayecto); marcar AUSENTE a quien ya lo está corrige el motivo. Las paradas lo devuelven como `""` cuando no hay. |
 | `PUT /recorridos/{id}/orden {estudianteIds}` | `recorridos.operar` | Solo la monitora (o el conductor sin monitora, 403); la lista debe ser EXACTAMENTE las paradas por visitar (409). Guarda `ordenActualizado`. |
+| `GET /recorridos/{id}/fotos` | `recorridos.leer` / `recorridos.operar` | Fotos de los estudiantes del recorrido `[{estudianteId, foto}]` (solo los que tienen). Mismo acceso que `GET /recorridos/{id}`: el admin cualquiera de su empresa, el personal solo los suyos (403); el acudiente no (403). Se pide una vez por pantalla. |
 | `POST /recorridos/{id}/finalizar {observaciones}` | `recorridos.operar` | 422 si queda alguien a bordo o pendiente. |
 | `GET /recorridos/{id}` | `recorridos.leer` o `.operar` | El administrador ve cualquiera de su empresa; el empleado solo los suyos (403). |
 | `GET /recorridos?texto&desde&hasta&rutaId&trayecto&estado&novedad` | `recorridos.leer` | Historial paginado, del más reciente al más antiguo; `novedad` = AUSENCIAS u OBSERVACIONES. |
@@ -197,7 +200,7 @@ por asignación **y fecha** (migración `Fase5EnCursoPorFecha`): uno que quedó 
 | Petición | Quién | Respuesta |
 |---|---|---|
 | `POST /recorridos/{id}/gps {posiciones:[{latitud, longitud, velocidad?, rumbo?, fecha}]}` | Conductor o monitora del recorrido (`gps.reportar`) | `{recibidas, descartadas, ultima}`. Máximo 500 por lote; latitud −90…90, longitud −180…180, velocidad 0…300 km/h, rumbo 0…360. Reportan los DOS teléfonos (conductor y monitora) para que la ubicación siga al día si uno se apaga: se descarta la lectura a menos de 4 s de otra ya guardada del recorrido (`SeparacionMinima`; incluye las repetidas) y las que caen fuera de inicio − 5 min … fin + 5 min (un lote sin señal llega bien después de finalizar). `fecha` en ISO UTC. |
-| `GET /recorridos/{id}/gps/ultima` | Administrador, personal del recorrido o acudiente de uno de sus estudiantes | Última posición, o 204. El acudiente solo mientras el recorrido está EN_CURSO. |
+| `GET /recorridos/{id}/gps/ultima` | Administrador, personal del recorrido o acudiente de uno de sus estudiantes | Última posición, o 204. El acudiente solo mientras el recorrido está EN_CURSO y si la empresa comparte la ubicación (`gps.acudientes_ven_ubicacion` = 1; si no, 403). |
 | `GET /recorridos/{id}/gps?desde=` | Administrador o personal | Trayecto en orden (máx. 5000 puntos); `desde` trae solo lo nuevo. |
 | `GET /recorridos/en-curso` | Administrador (`recorridos.leer`) | Recorridos EN_CURSO con conteo de paradas y última posición (mapa). |
 

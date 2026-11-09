@@ -29,6 +29,7 @@ internal class UsuarioConfig : IEntityTypeConfiguration<Usuario>
         b.Property(x => x.NombreUsuario).HasColumnName("usuario").HasMaxLength(40);
         b.Property(x => x.Email).HasMaxLength(150);
         b.Property(x => x.Telefono).HasMaxLength(20);
+        b.Property(x => x.Foto).HasColumnName("foto");
         b.Property(x => x.PasswordHash).HasMaxLength(500);
         b.HasIndex(x => x.NombreUsuario).IsUnique();
         b.HasIndex(x => x.Email).IsUnique().HasFilter("email IS NOT NULL");

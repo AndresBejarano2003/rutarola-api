@@ -50,10 +50,10 @@ public class ValidadorLoteGps : AbstractValidator<SolicitudLoteGps>
 public interface IAvisosRecorrido
 {
     /// <summary>
-    /// A la empresa (mapa del administrador) y, si el recorrido sigue EN_CURSO, a quienes lo siguen
-    /// (el acudiente solo ve el vehículo mientras el recorrido está en curso).
+    /// A la empresa (mapa del administrador) y, si el recorrido sigue EN_CURSO, a su personal que lo sigue y, solo
+    /// si <paramref name="acudientes"/> (la empresa comparte la ubicación con ellos), a los acudientes que lo siguen.
     /// </summary>
-    Task PosicionAsync(Guid idEmpresa, PosicionDto posicion, bool enCurso, CancellationToken ct = default);
+    Task PosicionAsync(Guid idEmpresa, PosicionDto posicion, bool enCurso, bool acudientes, CancellationToken ct = default);
 
     /// <summary>
     /// El recorrido cambió (inicio, paradas, orden, fin): lo vuelven a consultar quienes lo siguen, la empresa,
@@ -85,8 +85,12 @@ public enum AlcanceGps
 /// mientras el recorrido está en curso.
 /// </summary>
 public class ServicioGps(
-    IBaseDatos db, IContextoUsuario contexto, IAvisosRecorrido avisos, TimeProvider reloj, Suscripciones.ServicioSuscripcion suscripcion)
+    IBaseDatos db, IContextoUsuario contexto, IAvisosRecorrido avisos, TimeProvider reloj, Suscripciones.ServicioSuscripcion suscripcion,
+    Configuracion.ParametrosEmpresa parametros)
 {
+    /// <summary>La empresa desactivó <c>gps.acudientes_ven_ubicacion</c>.</summary>
+    public const string MensajeUbicacionNoCompartida = "Tu empresa de transporte no comparte la ubicación en vivo de la ruta.";
+
     /// <summary>Tolerancia del reloj del teléfono frente al inicio del recorrido y a la hora del servidor.</summary>
     public static readonly TimeSpan Tolerancia = TimeSpan.FromMinutes(5);
 
@@ -164,7 +168,8 @@ public class ServicioGps(
         var ultima = await LeerUltimaAsync(viaje.Id, ct);
         if (validas.Count > 0 && ultima is not null && validas.Any(p => p.Fecha == ultima.Fecha) && contexto.IdEmpresa is { } empresa)
         {
-            await avisos.PosicionAsync(empresa, ultima, viaje.Estado == EstadoViaje.EnCurso, ct);
+            var enCurso = viaje.Estado == EstadoViaje.EnCurso;
+            await avisos.PosicionAsync(empresa, ultima, enCurso, enCurso && await parametros.AcudientesVenUbicacionAsync(ct), ct);
         }
         return new ResultadoLoteGps(validas.Count, s.Posiciones!.Count - validas.Count, ultima);
     }
@@ -235,6 +240,10 @@ public class ServicioGps(
                 consulta = consulta.Where(v => v.IdConductor == empleado || v.IdMonitora == empleado);
                 break;
             case AlcanceGps.Acudiente:
+                if (!await parametros.AcudientesVenUbicacionAsync(ct))
+                {
+                    throw new ErrorNegocio(MensajeUbicacionNoCompartida, CodigoError.Prohibido);
+                }
                 var acudiente = contexto.IdAcudiente ?? Guid.Empty;
                 consulta = consulta.Where(v => v.Paradas.Any(p =>
                     db.EstudiantesAcudientes.Any(ea => ea.IdEstudiante == p.IdEstudiante && ea.IdAcudiente == acudiente)));

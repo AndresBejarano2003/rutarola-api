@@ -49,6 +49,21 @@ public class RecorridosController(ServicioRecorridos servicio, IAuthorizationSer
         return Forbid();
     }
 
+    /// <summary>Fotos de los estudiantes del recorrido (mismo acceso que el recorrido).</summary>
+    [HttpGet("{id:guid}/fotos")]
+    public async Task<ActionResult<IReadOnlyList<FotoEstudianteDto>>> Fotos(Guid id, CancellationToken ct)
+    {
+        if ((await autorizacion.AuthorizeAsync(User, Permisos.RecorridosLeer)).Succeeded)
+        {
+            return Ok(await servicio.FotosAsync(id, true, ct));
+        }
+        if ((await autorizacion.AuthorizeAsync(User, Permisos.RecorridosOperar)).Succeeded)
+        {
+            return Ok(await servicio.FotosAsync(id, false, ct));
+        }
+        return Forbid();
+    }
+
     /// <summary>201 con el recorrido nuevo, o 200 con el que el compañero ya inició (se une).</summary>
     [HttpPost]
     [RequierePermiso(Permisos.RecorridosOperar)]

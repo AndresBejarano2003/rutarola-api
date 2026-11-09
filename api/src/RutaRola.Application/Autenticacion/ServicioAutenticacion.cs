@@ -169,7 +169,7 @@ public class ServicioAutenticacion(
         db.Usuarios.IgnoreQueryFilters([FiltrosConsulta.Empresa]).Include(u => u.Rol).Include(u => u.Empresa);
 
     /// <summary>Persona vinculada al usuario (conductor/monitora o acudiente).</summary>
-    private record Titular(Guid? IdEmpleado, Guid? IdAcudiente, string? Nombre, string? Correo);
+    private record Titular(Guid? IdEmpleado, Guid? IdAcudiente, string? Nombre, string? Correo, string? Foto = null);
 
     private async Task<Titular> ValidarAccesoAsync(Usuario usuario, CancellationToken ct)
     {
@@ -187,26 +187,26 @@ public class ServicioAutenticacion(
             case Roles.Conductor or Roles.Monitora:
                 var empleado = await db.Empleados.IgnoreQueryFilters([FiltrosConsulta.Empresa])
                     .Where(e => e.IdUsuario == usuario.Id)
-                    .Select(e => new { e.Id, e.Activo, e.PrimerNombre, e.SegundoNombre, e.PrimerApellido, e.SegundoApellido, e.Correo })
+                    .Select(e => new { e.Id, e.Activo, e.PrimerNombre, e.SegundoNombre, e.PrimerApellido, e.SegundoApellido, e.Correo, e.Foto })
                     .FirstOrDefaultAsync(ct)
                     ?? throw new ErrorNegocio("Tu usuario no está vinculado a un conductor o monitora.", CodigoError.Prohibido);
                 if (!empleado.Activo)
                 {
                     throw new ErrorNegocio(MensajeInactivo, CodigoError.Prohibido);
                 }
-                return new Titular(empleado.Id, null, Nombre(empleado.PrimerNombre, empleado.SegundoNombre, empleado.PrimerApellido, empleado.SegundoApellido), empleado.Correo);
+                return new Titular(empleado.Id, null, Nombre(empleado.PrimerNombre, empleado.SegundoNombre, empleado.PrimerApellido, empleado.SegundoApellido), empleado.Correo, empleado.Foto);
 
             case Roles.Acudiente:
                 var acudiente = await db.Acudientes.IgnoreQueryFilters([FiltrosConsulta.Empresa])
                     .Where(a => a.IdUsuario == usuario.Id)
-                    .Select(a => new { a.Id, a.Activo, a.PrimerNombre, a.SegundoNombre, a.PrimerApellido, a.SegundoApellido, a.Correo })
+                    .Select(a => new { a.Id, a.Activo, a.PrimerNombre, a.SegundoNombre, a.PrimerApellido, a.SegundoApellido, a.Correo, a.Foto })
                     .FirstOrDefaultAsync(ct)
                     ?? throw new ErrorNegocio("Tu usuario no está vinculado a un acudiente.", CodigoError.Prohibido);
                 if (!acudiente.Activo)
                 {
                     throw new ErrorNegocio(MensajeInactivo, CodigoError.Prohibido);
                 }
-                return new Titular(null, acudiente.Id, Nombre(acudiente.PrimerNombre, acudiente.SegundoNombre, acudiente.PrimerApellido, acudiente.SegundoApellido), acudiente.Correo);
+                return new Titular(null, acudiente.Id, Nombre(acudiente.PrimerNombre, acudiente.SegundoNombre, acudiente.PrimerApellido, acudiente.SegundoApellido), acudiente.Correo, acudiente.Foto);
 
             default:
                 return new Titular(null, null, null, null);
@@ -257,7 +257,7 @@ public class ServicioAutenticacion(
         Roles.CodigoSesion(usuario.Rol.Nombre),
         titular.IdEmpleado,
         titular.IdAcudiente,
-        "",
+        titular.Foto ?? usuario.Foto ?? "",
         inicio,
         usuario.Empresa is { } e ? new EmpresaSesion(e.Id, e.Nombre) : null,
         permisos);

@@ -222,6 +222,38 @@ public class GpsTests(BaseDatosPrueba bd)
     }
 
     [Fact]
+    public async Task Si_la_empresa_no_comparte_la_ubicacion_el_acudiente_no_la_ve_pero_si_la_hora_de_inicio_y_el_admin_si()
+    {
+        var (e, r) = await EnCursoAsync();
+        var acudiente = await bd.ClienteDeAsync(e.Acudiente.Usuario, "Clave-123");
+        await using var siguiendo = await HubPrueba.ConectarAsync(bd, Token(acudiente));
+        Assert.Null(await siguiendo.InvocarAsync("Seguir", r.Id));
+        var portal = JsonDocument.Parse(await (await acudiente.GetAsync("/api/v1/portal")).Content.ReadAsStringAsync()).RootElement;
+        Assert.True(portal.GetProperty("ubicacionEnVivo").GetBoolean());
+
+        (await e.Admin.Cliente.PutAsJsonAsync("/api/v1/configuracion/gps.acudientes_ven_ubicacion", new { valor = "0" }, ClienteApi.Json)).EnsureSuccessStatusCode();
+        await using var admin = await HubPrueba.ConectarAsync(bd, Token(e.Admin.Cliente));
+        Assert.Null(await admin.InvocarAsync("SeguirEmpresa"));
+        await EnviarAsync(e.ClienteConductor, r.Id, Punto(DateTime.UtcNow, 2.8m));
+
+        // El administrador sigue viendo todo; el acudiente ya conectado deja de recibir posiciones.
+        Assert.Equal(2.8m, (await admin.EsperarAsync("posicion")).GetProperty("latitud").GetDecimal());
+        Assert.Equal(HttpStatusCode.OK, (await e.Admin.Cliente.GetAsync($"/api/v1/recorridos/{r.Id}/gps/ultima")).StatusCode);
+        await Assert.ThrowsAnyAsync<Exception>(() => siguiendo.EsperarAsync("posicion", segundos: 2));
+
+        var ultima = await acudiente.GetAsync($"/api/v1/recorridos/{r.Id}/gps/ultima");
+        Assert.Contains("no comparte la ubicación", await ultima.MensajeErrorAsync(HttpStatusCode.Forbidden));
+        await using var nuevo = await HubPrueba.ConectarAsync(bd, Token(acudiente));
+        Assert.Contains("no comparte la ubicación", await nuevo.InvocarAsync("Seguir", r.Id));
+
+        portal = JsonDocument.Parse(await (await acudiente.GetAsync("/api/v1/portal")).Content.ReadAsStringAsync()).RootElement;
+        Assert.False(portal.GetProperty("ubicacionEnVivo").GetBoolean());
+        var hoy = portal.GetProperty("estudiantes")[0].GetProperty("hoy")[0];
+        Assert.True(hoy.GetProperty("enCurso").GetBoolean());
+        Assert.Equal(JsonValueKind.String, hoy.GetProperty("horaInicio").ValueKind);
+    }
+
+    [Fact]
     public async Task La_retencion_borra_las_lecturas_antiguas()
     {
         var (e, r) = await EnCursoAsync();

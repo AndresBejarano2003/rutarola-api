@@ -21,6 +21,8 @@ namespace RutaRola.Api.TiempoReal;
 public class RecorridosHub(ServicioGps servicio, IContextoUsuario contexto, IAuthorizationService autorizacion) : Hub
 {
     public static string GrupoRecorrido(Guid id) => $"recorrido:{id}";
+    /// <summary>Acudientes que siguen el recorrido: reciben posiciones solo si la empresa comparte la ubicación con ellos.</summary>
+    public static string GrupoRecorridoAcudientes(Guid id) => $"recorrido:{id}:acudientes";
     public static string GrupoEmpresa(Guid id) => $"empresa:{id}";
     public static string GrupoEmpleado(Guid id) => $"empleado:{id}";
     public static string GrupoAcudiente(Guid id) => $"acudiente:{id}";
@@ -61,10 +63,15 @@ public class RecorridosHub(ServicioGps servicio, IContextoUsuario contexto, IAut
         {
             throw new HubException("La ubicación del vehículo solo se ve mientras el recorrido está en curso.");
         }
-        await Groups.AddToGroupAsync(Context.ConnectionId, GrupoRecorrido(recorridoId));
+        await Groups.AddToGroupAsync(Context.ConnectionId,
+            alcance == AlcanceGps.Acudiente ? GrupoRecorridoAcudientes(recorridoId) : GrupoRecorrido(recorridoId));
     }
 
-    public Task Dejar(Guid recorridoId) => Groups.RemoveFromGroupAsync(Context.ConnectionId, GrupoRecorrido(recorridoId));
+    public async Task Dejar(Guid recorridoId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, GrupoRecorrido(recorridoId));
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, GrupoRecorridoAcudientes(recorridoId));
+    }
 
     public async Task SeguirEmpresa()
     {
@@ -89,13 +96,19 @@ public class RecorridosHub(ServicioGps servicio, IContextoUsuario contexto, IAut
 /// <summary>Envía los avisos por SignalR; un fallo se registra y no afecta la petición que lo originó.</summary>
 public class AvisosRecorridoSignalR(IHubContext<RecorridosHub> hub, ILogger<AvisosRecorridoSignalR> log) : IAvisosRecorrido
 {
-    public async Task PosicionAsync(Guid idEmpresa, PosicionDto posicion, bool enCurso, CancellationToken ct = default)
+    public async Task PosicionAsync(Guid idEmpresa, PosicionDto posicion, bool enCurso, bool acudientes, CancellationToken ct = default)
     {
         try
         {
-            IReadOnlyList<string> grupos = enCurso
-                ? [RecorridosHub.GrupoRecorrido(posicion.RecorridoId), RecorridosHub.GrupoEmpresa(idEmpresa)]
-                : [RecorridosHub.GrupoEmpresa(idEmpresa)];
+            List<string> grupos = [RecorridosHub.GrupoEmpresa(idEmpresa)];
+            if (enCurso)
+            {
+                grupos.Add(RecorridosHub.GrupoRecorrido(posicion.RecorridoId));
+            }
+            if (enCurso && acudientes)
+            {
+                grupos.Add(RecorridosHub.GrupoRecorridoAcudientes(posicion.RecorridoId));
+            }
             await hub.Clients.Groups(grupos).SendAsync("posicion", posicion, ct);
         }
         catch (Exception e) when (e is not OperationCanceledException)
@@ -108,7 +121,9 @@ public class AvisosRecorridoSignalR(IHubContext<RecorridosHub> hub, ILogger<Avis
     {
         try
         {
-            List<string> grupos = [RecorridosHub.GrupoRecorrido(aviso.RecorridoId), RecorridosHub.GrupoEmpresa(idEmpresa)];
+            List<string> grupos = [
+                RecorridosHub.GrupoRecorrido(aviso.RecorridoId), RecorridosHub.GrupoRecorridoAcudientes(aviso.RecorridoId),
+                RecorridosHub.GrupoEmpresa(idEmpresa)];
             grupos.AddRange(aviso.Empleados.Select(RecorridosHub.GrupoEmpleado));
             grupos.AddRange(aviso.Acudientes.Select(RecorridosHub.GrupoAcudiente));
             await hub.Clients.Groups(grupos).SendAsync(

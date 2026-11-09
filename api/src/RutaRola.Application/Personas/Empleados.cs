@@ -13,13 +13,14 @@ public record EmpleadoDto(
     string SegundoApellido, TipoEmpleado TipoEmpleado, string Telefono, string Correo, string Direccion, DateOnly FechaIngreso,
     decimal Sueldo, TipoContrato TipoContrato, ArchivoAdjuntoDto? Contrato, string NumeroLicencia, string CategoriaLicencia,
     DateOnly? VencimientoLicencia, string Usuario, string Contrasena, string Estado, DateTime FechaCreacion,
-    DateTime? FechaActualizacion);
+    DateTime? FechaActualizacion, string Foto);
 
 public record SolicitudEmpleado(
     string? TipoDocumento, string? NumeroDocumento, string? PrimerNombre, string? SegundoNombre, string? PrimerApellido,
     string? SegundoApellido, TipoEmpleado? TipoEmpleado, string? Telefono, string? Correo, string? Direccion,
     DateOnly? FechaIngreso, decimal? Sueldo, TipoContrato? TipoContrato, ArchivoAdjuntoDto? Contrato, string? NumeroLicencia,
-    string? CategoriaLicencia, DateOnly? VencimientoLicencia, string? Usuario, string? Contrasena, string? Estado)
+    string? CategoriaLicencia, DateOnly? VencimientoLicencia, string? Usuario, string? Contrasena, string? Estado,
+    string? Foto = null)
     : ISolicitudPersona, ISolicitudAcceso;
 
 /// <summary><c>texto</c> busca en nombres, apellidos y documento.</summary>
@@ -98,7 +99,7 @@ public class ServicioEmpleados(IBaseDatos db, ServicioAcceso acceso, IContextoUs
             e.TipoContrato, e.IdArchivoContrato is { } a ? archivos.GetValueOrDefault(a) : null, e.NumeroLicencia ?? "",
             e.CategoriaLicencia ?? "", e.FechaVencimientoLicencia,
             e.IdUsuario is { } u ? usuarios.GetValueOrDefault(u, "") : "", "",
-            EstadoRegistro.Texto(e.Activo), e.FechaCreacion, e.FechaActualizacion)).ToList();
+            EstadoRegistro.Texto(e.Activo), e.FechaCreacion, e.FechaActualizacion, e.Foto ?? "")).ToList();
     }
 
     protected override async Task AplicarAsync(Empleado e, SolicitudEmpleado s, bool nuevo, CancellationToken ct)

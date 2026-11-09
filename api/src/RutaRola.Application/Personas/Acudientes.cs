@@ -9,12 +9,12 @@ namespace RutaRola.Application.Personas;
 public record AcudienteDto(
     Guid Id, string TipoDocumento, string NumeroDocumento, string PrimerNombre, string SegundoNombre, string PrimerApellido,
     string SegundoApellido, string Telefono, string TelefonoAlterno, string Correo, string Direccion, string Usuario,
-    string Contrasena, string Estado, DateTime FechaCreacion, DateTime? FechaActualizacion);
+    string Contrasena, string Estado, DateTime FechaCreacion, DateTime? FechaActualizacion, string Foto);
 
 public record SolicitudAcudiente(
     string? TipoDocumento, string? NumeroDocumento, string? PrimerNombre, string? SegundoNombre, string? PrimerApellido,
     string? SegundoApellido, string? Telefono, string? TelefonoAlterno, string? Correo, string? Direccion, string? Usuario,
-    string? Contrasena, string? Estado) : ISolicitudPersona, ISolicitudAcceso;
+    string? Contrasena, string? Estado, string? Foto = null) : ISolicitudPersona, ISolicitudAcceso;
 
 public record FiltrosAcudiente(string? Texto = null, string? Estado = null);
 
@@ -64,7 +64,7 @@ public class ServicioAcudientes(IBaseDatos db, ServicioAcceso acceso)
             a.Id, a.TipoDocumento, a.NumeroDocumento, a.PrimerNombre, a.SegundoNombre ?? "", a.PrimerApellido,
             a.SegundoApellido ?? "", a.Telefono, a.TelefonoAlterno ?? "", a.Correo ?? "", a.Direccion ?? "",
             a.IdUsuario is { } u ? usuarios.GetValueOrDefault(u, "") : "", "",
-            EstadoRegistro.Texto(a.Activo), a.FechaCreacion, a.FechaActualizacion)).ToList();
+            EstadoRegistro.Texto(a.Activo), a.FechaCreacion, a.FechaActualizacion, a.Foto ?? "")).ToList();
     }
 
     protected override async Task AplicarAsync(Acudiente a, SolicitudAcudiente s, bool nuevo, CancellationToken ct)

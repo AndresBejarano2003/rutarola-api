@@ -16,6 +16,8 @@ public interface ISolicitudPersona
     string? SegundoNombre { get; }
     string? PrimerApellido { get; }
     string? SegundoApellido { get; }
+    /// <summary>Data URL de la foto; "" o null = sin foto.</summary>
+    string? Foto { get; }
 }
 
 /// <summary>Credenciales de acceso (<c>DatosAcceso</c>): la contraseña es de solo escritura.</summary>
@@ -43,6 +45,7 @@ public static class ReglasPersona
         v.RuleFor(x => x.PrimerApellido).NotEmpty().WithMessage("Ingresa el primer apellido.")
             .MaximumLength(50).WithMessage("El apellido admite máximo 50 caracteres.");
         v.RuleFor(x => x.SegundoApellido).MaximumLength(50).WithMessage("El apellido admite máximo 50 caracteres.");
+        v.RuleFor(x => x.Foto).FotoValida();
     }
 
     /// <summary>La contraseña es opcional aquí (vacía al editar = conservar); al crear la exige <see cref="ServicioAcceso"/>.</summary>
@@ -63,6 +66,7 @@ public static class ReglasPersona
         p.SegundoNombre = Texto.Opcional(s.SegundoNombre);
         p.PrimerApellido = s.PrimerApellido!.Trim();
         p.SegundoApellido = Texto.Opcional(s.SegundoApellido);
+        p.Foto = Fotos.Normalizar(s.Foto);
     }
 
     /// <summary>Busca en nombre completo y número de documento, sin tildes ni mayúsculas (<c>coincideTexto</c>).</summary>

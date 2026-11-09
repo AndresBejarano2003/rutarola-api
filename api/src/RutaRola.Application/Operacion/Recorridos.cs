@@ -14,6 +14,9 @@ public record ParadaDto(
     Guid EstudianteId, string Estudiante, string Grado, string Direccion, string Acudiente, string TelefonoAcudiente,
     EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega, string MotivoAusencia);
 
+/// <summary>Foto de perfil actual de un estudiante del recorrido (solo los que tienen foto).</summary>
+public record FotoEstudianteDto(Guid EstudianteId, string Foto);
+
 public record CambioOrdenDto(Guid EmpleadoId, string Nombre, DateTime Hora);
 
 /// <summary><c>Recorrido</c> del frontend (tabla <c>viajes_ruta</c>). <c>paradas</c> en el orden de visita.</summary>
@@ -27,7 +30,7 @@ public record ConteoParadasDto(int Total, int Pendientes, int ABordo, int Entreg
 
 public record ResumenRecorridoDto(Guid Id, Trayecto Trayecto, EstadoViaje Estado, DateTime? Inicio, DateTime? Fin, ConteoParadasDto Conteo);
 
-public record CompaneroDto(string Nombre, string Telefono, TipoEmpleado Rol);
+public record CompaneroDto(string Nombre, string Telefono, TipoEmpleado Rol, string Foto = "");
 
 /// <summary>Ruta que el empleado autenticado cubre en la fecha (<c>RutaAsignada</c>).</summary>
 public record RutaAsignadaDto(
@@ -140,7 +143,7 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
                 return new RutaAsignadaDto(
                     a.Id, a.IdRuta, ServicioRutas.Etiquetar(a.Ruta), a.Ruta.Jornada, a.Ruta.Sector ?? "", a.Ruta.Colegio.RazonSocial,
                     a.Ruta.Colegio.Direccion, a.Vehiculo.Placa, rol,
-                    otro is null ? null : new CompaneroDto(otro.NombreCompleto, otro.Telefono, otro.TipoEmpleado),
+                    otro is null ? null : new CompaneroDto(otro.NombreCompleto, otro.Telefono, otro.TipoEmpleado, otro.Foto ?? ""),
                     a.Ruta.Estudiantes.Count,
                     recorridos.Where(v => v.IdAsignacion == a.Id).OrderBy(v => v.Trayecto).Select(Resumir).ToList());
             })
@@ -384,6 +387,24 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
     }
 
     private Task<RecorridoDto> ObtenerAsync(Guid id, CancellationToken ct) => ObtenerAsync(id, false, ct);
+
+    /// <summary>
+    /// Fotos ACTUALES de los estudiantes del recorrido, para que la monitora y el conductor los reconozcan. Van aparte
+    /// del recorrido (que se vuelve a pedir en cada marca) para que el teléfono las descargue una sola vez por pantalla.
+    /// Mismo acceso que <see cref="ObtenerAsync(Guid, bool, CancellationToken)"/>: son datos de menores.
+    /// </summary>
+    public async Task<IReadOnlyList<FotoEstudianteDto>> FotosAsync(Guid id, bool todaLaEmpresa, CancellationToken ct = default)
+    {
+        var viaje = await db.ViajesRuta.AsNoTracking().Include(v => v.Paradas).FirstOrDefaultAsync(v => v.Id == id, ct)
+            ?? throw new ErrorNegocio("El recorrido no existe o no pertenece a tus rutas.", CodigoError.NoEncontrado);
+        if (!todaLaEmpresa && !EsDelEmpleado(viaje, IdEmpleado))
+        {
+            throw new ErrorNegocio("El recorrido no pertenece a tus rutas.", CodigoError.Prohibido);
+        }
+        var ids = viaje.Paradas.Select(p => p.IdEstudiante).ToList();
+        return await db.Estudiantes.AsNoTracking().Where(e => ids.Contains(e.Id) && e.Foto != null)
+            .Select(e => new FotoEstudianteDto(e.Id, e.Foto!)).ToListAsync(ct);
+    }
 
     /// <summary>Historial del administrador: del más reciente al más antiguo.</summary>
     public async Task<ListaPaginada<RecorridoDto>> ListarAsync(FiltrosRecorrido f, Paginacion paginacion, CancellationToken ct = default)

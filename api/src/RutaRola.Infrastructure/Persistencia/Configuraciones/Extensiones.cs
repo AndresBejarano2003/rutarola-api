@@ -27,6 +27,7 @@ internal static class Extensiones
         b.Property(x => x.SegundoNombre).HasMaxLength(50);
         b.Property(x => x.PrimerApellido).HasMaxLength(50);
         b.Property(x => x.SegundoApellido).HasMaxLength(50);
+        b.Property(x => x.Foto).HasColumnName("foto");
         b.HasIndex(x => new { x.IdEmpresa, x.TipoDocumento, x.NumeroDocumento }).IsUnique();
     }
 }

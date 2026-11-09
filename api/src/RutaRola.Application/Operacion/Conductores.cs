@@ -12,7 +12,7 @@ public record AsignacionConductorDto(Guid Id, string Ruta, string Jornada, strin
 public record ConductorDto(
     Guid Id, string Nombre, string Iniciales, string Documento, string Telefono, string Correo, string NumeroLicencia,
     string CategoriaLicencia, DateOnly? VencimientoLicencia, string? EstadoLicencia, string Estado,
-    AsignacionConductorDto? Asignacion);
+    AsignacionConductorDto? Asignacion, string Foto);
 
 /// <summary>
 /// <c>licencia</c>: VIGENTE | POR_VENCER | VENCIDA; <c>asignacion</c>: CON (con ruta asignada) | SIN.
@@ -60,7 +60,8 @@ public class ServicioConductores(IBaseDatos db, TimeProvider reloj, ParametrosEm
                 e.Id, e.NombreCompleto, ReglasPersona.Iniciales(e), $"{e.TipoDocumento} {e.NumeroDocumento}", e.Telefono,
                 e.Correo ?? "", e.NumeroLicencia ?? "", e.CategoriaLicencia ?? "", e.FechaVencimientoLicencia,
                 Catalogos.EstadoVencimiento(e.FechaVencimientoLicencia, hoy, diasAlerta), EstadoRegistro.Texto(e.Activo),
-                a is null ? null : new AsignacionConductorDto(a.Id, a.Ruta, a.Jornada, a.Vehiculo, a.Monitora?.NombreCompleto ?? ""));
+                a is null ? null : new AsignacionConductorDto(a.Id, a.Ruta, a.Jornada, a.Vehiculo, a.Monitora?.NombreCompleto ?? ""),
+                e.Foto ?? "");
         })
         .Where(c => Texto.Opcional(f.Licencia) is not { } licencia || c.EstadoLicencia == licencia)
         .Where(c => Texto.Opcional(f.Asignacion) is not { } asignacion || (asignacion == "CON") == (c.Asignacion is not null))

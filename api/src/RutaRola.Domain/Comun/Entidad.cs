@@ -32,6 +32,8 @@ public abstract class Persona : EntidadEmpresa
     public string? SegundoNombre { get; set; }
     public string PrimerApellido { get; set; } = "";
     public string? SegundoApellido { get; set; }
+    /// <summary>Foto de perfil: data URL de una imagen pequeña (el frontend la reduce a 256 px). Null = iniciales.</summary>
+    public string? Foto { get; set; }
 
     public string NombreCompleto =>
         string.Join(' ', new[] { PrimerNombre, SegundoNombre, PrimerApellido, SegundoApellido }.Where(p => !string.IsNullOrWhiteSpace(p)));

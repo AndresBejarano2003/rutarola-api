@@ -9,12 +9,12 @@ namespace RutaRola.Application.Personas;
 public record EstudianteDto(
     Guid Id, string TipoDocumento, string NumeroDocumento, string PrimerNombre, string SegundoNombre, string PrimerApellido,
     string SegundoApellido, DateOnly FechaNacimiento, string Direccion, Guid? AcudienteId, Guid ColegioId, string Grado,
-    string Jornada, string Estado, string Observaciones, DateTime FechaCreacion, DateTime? FechaActualizacion);
+    string Jornada, string Estado, string Observaciones, DateTime FechaCreacion, DateTime? FechaActualizacion, string Foto);
 
 public record SolicitudEstudiante(
     string? TipoDocumento, string? NumeroDocumento, string? PrimerNombre, string? SegundoNombre, string? PrimerApellido,
     string? SegundoApellido, DateOnly? FechaNacimiento, string? Direccion, Guid? AcudienteId, Guid? ColegioId, string? Grado,
-    string? Jornada, string? Estado, string? Observaciones) : ISolicitudPersona;
+    string? Jornada, string? Estado, string? Observaciones, string? Foto = null) : ISolicitudPersona;
 
 /// <summary><c>acudienteId</c> encuentra a los estudiantes de ese acudiente (principal o no).</summary>
 public record FiltrosEstudiante(
@@ -84,7 +84,7 @@ public class ServicioEstudiantes(IBaseDatos db, Suscripciones.ServicioSuscripcio
             e.SegundoApellido ?? "", e.FechaNacimiento, e.Direccion,
             e.Acudientes.FirstOrDefault(a => a.EsPrincipal)?.IdAcudiente ?? e.Acudientes.FirstOrDefault()?.IdAcudiente,
             e.IdColegio, e.Grado, e.Jornada, EstadoRegistro.Texto(e.Activo), e.Observaciones ?? "",
-            e.FechaCreacion, e.FechaActualizacion)).ToList());
+            e.FechaCreacion, e.FechaActualizacion, e.Foto ?? "")).ToList());
 
     protected override async Task AplicarAsync(Estudiante e, SolicitudEstudiante s, bool nuevo, CancellationToken ct)
     {

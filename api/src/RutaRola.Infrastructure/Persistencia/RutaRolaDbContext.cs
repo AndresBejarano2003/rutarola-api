@@ -190,7 +190,7 @@ public class RutaRolaDbContext(
 
     /// <summary>Campos que no se copian a la auditoría (técnicos o secretos).</summary>
     private static readonly HashSet<string> NoAuditados =
-        [nameof(Entidad.FechaCreacion), nameof(Entidad.FechaActualizacion), nameof(Usuario.UltimoLogin), nameof(Usuario.PasswordHash), "Version"];
+        [nameof(Entidad.FechaCreacion), nameof(Entidad.FechaActualizacion), nameof(Usuario.UltimoLogin), nameof(Usuario.PasswordHash), nameof(Persona.Foto), "Version"];
 
     private static readonly JsonSerializerOptions JsonAuditoria = new()
     {
@@ -212,10 +212,14 @@ public class RutaRolaDbContext(
             var campos = entrada.Properties.Where(p => !NoAuditados.Contains(p.Metadata.Name)).ToList();
             var claveCambiada = entrada.State == EntityState.Modified
                 && entrada.Properties.Any(p => p.Metadata.Name == nameof(Usuario.PasswordHash) && p.IsModified && !Equals(p.OriginalValue, p.CurrentValue));
+            // La foto nunca se copia (es una imagen): solo se anota que cambió.
+            var fotoCambiada = entrada.State != EntityState.Deleted
+                && entrada.Properties.Any(p => p.Metadata.Name == nameof(Persona.Foto)
+                    && (entrada.State == EntityState.Added ? p.CurrentValue is not null : p.IsModified && !Equals(p.OriginalValue, p.CurrentValue)));
             if (entrada.State == EntityState.Modified)
             {
                 campos = campos.Where(p => p.IsModified && !Equals(p.OriginalValue, p.CurrentValue)).ToList();
-                if (campos.Count == 0 && !claveCambiada)
+                if (campos.Count == 0 && !claveCambiada && !fotoCambiada)
                 {
                     continue; // p. ej. solo cambió ultimo_login.
                 }
@@ -226,6 +230,10 @@ public class RutaRolaDbContext(
             if (claveCambiada)
             {
                 nuevo!["contrasena"] = "(cambiada)";
+            }
+            if (fotoCambiada)
+            {
+                nuevo!["foto"] = "(cambiada)";
             }
 
             registros.Add(new Auditoria

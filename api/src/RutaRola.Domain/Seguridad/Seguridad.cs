@@ -32,6 +32,8 @@ public class Usuario : Entidad
     public string NombreUsuario { get; set; } = "";
     public string? Email { get; set; }
     public string? Telefono { get; set; }
+    /// <summary>Foto de perfil de administradores y SuperAdmin (data URL). La de conductores, monitoras y acudientes está en su registro.</summary>
+    public string? Foto { get; set; }
     public string PasswordHash { get; set; } = "";
     public bool Activo { get; set; } = true;
     public DateTime? UltimoLogin { get; set; }
