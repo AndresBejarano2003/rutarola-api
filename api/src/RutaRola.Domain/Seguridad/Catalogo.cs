@@ -76,6 +76,7 @@ public static class Permisos
 
     public const string SuscripcionLeer = "suscripcion.leer";
     public const string SuscripcionGestionar = "suscripcion.gestionar";
+    public const string PromocionesGestionar = "promociones.gestionar";
 
     public static readonly IReadOnlyDictionary<string, string> Descripciones = new Dictionary<string, string>
     {
@@ -122,6 +123,7 @@ public static class Permisos
         [SoporteGestionar] = "Atender los tickets de soporte de todas las empresas (plataforma)",
         [SuscripcionLeer] = "Ver el plan de la empresa y sus pagos",
         [SuscripcionGestionar] = "Pagar o cambiar el plan de la empresa",
+        [PromocionesGestionar] = "Crear y administrar los códigos promocionales (plataforma)",
     };
 
     public static IEnumerable<string> Todos => Descripciones.Keys;
@@ -132,9 +134,9 @@ public static class Permisos
     public static readonly IReadOnlyDictionary<string, IReadOnlyCollection<string>> PorRol =
         new Dictionary<string, IReadOnlyCollection<string>>
         {
-            [Roles.SuperAdmin] = [EmpresasGestionar, UsuariosLeer, UsuariosGestionar, AuditoriaLeer, NotificacionesPropias, SoporteGestionar],
+            [Roles.SuperAdmin] = [EmpresasGestionar, UsuariosLeer, UsuariosGestionar, AuditoriaLeer, NotificacionesPropias, SoporteGestionar, PromocionesGestionar],
             [Roles.AdminEmpresa] = Descripciones.Keys
-                .Where(p => p is not EmpresasGestionar and not RecorridosOperar and not GpsReportar and not PortalConsultar and not SoporteGestionar)
+                .Where(p => p is not EmpresasGestionar and not RecorridosOperar and not GpsReportar and not PortalConsultar and not SoporteGestionar and not PromocionesGestionar)
                 .ToArray(),
             [Roles.Conductor] = Operativos,
             [Roles.Monitora] = Operativos,

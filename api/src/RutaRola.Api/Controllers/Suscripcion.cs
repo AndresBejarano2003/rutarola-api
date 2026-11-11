@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RutaRola.Api.Seguridad;
+using RutaRola.Application.Comun;
 using RutaRola.Application.Suscripciones;
 using RutaRola.Domain.Seguridad;
 
@@ -26,6 +27,12 @@ public class SuscripcionController(ServicioSuscripcion servicio) : ControladorAp
     [HttpGet("pagos")]
     [RequierePermiso(Permisos.SuscripcionLeer)]
     public Task<IReadOnlyList<PagoSuscripcionDto>> Pagos(CancellationToken ct) => servicio.PagosAsync(ct);
+
+    /// <summary>Valida un código promocional para el plan y periodo (422 con el motivo si no aplica).</summary>
+    [HttpPost("codigo")]
+    [RequierePermiso(Permisos.SuscripcionGestionar)]
+    public Task<ValidacionCodigoDto> ValidarCodigo(SolicitudValidacionCodigo solicitud, CancellationToken ct) =>
+        servicio.ValidarCodigoAsync(solicitud, ct);
 
     /// <summary>Crea el pago PENDIENTE y devuelve la URL firmada del checkout de Wompi (422 si Wompi no está configurado).</summary>
     [HttpPost("pagos")]
@@ -53,4 +60,49 @@ public class EventosWompiController(ServicioSuscripcion servicio) : ControladorA
     [AllowAnonymous]
     public async Task<IActionResult> Evento([FromBody] JsonElement evento, CancellationToken ct) =>
         await servicio.ProcesarEventoAsync(evento, ct) ? Ok() : Unauthorized();
+}
+
+/// <summary>
+/// Códigos promocionales de la plataforma (SuperAdmin). Descuentan solo el primer mes facturado. Un código con usos
+/// no se elimina (409): se inactiva.
+/// </summary>
+[Route("api/v1/plataforma/codigos-promocionales")]
+[RequierePermiso(Permisos.PromocionesGestionar)]
+public class CodigosPromocionalesController(ServicioCodigosPromocionales servicio) : ControladorApi
+{
+    [HttpGet]
+    public Task<ListaPaginada<CodigoPromocionalDto>> Listar(
+        [FromQuery] FiltrosCodigoPromocional filtros, [FromQuery] Paginacion paginacion, CancellationToken ct) =>
+        servicio.ListarAsync(filtros, paginacion, ct);
+
+    [HttpGet("opciones")]
+    public Task<IReadOnlyList<Opcion>> Opciones(CancellationToken ct) => servicio.OpcionesAsync(ct);
+
+    [HttpGet("{id:guid}")]
+    public Task<CodigoPromocionalDto> Obtener(Guid id, CancellationToken ct) => servicio.ObtenerAsync(id, ct);
+
+    [HttpPost]
+    [ProducesResponseType<CodigoPromocionalDto>(StatusCodes.Status201Created)]
+    public async Task<IActionResult> Crear(SolicitudCodigoPromocional solicitud, CancellationToken ct)
+    {
+        var codigo = await servicio.CrearAsync(solicitud, ct);
+        return CreatedAtAction(nameof(Obtener), new { id = codigo.Id }, codigo);
+    }
+
+    [HttpPut("{id:guid}")]
+    public Task<CodigoPromocionalDto> Actualizar(Guid id, SolicitudCodigoPromocional solicitud, CancellationToken ct) =>
+        servicio.ActualizarAsync(id, solicitud, ct);
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Eliminar(Guid id, CancellationToken ct)
+    {
+        await servicio.EliminarAsync(id, ct);
+        return NoContent();
+    }
+
+    [HttpGet("{id:guid}/motivo-no-eliminar")]
+    public async Task<RespuestaMotivo> MotivoNoEliminar(Guid id, CancellationToken ct) => new(await servicio.MotivoNoEliminarAsync(id, ct));
+
+    [HttpGet("{id:guid}/usos")]
+    public Task<IReadOnlyList<UsoCodigoDto>> Usos(Guid id, CancellationToken ct) => servicio.UsosAsync(id, ct);
 }

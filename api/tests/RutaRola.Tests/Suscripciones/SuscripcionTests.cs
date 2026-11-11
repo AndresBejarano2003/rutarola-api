@@ -14,10 +14,10 @@ namespace RutaRola.Tests.Suscripciones;
 [Collection(ColeccionBaseDatos.Nombre)]
 public class SuscripcionTests(BaseDatosPrueba bd)
 {
-    private static string Sha256(string texto) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(texto))).ToLowerInvariant();
+    internal static string Sha256(string texto) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(texto))).ToLowerInvariant();
 
     /// <summary>Evento <c>transaction.updated</c> firmado como lo hace Wompi.</summary>
-    private static object Evento(string referencia, long centavos, string estado = "APPROVED", string? secreto = null)
+    internal static object Evento(string referencia, long centavos, string estado = "APPROVED", string? secreto = null)
     {
         var id = $"1234-{Guid.NewGuid():N}"[..20];
         const long marca = 1_730_000_000;

@@ -57,3 +57,7 @@ public enum EstadoSuscripcion { Prueba, Activa, Gratis }
 public enum PeriodoPago { Mensual, Anual }
 /// <summary>Estado de un pago en línea (Wompi: PENDING, APPROVED, DECLINED, VOIDED, ERROR).</summary>
 public enum EstadoPagoSuscripcion { Pendiente, Aprobado, Rechazado, Anulado, Error }
+/// <summary>Descuento de un código promocional: PORCENTAJE (1–100 % del primer mes) o VALOR_FIJO (pesos, máximo un mes).</summary>
+public enum TipoDescuento { Porcentaje, ValorFijo }
+/// <summary>A quién aplica un código: TODAS las empresas, solo las EMPRESAS elegidas o la PRIMERA_COMPRA (nunca han pagado un plan).</summary>
+public enum AlcanceCodigo { Todas, Empresas, PrimeraCompra }

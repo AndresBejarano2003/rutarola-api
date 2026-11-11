@@ -41,4 +41,57 @@ public class PagoSuscripcion : EntidadEmpresa
     public string? CorreoPagador { get; set; }
     /// <summary>UTC. Cuando se aplicó al plan (idempotencia).</summary>
     public DateTime? FechaAplicacion { get; set; }
+    /// <summary>Código promocional usado (copia del texto, aunque luego se edite) y su descuento sobre el primer mes.</summary>
+    public Guid? IdCodigoPromocional { get; set; }
+    public string? CodigoPromocional { get; set; }
+    public long DescuentoCentavos { get; set; }
+}
+
+/// <summary>
+/// Código promocional que crea la plataforma. Descuenta SOLO el primer mes que se factura (en el anual, una de
+/// sus mensualidades). Vigente entre <see cref="FechaInicio"/> y <see cref="FechaFin"/> (fechas de Colombia, ambas incluidas).
+/// No pertenece a una empresa: <see cref="Alcance"/> y <see cref="Empresas"/> dicen a quién aplica.
+/// </summary>
+public class CodigoPromocional : Entidad
+{
+    /// <summary>En mayúsculas, único (A-Z, 0-9, guion).</summary>
+    public string Codigo { get; set; } = "";
+    public string? Descripcion { get; set; }
+    public TipoDescuento TipoDescuento { get; set; }
+    /// <summary>Porcentaje (1–100) o pesos.</summary>
+    public decimal Valor { get; set; }
+    public DateOnly FechaInicio { get; set; }
+    public DateOnly FechaFin { get; set; }
+    public AlcanceCodigo Alcance { get; set; }
+    /// <summary>Planes a los que aplica separados por coma (<c>ESENCIAL,PROFESIONAL</c>); vacío = todos los de pago.</summary>
+    public string Planes { get; set; } = "";
+    /// <summary>null = mensual y anual.</summary>
+    public PeriodoPago? Periodo { get; set; }
+    /// <summary>Usos en total entre todas las empresas; null = sin límite.</summary>
+    public int? UsosMaximos { get; set; }
+    public int UsosPorEmpresa { get; set; } = 1;
+    public bool Activo { get; set; } = true;
+    public List<CodigoPromocionalEmpresa> Empresas { get; set; } = [];
+}
+
+/// <summary>Empresa a la que aplica un código con alcance EMPRESAS.</summary>
+public class CodigoPromocionalEmpresa
+{
+    public Guid IdCodigoPromocional { get; set; }
+    public CodigoPromocional CodigoPromocional { get; set; } = null!;
+    public Guid IdEmpresa { get; set; }
+}
+
+/// <summary>
+/// Un uso del código: se registra cuando el pago en línea queda aprobado o cuando la plataforma activa el plan a
+/// mano con el código. Cuenta para los límites de usos.
+/// </summary>
+public class UsoCodigoPromocional : EntidadEmpresa
+{
+    public Guid IdCodigoPromocional { get; set; }
+    public CodigoPromocional CodigoPromocional { get; set; } = null!;
+    public Guid? IdPagoSuscripcion { get; set; }
+    public PlanSuscripcion Plan { get; set; }
+    public PeriodoPago Periodo { get; set; }
+    public long DescuentoCentavos { get; set; }
 }

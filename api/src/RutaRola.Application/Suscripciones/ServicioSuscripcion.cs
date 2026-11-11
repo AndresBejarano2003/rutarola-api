@@ -25,19 +25,22 @@ public record SuscripcionDto(
     PlanSuscripcion Plan, string NombrePlan, EstadoSuscripcion Estado, string Periodo, DateTime FechaInicio, DateTime? FechaFin,
     int? DiasRestantes, bool PruebaUsada, LimitesDto Limites, UsoDto Uso, IReadOnlyList<string> Funciones, bool PagosEnLinea, string Nota);
 
+/// <summary><c>valor</c> = lo pagado (ya con el descuento); <c>codigoPromocional</c> <c>""</c> sin código.</summary>
 public record PagoSuscripcionDto(
     Guid Id, string Referencia, PlanSuscripcion Plan, PeriodoPago Periodo, long Valor, EstadoPagoSuscripcion Estado, string MetodoPago,
-    string IdTransaccion, DateTime FechaCreacion, DateTime? FechaAplicacion);
+    string IdTransaccion, DateTime FechaCreacion, DateTime? FechaAplicacion, string CodigoPromocional, long Descuento);
 
 /// <summary>Datos para abrir el Web Checkout de Wompi (la firma se calcula en el servidor).</summary>
 public record CheckoutDto(string Referencia, string Url, long ValorCentavos, string Moneda, string LlavePublica, string Firma, string UrlRetorno);
 
-public record SolicitudPagoSuscripcion(PlanSuscripcion? Plan, PeriodoPago? Periodo);
+public record SolicitudPagoSuscripcion(PlanSuscripcion? Plan, PeriodoPago? Periodo, string? CodigoPromocional = null);
 
 public record SolicitudVerificacionPago(string? IdTransaccion);
 
 /// <summary>Ajuste manual de la plataforma (convenio, pago por transferencia, extensión de la prueba…).</summary>
-public record SolicitudAjusteSuscripcion(PlanSuscripcion? Plan, EstadoSuscripcion? Estado, PeriodoPago? Periodo, DateTime? FechaFin, string? Nota);
+/// <summary><c>codigoPromocional</c> (opcional, solo en ACTIVA): registra el uso y anota el descuento del primer mes.</summary>
+public record SolicitudAjusteSuscripcion(
+    PlanSuscripcion? Plan, EstadoSuscripcion? Estado, PeriodoPago? Periodo, DateTime? FechaFin, string? Nota, string? CodigoPromocional = null);
 
 public class ValidadorSolicitudPagoSuscripcion : AbstractValidator<SolicitudPagoSuscripcion>
 {
@@ -46,6 +49,7 @@ public class ValidadorSolicitudPagoSuscripcion : AbstractValidator<SolicitudPago
         RuleFor(x => x.Plan).NotNull().WithMessage("Elige el plan.")
             .NotEqual(PlanSuscripcion.Gratis).WithMessage("El plan Gratis no requiere pago.");
         RuleFor(x => x.Periodo).NotNull().WithMessage("Elige si pagas mensual o anual.");
+        RuleFor(x => x.CodigoPromocional).MaximumLength(30).WithMessage("El código promocional no es válido.");
     }
 }
 
@@ -68,6 +72,9 @@ public class ValidadorSolicitudAjusteSuscripcion : AbstractValidator<SolicitudAj
         RuleFor(x => x.Plan).Equal(PlanSuscripcion.Gratis).When(x => x.Estado == EstadoSuscripcion.Gratis)
             .WithMessage("En estado Gratis el plan es Gratis.");
         RuleFor(x => x.Nota).MaximumLength(500).WithMessage("La nota admite máximo 500 caracteres.");
+        RuleFor(x => x.CodigoPromocional).MaximumLength(30).WithMessage("El código promocional no es válido.");
+        RuleFor(x => x.Estado).Equal(EstadoSuscripcion.Activa).When(x => !string.IsNullOrWhiteSpace(x.CodigoPromocional))
+            .WithMessage("El código promocional solo se aplica al activar un plan pagado.");
     }
 }
 
@@ -85,7 +92,7 @@ public class ValidadorSolicitudAjusteSuscripcion : AbstractValidator<SolicitudAj
 /// </summary>
 public class ServicioSuscripcion(
     IBaseDatos db, IContextoUsuario contexto, IPasarelaPagos pasarela, IOptions<OpcionesWompi> wompi, TimeProvider reloj,
-    ILogger<ServicioSuscripcion> logger)
+    ServicioCodigosPromocionales codigos, ILogger<ServicioSuscripcion> logger)
 {
     private const string Moneda = "COP";
     private OpcionesWompi Wompi => wompi.Value;
@@ -118,31 +125,67 @@ public class ServicioSuscripcion(
     public async Task<IReadOnlyList<PagoSuscripcionDto>> PagosAsync(CancellationToken ct = default) =>
         await db.PagosSuscripcion.AsNoTracking().OrderByDescending(p => p.FechaCreacion).Take(100)
             .Select(p => new PagoSuscripcionDto(p.Id, p.Referencia, p.Plan, p.Periodo, p.ValorCentavos / 100, p.Estado, p.MetodoPago ?? "",
-                p.IdTransaccion ?? "", p.FechaCreacion, p.FechaAplicacion))
+                p.IdTransaccion ?? "", p.FechaCreacion, p.FechaAplicacion, p.CodigoPromocional ?? "", p.DescuentoCentavos / 100))
             .ToListAsync(ct);
 
-    /// <summary>Crea el intento de pago (PENDIENTE) y devuelve el enlace firmado al Web Checkout de Wompi.</summary>
+    /// <summary>
+    /// Valida un código promocional para el plan y periodo elegidos (422 con el motivo si no aplica) y devuelve el
+    /// descuento, que es SOLO sobre el primer mes facturado.
+    /// </summary>
+    public async Task<ValidacionCodigoDto> ValidarCodigoAsync(SolicitudValidacionCodigo s, CancellationToken ct = default)
+    {
+        var idEmpresa = contexto.IdEmpresa ?? throw new ErrorNegocio("Inicia sesión de nuevo.", CodigoError.Prohibido);
+        return (await codigos.EvaluarAsync(s.Codigo, idEmpresa, s.Plan!.Value, s.Periodo!.Value, ct)).Resultado;
+    }
+
+    /// <summary>
+    /// Crea el intento de pago (PENDIENTE) y devuelve el enlace firmado al Web Checkout de Wompi. Con código
+    /// promocional el valor ya trae el descuento del primer mes; si el total queda en $0 el plan se activa de una vez
+    /// (sin Wompi) y <c>url</c> va vacía.
+    /// </summary>
     public async Task<CheckoutDto> IniciarPagoAsync(SolicitudPagoSuscripcion s, CancellationToken ct = default)
     {
-        if (!Wompi.Habilitada)
+        var plan = CatalogoPlanes.De(s.Plan!.Value);
+        var periodo = s.Periodo!.Value;
+        var idEmpresa = contexto.IdEmpresa ?? throw new ErrorNegocio("Inicia sesión de nuevo.", CodigoError.Prohibido);
+        var evaluacion = Texto.Opcional(s.CodigoPromocional) is { } texto ? await codigos.EvaluarAsync(texto, idEmpresa, plan.Plan, periodo, ct) : default;
+        var total = evaluacion.Resultado?.Total ?? plan.Precio(periodo);
+        if (total > 0 && !Wompi.Habilitada)
         {
             throw new ErrorNegocio("Los pagos en línea aún no están habilitados. Escríbenos desde Soporte y activamos tu plan.", CodigoError.Validacion);
         }
-        var plan = CatalogoPlanes.De(s.Plan!.Value);
-        var periodo = s.Periodo!.Value;
         var idUsuario = contexto.IdUsuario;
         var correo = idUsuario is { } id ? await db.Usuarios.AsNoTracking().Where(u => u.Id == id).Select(u => u.Email).FirstOrDefaultAsync(ct) : null;
         var pago = new PagoSuscripcion
         {
+            IdEmpresa = idEmpresa,
             Referencia = $"RR-{Guid.CreateVersion7():N}",
             Plan = plan.Plan,
             Periodo = periodo,
-            ValorCentavos = plan.Precio(periodo) * 100,
+            ValorCentavos = total * 100,
             IdUsuario = idUsuario,
             CorreoPagador = Texto.Opcional(correo),
-            Ambiente = Wompi.Ambiente,
+            Ambiente = Wompi.Habilitada ? Wompi.Ambiente : null,
+            IdCodigoPromocional = evaluacion.Codigo?.Id,
+            CodigoPromocional = evaluacion.Codigo?.Codigo,
+            DescuentoCentavos = (evaluacion.Resultado?.Descuento ?? 0) * 100,
         };
         db.PagosSuscripcion.Add(pago);
+        if (total == 0)
+        {
+            // El código cubre todo el primer pago: no hay nada que cobrar en Wompi.
+            pago.Estado = EstadoPagoSuscripcion.Aprobado;
+            pago.MetodoPago = "CODIGO_PROMOCIONAL";
+            var suscripcion = await db.Suscripciones.FirstOrDefaultAsync(ct);
+            if (suscripcion is null)
+            {
+                suscripcion = new Suscripcion { IdEmpresa = idEmpresa, PruebaUsada = true };
+                db.Suscripciones.Add(suscripcion);
+            }
+            Activar(suscripcion, pago);
+            await db.SaveChangesAsync(ct);
+            return new CheckoutDto(pago.Referencia, "", 0, Moneda, "", "", "");
+        }
         await db.SaveChangesAsync(ct);
 
         var firma = FirmasWompi.Integridad(pago.Referencia, pago.ValorCentavos, Moneda, Wompi.SecretoIntegridad);
@@ -183,7 +226,7 @@ public class ServicioSuscripcion(
         }
         return await db.PagosSuscripcion.AsNoTracking().Where(p => p.Id == pago.Id)
             .Select(p => new PagoSuscripcionDto(p.Id, p.Referencia, p.Plan, p.Periodo, p.ValorCentavos / 100, p.Estado, p.MetodoPago ?? "",
-                p.IdTransaccion ?? "", p.FechaCreacion, p.FechaAplicacion))
+                p.IdTransaccion ?? "", p.FechaCreacion, p.FechaAplicacion, p.CodigoPromocional ?? "", p.DescuentoCentavos / 100))
             .FirstAsync(ct);
     }
 
@@ -245,18 +288,35 @@ public class ServicioSuscripcion(
                 s = new Suscripcion { IdEmpresa = pago.IdEmpresa, PruebaUsada = true };
                 db.Suscripciones.Add(s);
             }
-            var ahora = Ahora;
-            var vigente = s.FechaFin is { } fin && fin > ahora && s.Estado != EstadoSuscripcion.Gratis;
-            var desde = vigente && (s.Estado == EstadoSuscripcion.Prueba || s.Plan == pago.Plan) ? s.FechaFin!.Value : ahora;
-            s.Plan = pago.Plan;
-            s.Estado = EstadoSuscripcion.Activa;
-            s.Periodo = pago.Periodo;
-            s.FechaInicio = ahora;
-            s.FechaFin = pago.Periodo == PeriodoPago.Anual ? desde.AddYears(1) : desde.AddMonths(1);
-            s.PruebaUsada = true;
-            pago.FechaAplicacion = ahora;
+            Activar(s, pago);
         }
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Aplica un pago aprobado al plan (y registra el uso de su código promocional). Pagar durante la prueba o
+    /// renovar el mismo plan suma al periodo vigente; cambiar de plan empieza hoy.
+    /// </summary>
+    private void Activar(Suscripcion s, PagoSuscripcion pago)
+    {
+        var ahora = Ahora;
+        var vigente = s.FechaFin is { } fin && fin > ahora && s.Estado != EstadoSuscripcion.Gratis;
+        var desde = vigente && (s.Estado == EstadoSuscripcion.Prueba || s.Plan == pago.Plan) ? s.FechaFin!.Value : ahora;
+        s.Plan = pago.Plan;
+        s.Estado = EstadoSuscripcion.Activa;
+        s.Periodo = pago.Periodo;
+        s.FechaInicio = ahora;
+        s.FechaFin = pago.Periodo == PeriodoPago.Anual ? desde.AddYears(1) : desde.AddMonths(1);
+        s.PruebaUsada = true;
+        pago.FechaAplicacion = ahora;
+        if (pago.IdCodigoPromocional is { } idCodigo)
+        {
+            db.UsosCodigoPromocional.Add(new UsoCodigoPromocional
+            {
+                IdEmpresa = pago.IdEmpresa, IdCodigoPromocional = idCodigo, IdPagoSuscripcion = pago.Id, Plan = pago.Plan, Periodo = pago.Periodo,
+                DescuentoCentavos = pago.DescuentoCentavos,
+            });
+        }
     }
 
     // --- Límites (los usan otros módulos) ----------------------------------------------------------
@@ -308,7 +368,7 @@ public class ServicioSuscripcion(
         await db.PagosSuscripcion.IgnoreQueryFilters([FiltrosConsulta.Empresa]).AsNoTracking().Where(p => p.IdEmpresa == idEmpresa)
             .OrderByDescending(p => p.FechaCreacion).Take(100)
             .Select(p => new PagoSuscripcionDto(p.Id, p.Referencia, p.Plan, p.Periodo, p.ValorCentavos / 100, p.Estado, p.MetodoPago ?? "",
-                p.IdTransaccion ?? "", p.FechaCreacion, p.FechaAplicacion))
+                p.IdTransaccion ?? "", p.FechaCreacion, p.FechaAplicacion, p.CodigoPromocional ?? "", p.DescuentoCentavos / 100))
             .ToListAsync(ct);
 
     public async Task<SuscripcionDto> AjustarAsync(Guid idEmpresa, SolicitudAjusteSuscripcion a, CancellationToken ct = default)
@@ -325,11 +385,25 @@ public class ServicioSuscripcion(
         }
         s.FechaInicio = Ahora;
         s.Nota = Texto.Opcional(a.Nota);
+        if (Texto.Opcional(a.CodigoPromocional) is { } texto)
+        {
+            // Plan activado a mano con un código (p. ej. pago por transferencia): cuenta como uso y queda anotado.
+            var (codigo, r) = await codigos.EvaluarAsync(texto, idEmpresa, s.Plan, s.Periodo!.Value, ct);
+            db.UsosCodigoPromocional.Add(new UsoCodigoPromocional
+            {
+                IdEmpresa = idEmpresa, IdCodigoPromocional = codigo.Id, Plan = s.Plan, Periodo = s.Periodo.Value, DescuentoCentavos = r.Descuento * 100,
+            });
+            var anotacion = $"Código {codigo.Codigo}: descuento de {Pesos(r.Descuento)} en el primer mes (total {Pesos(r.Total)}).";
+            var nota = s.Nota is null ? anotacion : $"{s.Nota} · {anotacion}";
+            s.Nota = nota.Length > 500 ? nota[..500] : nota;
+        }
         await db.SaveChangesAsync(ct);
         return await DtoAsync(s, ct, idEmpresa);
     }
 
     // --- Apoyo -------------------------------------------------------------------------------------
+
+    private static string Pesos(long valor) => "$" + valor.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("es-CO"));
 
     private bool Vencida(Suscripcion s) => s.Estado != EstadoSuscripcion.Gratis && (s.FechaFin is null || s.FechaFin <= Ahora);
 

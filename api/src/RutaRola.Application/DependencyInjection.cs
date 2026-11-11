@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<Soporte.AvisosSoporte>();
         services.AddScoped<Soporte.ServicioSoporte>();
         services.AddScoped<Suscripciones.ServicioSuscripcion>();
+        services.AddScoped<Suscripciones.ServicioCodigosPromocionales>();
         services.AddScoped<Empresas.ServicioRegistro>();
         return services;
     }

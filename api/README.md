@@ -370,10 +370,12 @@ contraseña o inactivar revoca sus sesiones.
 |---|---|---|
 | `GET /suscripcion/planes` | anónimo | Catálogo de `CatalogoPlanes` (precios COP con IVA, anual = 10 mensualidades, límites, funciones). |
 | `GET /suscripcion`, `GET /suscripcion/pagos` | `suscripcion.leer` | Plan, estado (PRUEBA/ACTIVA/GRATIS), días restantes, límites y uso; historial de pagos. |
-| `POST /suscripcion/pagos {plan, periodo}` | `suscripcion.gestionar` | 201 `{referencia, url}`: pago PENDIENTE y URL firmada del Web Checkout (integridad = SHA256(ref + centavos + moneda + secreto)). 422 sin llaves. |
+| `POST /suscripcion/codigo {codigo, plan, periodo}` | `suscripcion.gestionar` | `{codigo, precio, descuento, total, …}` si el código aplica; 422 con el motivo. El descuento es solo del primer mes. |
+| `POST /suscripcion/pagos {plan, periodo, codigoPromocional}` | `suscripcion.gestionar` | 201 `{referencia, url}`: pago PENDIENTE (con el descuento del código) y URL firmada del Web Checkout (integridad = SHA256(ref + centavos + moneda + secreto)). 422 sin llaves o si el código no aplica. Total $0 → pago APROBADO `CODIGO_PROMOCIONAL` aplicado de una vez y `url` vacía (también sin Wompi). |
 | `POST /suscripcion/pagos/{referencia}/verificacion {idTransaccion}` | `suscripcion.gestionar` | Consulta la transacción en Wompi y la aplica si está aprobada. |
 | `POST /pagos/wompi/eventos` | anónimo | Evento `transaction.updated`; checksum con `Wompi:SecretoEventos` (401 si no coincide). Valor y moneda deben coincidir con el pago. Idempotente. |
-| `GET/PUT /empresas/{id}/suscripcion`, `GET /empresas/{id}/suscripcion/pagos` | `empresas.gestionar` | Ajuste manual de la plataforma (plan, estado, vencimiento futuro, nota). |
+| `GET/PUT /empresas/{id}/suscripcion`, `GET /empresas/{id}/suscripcion/pagos` | `empresas.gestionar` | Ajuste manual de la plataforma (plan, estado, vencimiento futuro, nota y `codigoPromocional` opcional solo en ACTIVA: registra el uso y anota el descuento). |
+| `GET/POST /plataforma/codigos-promocionales`, `GET/PUT/DELETE …/{id}`, `GET …/opciones`, `GET …/{id}/motivo-no-eliminar`, `GET …/{id}/usos` | `promociones.gestionar` (SuperAdmin) | Códigos promocionales. Filtros `texto`, `estado`, `vigencia` (PROGRAMADO/VIGENTE/VENCIDO). 409 código repetido o `DELETE` de un código usado o con pagos (se inactiva). |
 | `POST /auth/registro {empresa, administrador, aceptaTerminos}` | anónimo (límite por IP) | 201 `{sesion, tokens}`: crea empresa, administrador y prueba. 409 NIT/usuario/correo en uso. |
 
 Tablas `suscripciones` (una por empresa) y `pagos_suscripcion` (`referencia` única). Toda empresa nueva recibe 3
@@ -383,6 +385,14 @@ renovar el mismo plan extiende; cambiar de plan empieza hoy. Límites: crear o a
 encima del plan → 422; lotes GPS sin `GPS_EN_VIVO` → 422; sin `RECORDATORIOS` el proceso no envía cobros. Una
 empresa sin fila cuenta como prueba Profesional. La migración `Suscripciones` dio 3 meses de prueba a las
 empresas existentes.
+
+**Códigos promocionales** (migración `CodigosPromocionales`): `codigos_promocionales` (global, `codigo` único en
+mayúsculas; `tipo_descuento` PORCENTAJE 1–100 o VALOR_FIJO en pesos; `fecha_inicio`/`fecha_fin` de Colombia,
+incluidas; `alcance` TODAS/EMPRESAS/PRIMERA_COMPRA; `planes` separados por coma, vacío = todos; `periodo` null =
+ambos; `usos_maximos` null = sin límite; `usos_por_empresa`), `codigos_promocionales_empresas` (alcance EMPRESAS) y
+`usos_codigo_promocional` (un uso por pago aprobado o activación manual). `pagos_suscripcion` guarda el código y
+`descuento_centavos`. Reglas en `ServicioCodigosPromocionales.EvaluarAsync`; el descuento es SOLO del primer mes
+(en el anual, una mensualidad; el valor fijo no supera un mes). Los pagos pendientes no cuentan como uso.
 
 **Estado actual: Wompi y Brevo PAUSADOS.** `render.yaml` deja `Mensajeria__Correo=Simulado` y sin llaves de
 Wompi: `pagosEnLinea` = false, el frontend ofrece "Solicitar por Soporte" y la plataforma activa el plan en

@@ -56,6 +56,9 @@ public interface IBaseDatos
     DbSet<AdjuntoTicket> AdjuntosTicket { get; }
     DbSet<Suscripcion> Suscripciones { get; }
     DbSet<PagoSuscripcion> PagosSuscripcion { get; }
+    DbSet<CodigoPromocional> CodigosPromocionales { get; }
+    DbSet<CodigoPromocionalEmpresa> CodigosPromocionalesEmpresas { get; }
+    DbSet<UsoCodigoPromocional> UsosCodigoPromocional { get; }
 
     /// <summary>Empresa del token (o <see cref="Guid.Empty"/>).</summary>
     Guid IdEmpresaActual { get; }

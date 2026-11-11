@@ -2697,6 +2697,108 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.ToTable("tickets_soporte", (string)null);
                 });
 
+            modelBuilder.Entity("RutaRola.Domain.Suscripciones.CodigoPromocional", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_codigo_promocional");
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("activo");
+
+                    b.Property<string>("Alcance")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("alcance");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("codigo");
+
+                    b.Property<string>("Descripcion")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("descripcion");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_actualizacion");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<DateOnly>("FechaFin")
+                        .HasColumnType("date")
+                        .HasColumnName("fecha_fin");
+
+                    b.Property<DateOnly>("FechaInicio")
+                        .HasColumnType("date")
+                        .HasColumnName("fecha_inicio");
+
+                    b.Property<string>("Periodo")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("periodo");
+
+                    b.Property<string>("Planes")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("planes");
+
+                    b.Property<string>("TipoDescuento")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("tipo_descuento");
+
+                    b.Property<int?>("UsosMaximos")
+                        .HasColumnType("integer")
+                        .HasColumnName("usos_maximos");
+
+                    b.Property<int>("UsosPorEmpresa")
+                        .HasColumnType("integer")
+                        .HasColumnName("usos_por_empresa");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("valor");
+
+                    b.HasKey("Id")
+                        .HasName("pk_codigos_promocionales");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique()
+                        .HasDatabaseName("ix_codigos_promocionales_codigo");
+
+                    b.ToTable("codigos_promocionales", (string)null);
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Suscripciones.CodigoPromocionalEmpresa", b =>
+                {
+                    b.Property<Guid>("IdCodigoPromocional")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_codigo_promocional");
+
+                    b.Property<Guid>("IdEmpresa")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_empresa");
+
+                    b.HasKey("IdCodigoPromocional", "IdEmpresa")
+                        .HasName("pk_codigos_promocionales_empresas");
+
+                    b.HasIndex("IdEmpresa")
+                        .HasDatabaseName("ix_codigos_promocionales_empresas_id_empresa");
+
+                    b.ToTable("codigos_promocionales_empresas", (string)null);
+                });
+
             modelBuilder.Entity("RutaRola.Domain.Suscripciones.PagoSuscripcion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2708,10 +2810,19 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("character varying(10)")
                         .HasColumnName("ambiente");
 
+                    b.Property<string>("CodigoPromocional")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("codigo_promocional");
+
                     b.Property<string>("CorreoPagador")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("correo_pagador");
+
+                    b.Property<long>("DescuentoCentavos")
+                        .HasColumnType("bigint")
+                        .HasColumnName("descuento_centavos");
 
                     b.Property<string>("Estado")
                         .IsRequired()
@@ -2730,6 +2841,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Property<DateTime>("FechaCreacion")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_creacion");
+
+                    b.Property<Guid?>("IdCodigoPromocional")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_codigo_promocional");
 
                     b.Property<Guid>("IdEmpresa")
                         .HasColumnType("uuid")
@@ -2773,6 +2888,9 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
 
                     b.HasKey("Id")
                         .HasName("pk_pagos_suscripcion");
+
+                    b.HasIndex("IdCodigoPromocional")
+                        .HasDatabaseName("ix_pagos_suscripcion_id_codigo_promocional");
 
                     b.HasIndex("Referencia")
                         .IsUnique()
@@ -2844,6 +2962,63 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasDatabaseName("ix_suscripciones_id_empresa");
 
                     b.ToTable("suscripciones", (string)null);
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Suscripciones.UsoCodigoPromocional", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_uso_codigo_promocional");
+
+                    b.Property<long>("DescuentoCentavos")
+                        .HasColumnType("bigint")
+                        .HasColumnName("descuento_centavos");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_actualizacion");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<Guid>("IdCodigoPromocional")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_codigo_promocional");
+
+                    b.Property<Guid>("IdEmpresa")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_empresa");
+
+                    b.Property<Guid?>("IdPagoSuscripcion")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_pago_suscripcion");
+
+                    b.Property<string>("Periodo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("periodo");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("plan");
+
+                    b.HasKey("Id")
+                        .HasName("pk_usos_codigo_promocional");
+
+                    b.HasIndex("IdEmpresa")
+                        .HasDatabaseName("ix_usos_codigo_promocional_id_empresa");
+
+                    b.HasIndex("IdPagoSuscripcion")
+                        .HasDatabaseName("ix_usos_codigo_promocional_id_pago_suscripcion");
+
+                    b.HasIndex("IdCodigoPromocional", "IdEmpresa")
+                        .HasDatabaseName("ix_usos_codigo_promocional_id_codigo_promocional_id_empresa");
+
+                    b.ToTable("usos_codigo_promocional", (string)null);
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Comunicacion.Archivo", b =>
@@ -3598,8 +3773,33 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Navigation("Solicitante");
                 });
 
+            modelBuilder.Entity("RutaRola.Domain.Suscripciones.CodigoPromocionalEmpresa", b =>
+                {
+                    b.HasOne("RutaRola.Domain.Suscripciones.CodigoPromocional", "CodigoPromocional")
+                        .WithMany("Empresas")
+                        .HasForeignKey("IdCodigoPromocional")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_codigos_promocionales_empresas_codigos_promocionales_id_cod");
+
+                    b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("IdEmpresa")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_codigos_promocionales_empresas_empresas_id_empresa");
+
+                    b.Navigation("CodigoPromocional");
+                });
+
             modelBuilder.Entity("RutaRola.Domain.Suscripciones.PagoSuscripcion", b =>
                 {
+                    b.HasOne("RutaRola.Domain.Suscripciones.CodigoPromocional", null)
+                        .WithMany()
+                        .HasForeignKey("IdCodigoPromocional")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pagos_suscripcion_codigos_promocionales_id_codigo_promocion");
+
                     b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
                         .WithMany()
                         .HasForeignKey("IdEmpresa")
@@ -3616,6 +3816,31 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_suscripciones_empresas_id_empresa");
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Suscripciones.UsoCodigoPromocional", b =>
+                {
+                    b.HasOne("RutaRola.Domain.Suscripciones.CodigoPromocional", "CodigoPromocional")
+                        .WithMany()
+                        .HasForeignKey("IdCodigoPromocional")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_usos_codigo_promocional_codigos_promocionales_id_codigo_pro");
+
+                    b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("IdEmpresa")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_usos_codigo_promocional_empresas_id_empresa");
+
+                    b.HasOne("RutaRola.Domain.Suscripciones.PagoSuscripcion", null)
+                        .WithMany()
+                        .HasForeignKey("IdPagoSuscripcion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_usos_codigo_promocional_pagos_suscripcion_id_pago_suscripci");
+
+                    b.Navigation("CodigoPromocional");
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Finanzas.Cotizacion", b =>
@@ -3684,6 +3909,11 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Navigation("Eventos");
 
                     b.Navigation("Reuniones");
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Suscripciones.CodigoPromocional", b =>
+                {
+                    b.Navigation("Empresas");
                 });
 #pragma warning restore 612, 618
         }
