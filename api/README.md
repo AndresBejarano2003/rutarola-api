@@ -145,6 +145,9 @@ conectados a la instancia que lo generó.
 | `PUT /api/v1/auth/contrasena` `{actual, nueva}` | Cambia la contraseña propia (cualquier rol): 422 `La contraseña actual no es correcta.` o si es igual, 400 si la nueva tiene menos de 6. Revoca las demás sesiones del usuario (la actual sigue); la auditoría registra `(cambiada)`. 204. |
 
 - **Access token:** JWT HS256 de 15 minutos con los claims `sub`, `sid` (sesión), `name`, `rol`, `id_empresa`, `id_empleado` / `id_acudiente` y un `permiso` por permiso.
+  Si una política niega un token al que le falta un permiso que su rol SÍ tiene hoy (`Permisos.PorRol`, p. ej. un permiso
+  agregado después de iniciar sesión), responde 401 `invalid_token` en vez de 403: el frontend renueva la sesión con los
+  permisos actuales y reintenta.
   - Se envía como `Authorization: Bearer`.
   - Al cerrar sesión, el access token sigue vivo hasta que expira (máximo 15 min).
 - **Refresh token:** 256 bits aleatorios. En `sesiones_usuario` se guarda solo su SHA-256, con IP, dispositivo y vencimiento.
@@ -387,7 +390,8 @@ empresa sin fila cuenta como prueba Profesional. La migración `Suscripciones` d
 empresas existentes.
 
 **Códigos promocionales** (migración `CodigosPromocionales`): `codigos_promocionales` (global, `codigo` único en
-mayúsculas; `tipo_descuento` PORCENTAJE 1–100 o VALOR_FIJO en pesos; `fecha_inicio`/`fecha_fin` de Colombia,
+mayúsculas; si llega vacío al crear lo genera el servidor con el `prefijo` opcional — `PREFIJO-XXXXXXXX` o `XXXX-XXXX`,
+aleatorio criptográfico sin 0/O/1/I/L — y vacío al editar lo conserva; `tipo_descuento` PORCENTAJE 1–100 o VALOR_FIJO en pesos; `fecha_inicio`/`fecha_fin` de Colombia,
 incluidas; `alcance` TODAS/EMPRESAS/PRIMERA_COMPRA; `planes` separados por coma, vacío = todos; `periodo` null =
 ambos; `usos_maximos` null = sin límite; `usos_por_empresa`), `codigos_promocionales_empresas` (alcance EMPRESAS) y
 `usos_codigo_promocional` (un uso por pago aprobado o activación manual). `pagos_suscripcion` guarda el código y

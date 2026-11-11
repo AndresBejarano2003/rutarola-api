@@ -138,6 +138,41 @@ public class CodigosPromocionalesTests(BaseDatosPrueba bd)
     }
 
     [Fact]
+    public async Task Sin_codigo_el_sistema_lo_genera_con_el_prefijo_y_al_editar_se_conserva()
+    {
+        var super = await bd.SuperAdminAsync();
+        var conPrefijo = Codigo("");
+        conPrefijo["prefijo"] = "regreso";
+        var a = await CrearAsync(super, conPrefijo);
+        Assert.Matches("^REGRESO-[A-HJ-NP-Z2-9]{8}$", a.Codigo);
+        var b = await CrearAsync(super, Codigo(""));
+        Assert.Matches("^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$", b.Codigo);
+        var editado = await (await super.PutAsJsonAsync($"{Url}/{b.Id}", Codigo("", valor: 30), ClienteApi.Json)).LeerAsync<CodigoPromocionalDto>();
+        Assert.Equal((b.Codigo, 30m), (editado.Codigo, editado.Valor));
+        conPrefijo["prefijo"] = "con-guion";
+        Assert.Equal(HttpStatusCode.BadRequest, (await super.PostAsJsonAsync(Url, conPrefijo, ClienteApi.Json)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Una_sesion_abierta_antes_de_un_permiso_nuevo_recibe_401_para_renovarse()
+    {
+        var super = await bd.SuperAdminAsync();
+        var token = super.DefaultRequestHeaders.Authorization!.Parameter!;
+        var claims = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(token).Claims.ToList();
+        string Valor(string tipo) => claims.First(c => c.Type == tipo).Value;
+        var permisos = claims.Where(c => c.Type == Reclamos.Permiso).Select(c => c.Value).Where(p => p != RutaRola.Domain.Seguridad.Permisos.PromocionesGestionar).ToList();
+        var generador = (RutaRola.Application.Autenticacion.IGeneradorTokens)bd.Api.Services.GetService(typeof(RutaRola.Application.Autenticacion.IGeneradorTokens))!;
+        var viejo = generador.CrearAcceso(new RutaRola.Application.Autenticacion.DatosToken(
+            Guid.Parse(Valor(Reclamos.IdUsuario)), "Super", null, Valor(Reclamos.Rol), null, null, Guid.Parse(Valor(Reclamos.IdSesion)), permisos));
+        var cliente = bd.Cliente(viejo.Token);
+        var respuesta = await cliente.GetAsync(Url);
+        Assert.Equal(HttpStatusCode.Unauthorized, respuesta.StatusCode);
+        Assert.Contains("invalid_token", respuesta.Headers.WwwAuthenticate.ToString());
+        // Un permiso que el rol NO tiene sigue siendo 403.
+        Assert.Equal(HttpStatusCode.Forbidden, (await super.GetAsync("/api/v1/suscripcion")).StatusCode);
+    }
+
+    [Fact]
     public async Task Valida_los_datos_del_codigo_y_no_repite_el_texto()
     {
         var super = await bd.SuperAdminAsync();

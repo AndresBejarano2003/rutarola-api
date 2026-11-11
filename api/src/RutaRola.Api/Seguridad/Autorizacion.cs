@@ -72,8 +72,17 @@ public static class Autorizacion
                             : "Bearer error=\"invalid_token\"";
                         await EscribirProblemaAsync(contexto.HttpContext, StatusCodes.Status401Unauthorized, mensaje);
                     },
+                    // Si al token le falta un permiso que su rol SÍ tiene hoy (se agregó un permiso después de
+                    // iniciar sesión), responde 401: el frontend renueva la sesión (con los permisos actuales) y reintenta.
                     OnForbidden = contexto =>
-                        EscribirProblemaAsync(contexto.HttpContext, StatusCodes.Status403Forbidden, DetallesProblema.MensajePorEstado(403)),
+                    {
+                        if (PermisosDesactualizados(contexto.HttpContext.User))
+                        {
+                            contexto.Response.Headers.WWWAuthenticate = "Bearer error=\"invalid_token\", error_description=\"permisos desactualizados\"";
+                            return EscribirProblemaAsync(contexto.HttpContext, StatusCodes.Status401Unauthorized, ServicioAutenticacion.MensajeSesionInvalida);
+                        }
+                        return EscribirProblemaAsync(contexto.HttpContext, StatusCodes.Status403Forbidden, DetallesProblema.MensajePorEstado(403));
+                    },
                 };
             });
 
@@ -101,6 +110,15 @@ public static class Autorizacion
         });
 
         return services;
+    }
+
+    /// <summary>El token se emitió antes de que su rol recibiera algún permiso del catálogo actual.</summary>
+    internal static bool PermisosDesactualizados(System.Security.Claims.ClaimsPrincipal usuario)
+    {
+        var rol = usuario.FindFirst(Reclamos.Rol)?.Value;
+        if (rol is null || !Permisos.PorRol.TryGetValue(rol, out var esperados)) return false;
+        var actuales = usuario.FindAll(Reclamos.Permiso).Select(c => c.Value).ToHashSet();
+        return esperados.Any(p => !actuales.Contains(p));
     }
 
     private static AuthorizationBuilder AgregarPoliticasDePermisos(this AuthorizationBuilder builder)

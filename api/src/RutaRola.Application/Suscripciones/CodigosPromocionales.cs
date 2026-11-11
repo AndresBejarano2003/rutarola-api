@@ -15,10 +15,14 @@ public record CodigoPromocionalDto(
     AlcanceCodigo Alcance, IReadOnlyList<PlanSuscripcion> Planes, string Periodo, int? UsosMaximos, int UsosPorEmpresa, string Estado,
     IReadOnlyList<Guid> EmpresaIds, IReadOnlyList<Opcion> Empresas, int Usos, string Vigencia, DateTime FechaCreacion);
 
+/// <summary>
+/// <c>codigo</c> vacío = el sistema lo genera (al crear; al editar se conserva el actual) con el <c>prefijo</c> opcional:
+/// <c>REGRESO-7KQ9M2XT</c> o <c>7KQ9-M2XT</c>.
+/// </summary>
 public record SolicitudCodigoPromocional(
     string? Codigo, string? Descripcion, TipoDescuento? TipoDescuento, decimal? Valor, DateOnly? FechaInicio, DateOnly? FechaFin,
     AlcanceCodigo? Alcance, IReadOnlyList<PlanSuscripcion>? Planes, PeriodoPago? Periodo, int? UsosMaximos, int? UsosPorEmpresa,
-    string? Estado, IReadOnlyList<Guid>? EmpresaIds);
+    string? Estado, IReadOnlyList<Guid>? EmpresaIds, string? Prefijo = null);
 
 /// <summary><c>vigencia</c>: PROGRAMADO, VIGENTE o VENCIDO.</summary>
 public record FiltrosCodigoPromocional(string? Texto = null, string? Estado = null, string? Vigencia = null);
@@ -39,6 +43,17 @@ public static class ReglasCodigoPromocional
     public const string Programado = "PROGRAMADO";
     public const string Vencido = "VENCIDO";
     public const string PatronCodigo = "^[A-Z0-9-]{4,30}$";
+    public const string PatronPrefijo = "^[A-Z0-9]{0,12}$";
+    /// <summary>Sin 0/O ni 1/I/L para que se pueda dictar y escribir sin confundirse.</summary>
+    private const string Alfabeto = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+    /// <summary>Código aleatorio (criptográfico, 8 caracteres ≈ 40 bits): <c>PREFIJO-XXXXXXXX</c> o <c>XXXX-XXXX</c>.</summary>
+    public static string Generar(string? prefijo)
+    {
+        var azar = System.Security.Cryptography.RandomNumberGenerator.GetString(Alfabeto, 8);
+        var p = Normalizar(prefijo);
+        return p.Length > 0 ? $"{p}-{azar}" : $"{azar[..4]}-{azar[4..]}";
+    }
 
     public static string Normalizar(string? codigo) => (codigo ?? "").Trim().ToUpperInvariant();
 
@@ -67,9 +82,13 @@ public class ValidadorSolicitudCodigoPromocional : AbstractValidator<SolicitudCo
 {
     public ValidadorSolicitudCodigoPromocional()
     {
-        RuleFor(x => x.Codigo).NotEmpty().WithMessage("Ingresa el código.")
+        RuleFor(x => x.Codigo)
             .Must(c => System.Text.RegularExpressions.Regex.IsMatch(ReglasCodigoPromocional.Normalizar(c), ReglasCodigoPromocional.PatronCodigo))
+            .When(x => !string.IsNullOrWhiteSpace(x.Codigo))
             .WithMessage("El código debe tener de 4 a 30 letras, números o guiones, sin espacios.");
+        RuleFor(x => x.Prefijo)
+            .Must(p => System.Text.RegularExpressions.Regex.IsMatch(ReglasCodigoPromocional.Normalizar(p), ReglasCodigoPromocional.PatronPrefijo))
+            .WithMessage("El prefijo admite hasta 12 letras o números, sin espacios ni guiones.");
         RuleFor(x => x.Descripcion).MaximumLength(200).WithMessage("La descripción admite máximo 200 caracteres.");
         RuleFor(x => x.TipoDescuento).NotNull().WithMessage("Elige el tipo de descuento.");
         RuleFor(x => x.Valor).NotNull().WithMessage("Ingresa el valor del descuento.");
@@ -263,6 +282,18 @@ public class ServicioCodigosPromocionales(IBaseDatos db, TimeProvider reloj)
     private async Task AplicarAsync(CodigoPromocional c, SolicitudCodigoPromocional s, CancellationToken ct)
     {
         var codigo = ReglasCodigoPromocional.Normalizar(s.Codigo);
+        if (codigo.Length == 0 && c.Codigo.Length > 0)
+        {
+            codigo = c.Codigo; // Editar sin código = se conserva.
+        }
+        else if (codigo.Length == 0)
+        {
+            // Lo genera el sistema; un choque es improbable, pero se reintenta.
+            for (var intento = 0; intento < 5 && (codigo.Length == 0 || await db.CodigosPromocionales.AnyAsync(x => x.Codigo == codigo, ct)); intento++)
+            {
+                codigo = ReglasCodigoPromocional.Generar(s.Prefijo);
+            }
+        }
         if (await db.CodigosPromocionales.AnyAsync(x => x.Codigo == codigo && x.Id != c.Id, ct))
         {
             throw new ErrorNegocio($"Ya existe el código {codigo}.", CodigoError.Duplicado);
