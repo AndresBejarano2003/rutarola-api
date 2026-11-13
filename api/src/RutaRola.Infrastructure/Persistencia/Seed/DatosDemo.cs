@@ -79,6 +79,20 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
         {
             v.FechaCreacion = Creado(hoy, 1, 8);
             db.Vehiculos.Add(v);
+            // Historial de documentos: el vigente de cada tipo y el anterior, ya vencido.
+            foreach (var d in v.Documentos)
+            {
+                db.HistorialDocumentosVehiculo.Add(new HistorialDocumentoVehiculo
+                {
+                    IdEmpresa = idEmpresa, IdVehiculo = v.Id, TipoDocumento = d.TipoDocumento, FechaVencimiento = d.FechaVencimiento,
+                    FechaExpedicion = d.FechaVencimiento.AddYears(-1), FechaCreacion = v.FechaCreacion,
+                });
+                db.HistorialDocumentosVehiculo.Add(new HistorialDocumentoVehiculo
+                {
+                    IdEmpresa = idEmpresa, IdVehiculo = v.Id, TipoDocumento = d.TipoDocumento, FechaVencimiento = d.FechaVencimiento.AddYears(-1),
+                    FechaExpedicion = d.FechaVencimiento.AddYears(-2), FechaCreacion = v.FechaCreacion,
+                });
+            }
         }
 
         foreach (var e in Empleados(idEmpresa, hoy))

@@ -8,11 +8,12 @@ namespace RutaRola.Application.Operacion;
 
 /// <summary>
 /// Estudiante del recorrido, con los datos como estaban al iniciar (<c>Parada</c> del frontend).
-/// <c>motivoAusencia</c>: <c>NO_ASISTE</c> | <c>POR_SU_CUENTA</c> | <c>""</c>.
+/// <c>motivoAusencia</c>: <c>NO_ASISTE</c> | <c>POR_SU_CUENTA</c> | <c>""</c>. <c>aviso</c>: el acudiente avisó desde su
+/// portal que no viaja (null si no hay aviso).
 /// </summary>
 public record ParadaDto(
     Guid EstudianteId, string Estudiante, string Grado, string Direccion, string Acudiente, string TelefonoAcudiente,
-    EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega, string MotivoAusencia);
+    EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega, string MotivoAusencia, AvisoParadaDto? Aviso = null);
 
 /// <summary>Foto de perfil actual de un estudiante del recorrido (solo los que tienen foto).</summary>
 public record FotoEstudianteDto(Guid EstudianteId, string Foto);
@@ -33,9 +34,11 @@ public record ResumenRecorridoDto(Guid Id, Trayecto Trayecto, EstadoViaje Estado
 public record CompaneroDto(string Nombre, string Telefono, TipoEmpleado Rol, string Foto = "");
 
 /// <summary>Ruta que el empleado autenticado cubre en la fecha (<c>RutaAsignada</c>).</summary>
+/// <summary><c>avisosAusencia</c>: estudiantes de la ruta cuyo acudiente avisó que hoy no viajan (en algún trayecto).</summary>
 public record RutaAsignadaDto(
     Guid AsignacionId, Guid RutaId, string Ruta, string Jornada, string Sector, string Colegio, string DireccionColegio,
-    string Vehiculo, TipoEmpleado Rol, CompaneroDto? Companero, int Estudiantes, IReadOnlyList<ResumenRecorridoDto> Recorridos);
+    string Vehiculo, TipoEmpleado Rol, CompaneroDto? Companero, int Estudiantes, IReadOnlyList<ResumenRecorridoDto> Recorridos,
+    int AvisosAusencia = 0);
 
 public record SolicitudIniciarRecorrido(Guid? AsignacionId, Trayecto? Trayecto);
 
@@ -135,6 +138,9 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
         var ids = asignaciones.Select(a => a.Id).ToList();
         var recorridos = await db.ViajesRuta.AsNoTracking().Include(v => v.Paradas)
             .Where(v => ids.Contains(v.IdAsignacion) && v.FechaViaje == fecha).ToListAsync(ct);
+        var enRutas = asignaciones.SelectMany(a => a.Ruta.Estudiantes.Select(e => e.IdEstudiante)).Distinct().ToList();
+        var conAviso = (await db.AvisosAusencia.AsNoTracking().Where(a => a.Fecha == fecha && enRutas.Contains(a.IdEstudiante))
+            .Select(a => a.IdEstudiante).ToListAsync(ct)).ToHashSet();
 
         return asignaciones.Select(a =>
             {
@@ -145,7 +151,8 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
                     a.Ruta.Colegio.Direccion, a.Vehiculo.Placa, rol,
                     otro is null ? null : new CompaneroDto(otro.NombreCompleto, otro.Telefono, otro.TipoEmpleado, otro.Foto ?? ""),
                     a.Ruta.Estudiantes.Count,
-                    recorridos.Where(v => v.IdAsignacion == a.Id).OrderBy(v => v.Trayecto).Select(Resumir).ToList());
+                    recorridos.Where(v => v.IdAsignacion == a.Id).OrderBy(v => v.Trayecto).Select(Resumir).ToList(),
+                    a.Ruta.Estudiantes.Count(e => conAviso.Contains(e.IdEstudiante)));
             })
             .OrderBy(r => Catalogos.OrdenJornada(r.Jornada)).ThenBy(r => r.Ruta, StringComparer.Create(new("es-CO"), false))
             .ToList();
@@ -259,8 +266,14 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
         return (await ObtenerAsync(viaje.Id, ct), true);
     }
 
-    public Task<RecorridoDto> MarcarAsync(Guid id, SolicitudMarcarParadas s, CancellationToken ct = default) =>
-        ModificarAsync(id, viaje =>
+    public async Task<RecorridoDto> MarcarAsync(Guid id, SolicitudMarcarParadas s, CancellationToken ct = default)
+    {
+        // Avisos del acudiente de estos estudiantes (se confirman al marcarlos AUSENTE y se reabren al deshacer).
+        var marcados = s.EstudianteIds!.ToList();
+        var hoy = Fechas.Hoy(reloj);
+        var avisosAcudiente = await db.AvisosAusencia
+            .Where(a => marcados.Contains(a.IdEstudiante) && a.Fecha >= hoy.AddDays(-7) && a.Fecha <= hoy).ToListAsync(ct);
+        return await ModificarAsync(id, viaje =>
         {
             var ids = s.EstudianteIds!.ToHashSet();
             var paradas = viaje.Paradas.Where(p => ids.Contains(p.IdEstudiante)).OrderBy(p => p.OrdenRecogida).ToList();
@@ -308,7 +321,30 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
                 viaje.Eventos.Add(Evento(TipoEvento.CambioParada,
                     $"{p.NombreEstudiante}: {(estado == EstadoParada.Ausente ? NombreAusencia(motivo, viaje.Trayecto) : NombreEstado(estado))}."));
             }
+            var empleado = IdEmpleado;
+            var quien = empleado == viaje.IdConductor ? viaje.NombreConductor : viaje.NombreMonitora ?? "";
+            foreach (var p in paradas)
+            {
+                foreach (var aviso in avisosAcudiente.Where(a => ServicioAvisosAusencia.Aplica(a, p.IdEstudiante, viaje.FechaViaje, viaje.Trayecto)))
+                {
+                    if (p.Estado == EstadoParada.Ausente && aviso.IdConfirmadoPor is null)
+                    {
+                        aviso.IdConfirmadoPor = empleado;
+                        aviso.NombreConfirmadoPor = quien;
+                        aviso.FechaConfirmacion = Ahora;
+                        viaje.Eventos.Add(Evento(TipoEvento.Novedad, $"{quien} confirmó el aviso del acudiente: {p.NombreEstudiante} no viaja."));
+                    }
+                    else if (p.Estado != EstadoParada.Ausente && aviso.IdConfirmadoPor is not null)
+                    {
+                        // "Deshacer" o sí viajó: el aviso vuelve a quedar sin confirmar.
+                        aviso.IdConfirmadoPor = null;
+                        aviso.NombreConfirmadoPor = null;
+                        aviso.FechaConfirmacion = null;
+                    }
+                }
+            }
         }, ct);
+    }
 
     public Task<RecorridoDto> ReordenarAsync(Guid id, SolicitudOrdenParadas s, CancellationToken ct = default) =>
         ModificarAsync(id, viaje =>
@@ -383,7 +419,7 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
         {
             throw new ErrorNegocio("El recorrido no pertenece a tus rutas.", CodigoError.Prohibido);
         }
-        return Mapear(viaje);
+        return (await MapearAsync([viaje], ct))[0];
     }
 
     private Task<RecorridoDto> ObtenerAsync(Guid id, CancellationToken ct) => ObtenerAsync(id, false, ct);
@@ -448,7 +484,7 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
         var total = await consulta.CountAsync(ct);
         var viajes = await consulta.OrderByDescending(v => v.FechaViaje).ThenByDescending(v => v.HoraInicio).ThenByDescending(v => v.Id)
             .Skip(paginacion.Omitir).Take(paginacion.TamanoValido).Include(v => v.Paradas).ToListAsync(ct);
-        return new ListaPaginada<RecorridoDto>(viajes.Select(Mapear).ToList(), total, paginacion.PaginaValida, paginacion.TamanoValido);
+        return new ListaPaginada<RecorridoDto>(await MapearAsync(viajes, ct), total, paginacion.PaginaValida, paginacion.TamanoValido);
     }
 
     // ---------- Ayudas ----------
@@ -492,7 +528,7 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
     {
         var viaje = await db.ViajesRuta.AsNoTracking().Include(v => v.Paradas)
             .FirstOrDefaultAsync(v => v.IdAsignacion == idAsignacion && v.FechaViaje == fecha && v.Trayecto == trayecto, ct);
-        return viaje is null ? null : Mapear(viaje);
+        return viaje is null ? null : (await MapearAsync([viaje], ct))[0];
     }
 
     private static bool EsDelEmpleado(ViajeRuta v, Guid empleado) => v.IdConductor == empleado || v.IdMonitora == empleado;
@@ -521,13 +557,25 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
         paradas.Count(p => p.Estado == EstadoParada.Entregado),
         paradas.Count(p => p.Estado == EstadoParada.Ausente));
 
-    private static RecorridoDto Mapear(ViajeRuta v) => new(
+    private async Task<IReadOnlyList<RecorridoDto>> MapearAsync(IReadOnlyList<ViajeRuta> viajes, CancellationToken ct)
+    {
+        var avisos = await ServicioAvisosAusencia.DeRecorridosAsync(db, viajes, ct);
+        return viajes.Select(v => Mapear(v, avisos)).ToList();
+    }
+
+    private static AvisoParadaDto? Aviso(IReadOnlyList<Domain.Operacion.AvisoAusencia> avisos, ViajeRuta v, Guid idEstudiante) =>
+        avisos.FirstOrDefault(a => ServicioAvisosAusencia.Aplica(a, idEstudiante, v.FechaViaje, v.Trayecto)) is { } a
+            ? new AvisoParadaDto(a.Id, a.Motivo, a.Nota ?? "", a.Acudiente.NombreCompleto, a.FechaCreacion, a.IdConfirmadoPor is not null,
+                a.NombreConfirmadoPor ?? "")
+            : null;
+
+    private static RecorridoDto Mapear(ViajeRuta v, IReadOnlyList<Domain.Operacion.AvisoAusencia> avisos) => new(
         v.Id, v.IdAsignacion, v.IdRuta, v.FechaViaje, v.Trayecto, v.Estado, v.NombreRuta, v.Jornada, v.NombreColegio,
         v.DireccionColegio ?? "", v.DescripcionVehiculo, v.IdConductor, v.NombreConductor, v.IdMonitora?.ToString() ?? "",
         v.NombreMonitora ?? "",
         v.Paradas.OrderBy(p => p.OrdenRecogida).Select(p => new ParadaDto(
             p.IdEstudiante, p.NombreEstudiante, p.Grado, p.Direccion, p.NombreAcudiente ?? "", p.TelefonoAcudiente ?? "",
-            p.Estado, p.HoraRecogida, p.HoraEntrega, TextoMotivo(p.MotivoAusencia))).ToList(),
+            p.Estado, p.HoraRecogida, p.HoraEntrega, TextoMotivo(p.MotivoAusencia), Aviso(avisos, v, p.IdEstudiante))).ToList(),
         v.HoraInicio, v.HoraFin, v.IdIniciadoPor?.ToString() ?? "",
         v.IdOrdenActualizadoPor is { } quien && v.FechaOrdenActualizado is { } hora
             ? new CambioOrdenDto(quien, v.NombreOrdenActualizadoPor ?? "", hora)

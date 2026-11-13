@@ -20,6 +20,31 @@ public class Suscripcion : EntidadEmpresa
     public bool PruebaUsada { get; set; }
     /// <summary>Nota de la plataforma cuando ajusta el plan a mano (convenio, transferencia…).</summary>
     public string? Nota { get; set; }
+    /// <summary>
+    /// Días de prueba que recibió la empresa al registrarse (el parámetro de la plataforma de ESE momento: si la
+    /// plataforma lo cambia después, esta empresa conserva los suyos). 0 = sin prueba (pagó de una vez) o anterior.
+    /// </summary>
+    public int DiasPrueba { get; set; }
+    /// <summary>
+    /// La prueba o el plan pagado venció y el administrador aún no decide si paga o sigue en Gratis: al iniciar
+    /// sesión ve la pasarela de pagos. Se apaga al pagar o al elegir Gratis.
+    /// </summary>
+    public bool PendienteDecision { get; set; }
+    /// <summary>Plan que venció (para mostrar "Tu plan Profesional venció el …") y cuándo.</summary>
+    public PlanSuscripcion? PlanVencido { get; set; }
+    public DateTime? FechaVencimiento { get; set; }
+    /// <summary>Último pago aprobado aplicado (UTC), para la tabla de la plataforma.</summary>
+    public DateTime? FechaUltimoPago { get; set; }
+}
+
+/// <summary>
+/// Parámetro global de la plataforma (no pertenece a una empresa), p. ej. <c>suscripcion.dias_prueba</c>.
+/// Solo se aceptan las claves de <c>Application/Suscripciones/ParametrosPlataforma</c>.
+/// </summary>
+public class ParametroPlataforma : Entidad
+{
+    public string Clave { get; set; } = "";
+    public string Valor { get; set; } = "";
 }
 
 /// <summary>

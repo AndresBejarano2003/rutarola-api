@@ -10,6 +10,7 @@ internal class SuscripcionConfig : IEntityTypeConfiguration<Suscripcion>
     {
         b.Tabla("suscripciones", "id_suscripcion");
         b.Property(x => x.Nota).HasMaxLength(500);
+        b.Property(x => x.DiasPrueba).HasDefaultValue(0);
         // Una por empresa.
         b.HasIndex(x => x.IdEmpresa).IsUnique().HasDatabaseName("ix_suscripciones_id_empresa");
     }
@@ -69,5 +70,16 @@ internal class UsoCodigoPromocionalConfig : IEntityTypeConfiguration<UsoCodigoPr
         b.HasOne(x => x.CodigoPromocional).WithMany().HasForeignKey(x => x.IdCodigoPromocional);
         b.HasOne<PagoSuscripcion>().WithMany().HasForeignKey(x => x.IdPagoSuscripcion);
         b.HasIndex(x => new { x.IdCodigoPromocional, x.IdEmpresa });
+    }
+}
+
+internal class ParametroPlataformaConfig : IEntityTypeConfiguration<ParametroPlataforma>
+{
+    public void Configure(EntityTypeBuilder<ParametroPlataforma> b)
+    {
+        b.Tabla("parametros_plataforma", "id_parametro_plataforma");
+        b.Property(x => x.Clave).HasMaxLength(100);
+        b.Property(x => x.Valor).HasMaxLength(200);
+        b.HasIndex(x => x.Clave).IsUnique().HasDatabaseName("ix_parametros_plataforma_clave");
     }
 }

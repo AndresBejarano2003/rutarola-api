@@ -64,6 +64,35 @@ internal class DocumentoVehiculoConfig : IEntityTypeConfiguration<DocumentoVehic
     }
 }
 
+internal class HistorialDocumentoVehiculoConfig : IEntityTypeConfiguration<HistorialDocumentoVehiculo>
+{
+    public void Configure(EntityTypeBuilder<HistorialDocumentoVehiculo> b)
+    {
+        b.Tabla("historial_documentos_vehiculo", "id_historial_documento");
+        b.Property(x => x.NumeroDocumento).HasMaxLength(50);
+        b.Property(x => x.Entidad).HasMaxLength(100);
+        b.Property(x => x.Observaciones).HasMaxLength(500);
+        b.HasOne(x => x.Vehiculo).WithMany().HasForeignKey(x => x.IdVehiculo).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Archivo).WithMany().HasForeignKey(x => x.IdArchivo);
+        b.HasIndex(x => new { x.IdVehiculo, x.TipoDocumento, x.FechaVencimiento });
+    }
+}
+
+internal class AvisoAusenciaConfig : IEntityTypeConfiguration<AvisoAusencia>
+{
+    public void Configure(EntityTypeBuilder<AvisoAusencia> b)
+    {
+        b.Tabla("avisos_ausencia", "id_aviso_ausencia");
+        b.Property(x => x.Nota).HasMaxLength(300);
+        b.Property(x => x.NombreConfirmadoPor).HasMaxLength(150);
+        b.Property(x => x.IdConfirmadoPor).HasColumnName("id_confirmado_por");
+        b.HasOne(x => x.Estudiante).WithMany().HasForeignKey(x => x.IdEstudiante).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Acudiente).WithMany().HasForeignKey(x => x.IdAcudiente).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(x => new { x.IdEmpresa, x.Fecha });
+        b.HasIndex(x => new { x.IdEstudiante, x.Fecha });
+    }
+}
+
 internal class RutaConfig : IEntityTypeConfiguration<Ruta>
 {
     public void Configure(EntityTypeBuilder<Ruta> b)

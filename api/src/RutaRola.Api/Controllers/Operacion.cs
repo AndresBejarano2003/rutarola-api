@@ -100,6 +100,7 @@ public class RecorridosController(ServicioRecorridos servicio, IAuthorizationSer
 
     /// <summary>Última posición (204 si aún no hay). El acudiente solo la ve mientras el recorrido de su estudiante está en curso.</summary>
     [HttpGet("{id:guid}/gps/ultima")]
+    [RequiereFuncionPlan(Application.Suscripciones.FuncionPlan.GpsEnVivo)]
     [ProducesResponseType<PosicionDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<ActionResult<PosicionDto?>> UltimaPosicion(Guid id, [FromServices] ServicioGps gps, CancellationToken ct)
@@ -113,6 +114,7 @@ public class RecorridosController(ServicioRecorridos servicio, IAuthorizationSer
 
     /// <summary>Trayecto en orden (administrador o personal del recorrido); <c>desde</c> trae solo lo nuevo.</summary>
     [HttpGet("{id:guid}/gps")]
+    [RequiereFuncionPlan(Application.Suscripciones.FuncionPlan.GpsEnVivo)]
     public async Task<ActionResult<IReadOnlyList<PosicionDto>>> Trayecto(Guid id, [FromQuery] DateTime? desde, [FromServices] ServicioGps gps, CancellationToken ct)
     {
         if (await AlcanceGpsDe.ResolverAsync(autorizacion, User) is not { } alcance || alcance == AlcanceGps.Acudiente)
@@ -124,6 +126,7 @@ public class RecorridosController(ServicioRecorridos servicio, IAuthorizationSer
 
     /// <summary>Recorridos en curso de la empresa con su última posición (mapa del administrador).</summary>
     [HttpGet("en-curso")]
+    [RequiereFuncionPlan(Application.Suscripciones.FuncionPlan.GpsEnVivo)]
     [RequierePermiso(Permisos.RecorridosLeer)]
     public Task<IReadOnlyList<PosicionRecorridoDto>> EnCurso([FromServices] ServicioGps gps, CancellationToken ct) => gps.EnCursoAsync(ct);
 
@@ -131,4 +134,13 @@ public class RecorridosController(ServicioRecorridos servicio, IAuthorizationSer
     [RequierePermiso(Permisos.RecorridosOperar)]
     public Task<RecorridoDto> Finalizar(Guid id, SolicitudFinalizarRecorrido solicitud, CancellationToken ct) =>
         servicio.FinalizarAsync(id, solicitud, ct);
+}
+
+/// <summary>Avisos de ausencia de los acudientes (Operación › Asignaciones): <c>?fecha=YYYY-MM-DD&amp;rutaId=</c>, hoy por defecto.</summary>
+[Route("api/v1/avisos-ausencia")]
+[RequierePermiso(Permisos.RecorridosLeer)]
+public class AvisosAusenciaController(ServicioAvisosAusencia servicio) : ControladorApi
+{
+    [HttpGet]
+    public Task<IReadOnlyList<AvisoAusenciaDto>> Listar([FromQuery] FiltrosAvisoAusencia filtros, CancellationToken ct) => servicio.ListarAsync(filtros, ct);
 }

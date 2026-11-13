@@ -5,13 +5,16 @@ namespace RutaRola.Domain.Enums;
 
 public enum AccionAuditoria { Crear, Actualizar, Eliminar }
 
+public enum TemaApariencia { Oscuro, Claro }
+
 // Personas
 public enum TipoEmpleado { Conductor, Monitora }
 public enum TipoContrato { TerminoIndefinido, TerminoFijo, ObraLabor, PrestacionServicios }
 
 // Operación
 public enum TipoVehiculo { Bus, Buseta, Microbus, Camioneta }
-public enum TipoDocumentoVehiculo { Soat, Tecnomecanica, TarjetaOperacion, Polizas }
+/// <summary>OTRO solo en el historial (extintor, revisión preventiva…): no tiene vencimiento en el vehículo.</summary>
+public enum TipoDocumentoVehiculo { Soat, Tecnomecanica, TarjetaOperacion, Polizas, Otro }
 /// <summary>RECOGIDA: casa → colegio. ENTREGA: colegio → casa (orden inverso).</summary>
 public enum Trayecto { Recogida, Entrega }
 public enum EstadoViaje { Programado, EnCurso, Finalizado, Cancelado }
@@ -52,7 +55,7 @@ public enum EstadoReunion { Programada, Realizada, Cancelada }
 
 /// <summary>Plan contratado por la empresa (<c>Application/Suscripciones/CatalogoPlanes</c>).</summary>
 public enum PlanSuscripcion { Gratis, Esencial, Profesional, Empresarial }
-/// <summary>PRUEBA (3 meses de Profesional al registrarse), ACTIVA (pagada hasta <c>FechaFin</c>) o GRATIS (sin pago vigente).</summary>
+/// <summary>PRUEBA (días de Profesional al registrarse, parámetro de la plataforma), ACTIVA (pagada hasta <c>FechaFin</c>) o GRATIS (sin pago vigente).</summary>
 public enum EstadoSuscripcion { Prueba, Activa, Gratis }
 public enum PeriodoPago { Mensual, Anual }
 /// <summary>Estado de un pago en línea (Wompi: PENDING, APPROVED, DECLINED, VOIDED, ERROR).</summary>

@@ -38,9 +38,11 @@ public record TransporteEstudianteDto(
 
 public record HorarioDto(TimeOnly Entrada, TimeOnly Salida);
 
+/// <summary><c>avisos</c>: avisos de ausencia de hoy en adelante (el acudiente los crea y cancela desde el portal).</summary>
 public record EstudiantePortalDto(
     Guid Id, string Nombre, string Iniciales, string Grado, string Jornada, string Direccion, string Colegio, string DireccionColegio,
-    HorarioDto? Horario, string Estado, TransporteEstudianteDto? Transporte, IReadOnlyList<RecorridoHoyDto> Hoy, string Foto);
+    HorarioDto? Horario, string Estado, TransporteEstudianteDto? Transporte, IReadOnlyList<RecorridoHoyDto> Hoy, string Foto,
+    IReadOnlyList<AvisoAusenciaDto> Avisos);
 
 public record CotizacionPortalDto(
     Guid Id, string Numero, DateOnly Fecha, IReadOnlyList<string> Estudiantes, decimal ValorPorEstudiante, decimal ValorTotal, EstadoCotizacion Estado);
@@ -62,7 +64,9 @@ public record PortalAcudienteDto(
 /// (colegio, horario del curso, ruta activa con su asignación vigente y recorrido de hoy), su estado de cuenta
 /// con las reglas de <c>calcularEstadoCuenta</c>, los recibos de sus facturas y sus cotizaciones. Solo lectura.
 /// </summary>
-public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, ParametrosEmpresa parametros, TimeProvider reloj)
+public class ServicioPortal(
+    IBaseDatos db, IContextoUsuario usuario, ParametrosEmpresa parametros, TimeProvider reloj, ServicioAvisosAusencia avisosAusencia,
+    Suscripciones.ServicioSuscripcion suscripcion)
 {
     public async Task<PortalAcudienteDto> ObtenerAsync(CancellationToken ct = default)
     {
@@ -83,6 +87,7 @@ public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, ParametrosE
             .ToListAsync(ct);
         var paradas = await db.ParadasViaje.AsNoTracking().Include(p => p.Viaje)
             .Where(p => idsEstudiantes.Contains(p.IdEstudiante) && p.Viaje.FechaViaje == hoy).ToListAsync(ct);
+        var avisos = await avisosAusencia.DelAcudienteAsync(ct);
 
         var lista = estudiantes.Select(e =>
             {
@@ -104,7 +109,8 @@ public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, ParametrosE
                         .Select(p => new RecorridoHoyDto(p.IdViaje, p.Viaje.Trayecto, p.Viaje.Estado == EstadoViaje.EnCurso, p.Estado, p.HoraRecogida, p.HoraEntrega,
                             ServicioRecorridos.TextoMotivo(p.MotivoAusencia), p.Viaje.HoraInicio))
                         .ToList(),
-                    e.Foto ?? "");
+                    e.Foto ?? "",
+                    avisos.Where(a => a.EstudianteId == e.Id).ToList());
             })
             // Activos primero, luego por nombre.
             .OrderBy(e => e.Estado, StringComparer.Ordinal).ThenBy(e => e.Nombre, StringComparer.CurrentCulture)
@@ -127,7 +133,8 @@ public class ServicioPortal(IBaseDatos db, IContextoUsuario usuario, ParametrosE
                 c.Id, c.Numero, c.Fecha, c.Estudiantes.OrderBy(e => e.Orden).Select(e => e.Nombre).ToList(), c.ValorPorEstudiante, c.ValorTotal,
                 c.Estado)).ToList(),
             resumen,
-            await parametros.AcudientesVenUbicacionAsync(ct));
+            // La empresa comparte la ubicación Y su plan incluye el GPS en vivo.
+            await parametros.AcudientesVenUbicacionAsync(ct) && await suscripcion.TieneFuncionAsync(Suscripciones.FuncionPlan.GpsEnVivo, ct));
     }
 
     private static string Iniciales(string nombre, string apellido) =>

@@ -16,7 +16,30 @@ internal class EmpresaConfig : IEntityTypeConfiguration<Empresa>
         b.Property(x => x.Telefono).HasMaxLength(20);
         b.Property(x => x.Email).HasMaxLength(150);
         b.Property(x => x.LogoUrl).HasMaxLength(500);
+        b.Property(x => x.Tema).HasMaxLength(10).HasDefaultValue(RutaRola.Domain.Enums.TemaApariencia.Oscuro);
         b.HasIndex(x => x.Nit).IsUnique();
+    }
+}
+
+internal class FormatoDocumentosConfig : IEntityTypeConfiguration<FormatoDocumentos>
+{
+    public void Configure(EntityTypeBuilder<FormatoDocumentos> b)
+    {
+        b.Tabla("formatos_documentos", "id_formato_documentos");
+        b.Property(x => x.NombreComercial).HasMaxLength(150);
+        b.Property(x => x.Eslogan).HasMaxLength(150);
+        b.Property(x => x.Nit).HasMaxLength(30);
+        b.Property(x => x.Direccion).HasMaxLength(200);
+        b.Property(x => x.Ciudad).HasMaxLength(100);
+        b.Property(x => x.Telefono).HasMaxLength(60);
+        b.Property(x => x.Correo).HasMaxLength(150);
+        b.Property(x => x.SitioWeb).HasMaxLength(150);
+        b.Property(x => x.ColorPrincipal).HasMaxLength(7);
+        b.Property(x => x.PiePagina).HasMaxLength(500);
+        b.Property(x => x.NotaFactura).HasMaxLength(500);
+        b.Property(x => x.NotaRecibo).HasMaxLength(500);
+        b.Property(x => x.NotaCotizacion).HasMaxLength(500);
+        b.HasIndex(x => x.IdEmpresa).IsUnique().HasDatabaseName("ix_formatos_documentos_id_empresa");
     }
 }
 

@@ -44,7 +44,50 @@ public class Vehiculo : EntidadEmpresa
     public int Capacidad { get; set; }
     public string? Observaciones { get; set; }
     public bool Activo { get; set; } = true;
+    /// <summary>Data URL JPG/PNG/WebP (mismas reglas que la foto de las personas); null = sin foto.</summary>
+    public string? Foto { get; set; }
     public List<DocumentoVehiculo> Documentos { get; set; } = [];
+}
+
+/// <summary>
+/// Historial de los documentos del vehículo: cada SOAT, revisión, tarjeta o póliza que se renueva queda como un
+/// registro con su PDF. El vencimiento vigente de cada tipo (<see cref="DocumentoVehiculo"/>) es el mayor del historial.
+/// </summary>
+public class HistorialDocumentoVehiculo : EntidadEmpresa
+{
+    public Guid IdVehiculo { get; set; }
+    public Vehiculo Vehiculo { get; set; } = null!;
+    public TipoDocumentoVehiculo TipoDocumento { get; set; }
+    public string? NumeroDocumento { get; set; }
+    /// <summary>Aseguradora, CDA, secretaría de movilidad…</summary>
+    public string? Entidad { get; set; }
+    public DateOnly? FechaExpedicion { get; set; }
+    public DateOnly FechaVencimiento { get; set; }
+    public string? Observaciones { get; set; }
+    public Guid? IdArchivo { get; set; }
+    public Archivo? Archivo { get; set; }
+}
+
+/// <summary>
+/// El acudiente avisa desde su portal que su estudiante no viaja en la ruta una fecha (NO_ASISTE: no va al colegio,
+/// ambos trayectos; POR_SU_CUENTA: va pero no en la ruta, en <see cref="Trayecto"/> o en los dos si es null). La
+/// monitora o el conductor lo ven en el recorrido y lo confirman al marcarlo AUSENTE.
+/// </summary>
+public class AvisoAusencia : EntidadEmpresa
+{
+    public Guid IdEstudiante { get; set; }
+    public Estudiante Estudiante { get; set; } = null!;
+    public Guid IdAcudiente { get; set; }
+    public Acudiente Acudiente { get; set; } = null!;
+    public DateOnly Fecha { get; set; }
+    /// <summary>null = recogida y entrega.</summary>
+    public Trayecto? Trayecto { get; set; }
+    public MotivoAusencia Motivo { get; set; }
+    public string? Nota { get; set; }
+    /// <summary>Quién lo confirmó en el recorrido (conductor o monitora) y cuándo.</summary>
+    public Guid? IdConfirmadoPor { get; set; }
+    public string? NombreConfirmadoPor { get; set; }
+    public DateTime? FechaConfirmacion { get; set; }
 }
 
 /// <summary>SOAT, técnico-mecánica, tarjeta de operación y pólizas: uno vigente por tipo.</summary>

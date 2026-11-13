@@ -13,12 +13,43 @@ namespace RutaRola.Application.Operacion;
 public record VehiculoDto(
     Guid Id, string Placa, string NumeroInterno, TipoVehiculo Tipo, string Marca, string Linea, int Modelo, string Color,
     int Capacidad, DateOnly? VencimientoSoat, DateOnly? VencimientoTecnomecanica, DateOnly? VencimientoTarjetaOperacion,
-    DateOnly? VencimientoPolizas, string Estado, string Observaciones, DateTime FechaCreacion, DateTime? FechaActualizacion);
+    DateOnly? VencimientoPolizas, string Estado, string Observaciones, DateTime FechaCreacion, DateTime? FechaActualizacion,
+    string Foto = "");
 
+/// <summary><c>foto</c>: data URL JPG/PNG/WebP o <c>""</c> (sin foto).</summary>
 public record SolicitudVehiculo(
     string? Placa, string? NumeroInterno, TipoVehiculo? Tipo, string? Marca, string? Linea, int? Modelo, string? Color,
     int? Capacidad, DateOnly? VencimientoSoat, DateOnly? VencimientoTecnomecanica, DateOnly? VencimientoTarjetaOperacion,
-    DateOnly? VencimientoPolizas, string? Estado, string? Observaciones);
+    DateOnly? VencimientoPolizas, string? Estado, string? Observaciones, string? Foto = null);
+
+/// <summary>
+/// Un documento del historial del vehículo (SOAT, técnico-mecánica, tarjeta de operación, pólizas u OTRO) con su PDF.
+/// <c>vigente</c>: es el de vencimiento más reciente de su tipo (el que manda en el vehículo). <c>archivo.url</c> va
+/// vacía en el listado; el detalle trae el contenido.
+/// </summary>
+public record DocumentoHistorialDto(
+    Guid Id, Guid VehiculoId, TipoDocumentoVehiculo Tipo, string Numero, string Entidad, DateOnly? FechaExpedicion, DateOnly FechaVencimiento,
+    string Observaciones, ArchivoAdjuntoDto? Archivo, bool Vigente, DateTime FechaCreacion);
+
+public record SolicitudDocumentoHistorial(
+    TipoDocumentoVehiculo? Tipo, string? Numero, string? Entidad, DateOnly? FechaExpedicion, DateOnly? FechaVencimiento, string? Observaciones,
+    ArchivoAdjuntoDto? Archivo);
+
+public class ValidadorSolicitudDocumentoHistorial : AbstractValidator<SolicitudDocumentoHistorial>
+{
+    public ValidadorSolicitudDocumentoHistorial()
+    {
+        RuleFor(x => x.Tipo).NotNull().WithMessage("Elige el tipo de documento.");
+        RuleFor(x => x.Numero).MaximumLength(50).WithMessage("El número admite máximo 50 caracteres.");
+        RuleFor(x => x.Entidad).MaximumLength(100).WithMessage("La entidad admite máximo 100 caracteres.");
+        RuleFor(x => x.FechaVencimiento).NotNull().WithMessage("Ingresa la fecha de vencimiento.");
+        RuleFor(x => x.FechaVencimiento).GreaterThanOrEqualTo(x => x.FechaExpedicion)
+            .When(x => x.FechaExpedicion is not null && x.FechaVencimiento is not null)
+            .WithMessage("El vencimiento debe ser posterior a la expedición.");
+        RuleFor(x => x.Observaciones).MaximumLength(500).WithMessage("Las observaciones admiten máximo 500 caracteres.");
+        When(x => x.Archivo is not null, () => RuleFor(x => x.Archivo!).ReglasAdjunto("documento"));
+    }
+}
 
 /// <summary><c>texto</c> busca en placa, número interno, marca y línea.</summary>
 public record FiltrosVehiculo(string? Texto = null, TipoVehiculo? Tipo = null, string? Estado = null);
@@ -48,6 +79,7 @@ public class ValidadorSolicitudVehiculo : AbstractValidator<SolicitudVehiculo>
         RuleFor(x => x.VencimientoPolizas).NotNull().WithMessage("Ingresa el vencimiento de las pólizas.");
         RuleFor(x => x.Estado).EstadoRegistroValido();
         RuleFor(x => x.Observaciones).MaximumLength(500).WithMessage("Las observaciones admiten máximo 500 caracteres.");
+        RuleFor(x => x.Foto).FotoValida();
     }
 }
 
@@ -99,7 +131,7 @@ public class ServicioVehiculos(IBaseDatos db, Suscripciones.ServicioSuscripcion 
                 v.Id, v.Placa, v.NumeroInterno, v.Tipo, v.Marca, v.Linea ?? "", v.Anio, v.Color ?? "", v.Capacidad,
                 Vence(TipoDocumentoVehiculo.Soat), Vence(TipoDocumentoVehiculo.Tecnomecanica),
                 Vence(TipoDocumentoVehiculo.TarjetaOperacion), Vence(TipoDocumentoVehiculo.Polizas),
-                EstadoRegistro.Texto(v.Activo), v.Observaciones ?? "", v.FechaCreacion, v.FechaActualizacion);
+                EstadoRegistro.Texto(v.Activo), v.Observaciones ?? "", v.FechaCreacion, v.FechaActualizacion, v.Foto ?? "");
         }).ToList());
 
     protected override async Task AplicarAsync(Vehiculo v, SolicitudVehiculo s, bool nuevo, CancellationToken ct)
@@ -131,22 +163,41 @@ public class ServicioVehiculos(IBaseDatos db, Suscripciones.ServicioSuscripcion 
         }
         v.Activo = EstadoRegistro.EsActivo(s.Estado);
         v.Observaciones = Texto.Opcional(s.Observaciones);
+        v.Foto = Fotos.Normalizar(s.Foto);
 
-        Documento(v, TipoDocumentoVehiculo.Soat, s.VencimientoSoat!.Value);
-        Documento(v, TipoDocumentoVehiculo.Tecnomecanica, s.VencimientoTecnomecanica!.Value);
-        Documento(v, TipoDocumentoVehiculo.TarjetaOperacion, s.VencimientoTarjetaOperacion!.Value);
-        Documento(v, TipoDocumentoVehiculo.Polizas, s.VencimientoPolizas!.Value);
+        var historial = nuevo
+            ? []
+            : await Db.HistorialDocumentosVehiculo.Where(h => h.IdVehiculo == v.Id).Select(h => new { h.TipoDocumento, h.FechaVencimiento }).ToListAsync(ct);
+        void Documento(TipoDocumentoVehiculo tipo, DateOnly vencimiento)
+        {
+            var documento = v.Documentos.FirstOrDefault(d => d.TipoDocumento == tipo);
+            if (documento is null)
+            {
+                documento = new DocumentoVehiculo { TipoDocumento = tipo };
+                v.Documentos.Add(documento);
+            }
+            documento.FechaVencimiento = vencimiento;
+            // Cada vencimiento nuevo queda en el historial (sin PDF: se le puede adjuntar después).
+            if (!historial.Any(h => h.TipoDocumento == tipo && h.FechaVencimiento == vencimiento))
+            {
+                Db.HistorialDocumentosVehiculo.Add(new HistorialDocumentoVehiculo { IdVehiculo = v.Id, TipoDocumento = tipo, FechaVencimiento = vencimiento });
+            }
+        }
+        Documento(TipoDocumentoVehiculo.Soat, s.VencimientoSoat!.Value);
+        Documento(TipoDocumentoVehiculo.Tecnomecanica, s.VencimientoTecnomecanica!.Value);
+        Documento(TipoDocumentoVehiculo.TarjetaOperacion, s.VencimientoTarjetaOperacion!.Value);
+        Documento(TipoDocumentoVehiculo.Polizas, s.VencimientoPolizas!.Value);
     }
 
-    private static void Documento(Vehiculo v, TipoDocumentoVehiculo tipo, DateOnly vencimiento)
+    /// <summary>El historial se borra en cascada; sus PDF se borran aquí.</summary>
+    protected override async Task AntesDeEliminarAsync(Vehiculo registro, CancellationToken ct)
     {
-        var documento = v.Documentos.FirstOrDefault(d => d.TipoDocumento == tipo);
-        if (documento is null)
+        var archivos = await Db.HistorialDocumentosVehiculo.Where(h => h.IdVehiculo == registro.Id && h.IdArchivo != null)
+            .Select(h => h.IdArchivo).ToListAsync(ct);
+        foreach (var id in archivos)
         {
-            documento = new DocumentoVehiculo { TipoDocumento = tipo };
-            v.Documentos.Add(documento);
+            await Adjuntos.EliminarAsync(Db, id, ct);
         }
-        documento.FechaVencimiento = vencimiento;
     }
 
     public override async Task<string?> MotivoNoEliminarAsync(Guid id, CancellationToken ct = default)
@@ -156,4 +207,108 @@ public class ServicioVehiculos(IBaseDatos db, Suscripciones.ServicioSuscripcion 
             ? $"No se puede eliminar: el vehículo tiene {total} asignación(es) de ruta. Cámbialo a Inactivo para conservar el historial."
             : null;
     }
+}
+
+/// <summary>
+/// Historial de documentos de un vehículo (<c>/vehiculos/{id}/documentos</c>). Cada renovación queda como un registro
+/// con su PDF o imagen (≤ 2 MB). Al guardar o eliminar uno, el vencimiento del vehículo para ese tipo pasa a ser el más
+/// reciente del historial (salvo OTRO, que no tiene vencimiento en el vehículo).
+/// </summary>
+public class ServicioDocumentosVehiculo(IBaseDatos db, IContextoUsuario contexto, TimeProvider reloj)
+{
+    public async Task<IReadOnlyList<DocumentoHistorialDto>> ListarAsync(Guid idVehiculo, CancellationToken ct = default)
+    {
+        await VehiculoAsync(idVehiculo, ct);
+        var registros = await db.HistorialDocumentosVehiculo.AsNoTracking().Include(h => h.Archivo)
+            .Where(h => h.IdVehiculo == idVehiculo).OrderByDescending(h => h.FechaVencimiento).ThenByDescending(h => h.FechaCreacion).ToListAsync(ct);
+        var vigentes = Vigentes(registros);
+        return registros.Select(h => Dto(h, vigentes.Contains(h.Id), false)).ToList();
+    }
+
+    public async Task<DocumentoHistorialDto> ObtenerAsync(Guid idVehiculo, Guid id, CancellationToken ct = default)
+    {
+        var registros = await db.HistorialDocumentosVehiculo.AsNoTracking().Include(h => h.Archivo)
+            .Where(h => h.IdVehiculo == idVehiculo).ToListAsync(ct);
+        var registro = registros.FirstOrDefault(h => h.Id == id) ?? throw ErrorNegocio.NoEncontrado("El documento");
+        return Dto(registro, Vigentes(registros).Contains(id), true);
+    }
+
+    public async Task<DocumentoHistorialDto> CrearAsync(Guid idVehiculo, SolicitudDocumentoHistorial s, CancellationToken ct = default)
+    {
+        var vehiculo = await VehiculoAsync(idVehiculo, ct);
+        var registro = new HistorialDocumentoVehiculo { IdVehiculo = idVehiculo };
+        db.HistorialDocumentosVehiculo.Add(registro);
+        await AplicarAsync(vehiculo, registro, s, ct);
+        return await ObtenerAsync(idVehiculo, registro.Id, ct);
+    }
+
+    public async Task<DocumentoHistorialDto> ActualizarAsync(Guid idVehiculo, Guid id, SolicitudDocumentoHistorial s, CancellationToken ct = default)
+    {
+        var vehiculo = await VehiculoAsync(idVehiculo, ct);
+        var registro = await db.HistorialDocumentosVehiculo.FirstOrDefaultAsync(h => h.Id == id && h.IdVehiculo == idVehiculo, ct)
+            ?? throw ErrorNegocio.NoEncontrado("El documento");
+        var tipoAnterior = registro.TipoDocumento;
+        await AplicarAsync(vehiculo, registro, s, ct, tipoAnterior);
+        return await ObtenerAsync(idVehiculo, id, ct);
+    }
+
+    public async Task EliminarAsync(Guid idVehiculo, Guid id, CancellationToken ct = default)
+    {
+        var vehiculo = await VehiculoAsync(idVehiculo, ct);
+        var registro = await db.HistorialDocumentosVehiculo.FirstOrDefaultAsync(h => h.Id == id && h.IdVehiculo == idVehiculo, ct)
+            ?? throw ErrorNegocio.NoEncontrado("El documento");
+        await Adjuntos.EliminarAsync(db, registro.IdArchivo, ct);
+        db.HistorialDocumentosVehiculo.Remove(registro);
+        await db.SaveChangesAsync(ct);
+        await SincronizarAsync(vehiculo, registro.TipoDocumento, ct);
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task AplicarAsync(
+        Vehiculo vehiculo, HistorialDocumentoVehiculo h, SolicitudDocumentoHistorial s, CancellationToken ct, TipoDocumentoVehiculo? tipoAnterior = null)
+    {
+        h.TipoDocumento = s.Tipo!.Value;
+        h.NumeroDocumento = Texto.Opcional(s.Numero);
+        h.Entidad = Texto.Opcional(s.Entidad);
+        h.FechaExpedicion = s.FechaExpedicion;
+        h.FechaVencimiento = s.FechaVencimiento!.Value;
+        h.Observaciones = Texto.Opcional(s.Observaciones);
+        h.IdArchivo = await Adjuntos.AplicarAsync(db, h.IdArchivo, s.Archivo, contexto.IdUsuario, "documento", ct);
+        await db.SaveChangesAsync(ct);
+        await SincronizarAsync(vehiculo, h.TipoDocumento, ct);
+        if (tipoAnterior is { } anterior && anterior != h.TipoDocumento)
+        {
+            await SincronizarAsync(vehiculo, anterior, ct);
+        }
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>El vencimiento del vehículo para el tipo = el más reciente del historial (si queda alguno).</summary>
+    private async Task SincronizarAsync(Vehiculo vehiculo, TipoDocumentoVehiculo tipo, CancellationToken ct)
+    {
+        if (tipo == TipoDocumentoVehiculo.Otro) return;
+        var ultimo = await db.HistorialDocumentosVehiculo.Where(h => h.IdVehiculo == vehiculo.Id && h.TipoDocumento == tipo)
+            .OrderByDescending(h => h.FechaVencimiento).Select(h => (DateOnly?)h.FechaVencimiento).FirstOrDefaultAsync(ct);
+        if (ultimo is not { } fecha) return;
+        var documento = vehiculo.Documentos.FirstOrDefault(d => d.TipoDocumento == tipo);
+        if (documento is null)
+        {
+            documento = new DocumentoVehiculo { TipoDocumento = tipo };
+            vehiculo.Documentos.Add(documento);
+        }
+        documento.FechaVencimiento = fecha;
+        vehiculo.FechaActualizacion = reloj.GetUtcNow().UtcDateTime;
+    }
+
+    private async Task<Vehiculo> VehiculoAsync(Guid id, CancellationToken ct) =>
+        await db.Vehiculos.Include(v => v.Documentos).FirstOrDefaultAsync(v => v.Id == id, ct) ?? throw ErrorNegocio.NoEncontrado("El vehículo");
+
+    /// <summary>Ids de los registros con el vencimiento más reciente de cada tipo.</summary>
+    private static HashSet<Guid> Vigentes(IEnumerable<HistorialDocumentoVehiculo> registros) =>
+        registros.Where(h => h.TipoDocumento != TipoDocumentoVehiculo.Otro).GroupBy(h => h.TipoDocumento)
+            .Select(g => g.OrderByDescending(h => h.FechaVencimiento).ThenByDescending(h => h.FechaCreacion).First().Id).ToHashSet();
+
+    private static DocumentoHistorialDto Dto(HistorialDocumentoVehiculo h, bool vigente, bool conContenido) => new(
+        h.Id, h.IdVehiculo, h.TipoDocumento, h.NumeroDocumento ?? "", h.Entidad ?? "", h.FechaExpedicion, h.FechaVencimiento, h.Observaciones ?? "",
+        h.Archivo is { } a ? Adjuntos.Dto(a, conContenido) : null, vigente, h.FechaCreacion);
 }

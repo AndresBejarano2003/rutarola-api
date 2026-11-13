@@ -35,6 +35,11 @@ public class EmpresasController(
     public Task<ListaPaginada<EmpresaDto>> Listar([FromQuery] FiltrosEmpresa filtros, [FromQuery] Paginacion paginacion, CancellationToken ct) =>
         servicio.ListarAsync(filtros, paginacion, ct);
 
+    /// <summary>Cuántas empresas hay en cada situación de membresía (tarjetas de la plataforma).</summary>
+    [HttpGet("resumen-membresias")]
+    [RequierePermiso(Permisos.EmpresasGestionar)]
+    public Task<ResumenMembresiasDto> ResumenMembresias(CancellationToken ct) => servicio.ResumenMembresiasAsync(ct);
+
     [HttpGet("{id:guid}")]
     [RequierePermiso(Permisos.EmpresasGestionar)]
     public Task<EmpresaDto> Obtener(Guid id, CancellationToken ct) => servicio.ObtenerAsync(id, ct);
@@ -90,4 +95,12 @@ public class EmpresasController(
     [RequierePermiso(Permisos.ConfiguracionGestionar)]
     public Task<EmpresaDto> ActualizarActual(SolicitudEmpresaPropia solicitud, CancellationToken ct) =>
         servicio.ActualizarActualAsync(solicitud, ct);
+
+    /// <summary>Tema claro u oscuro de la aplicación para todos los usuarios de la empresa.</summary>
+    [HttpGet("actual/tema")]
+    public Task<TemaDto> Tema(CancellationToken ct) => servicio.TemaAsync(ct);
+
+    [HttpPut("actual/tema")]
+    [RequierePermiso(Permisos.ConfiguracionGestionar)]
+    public Task<TemaDto> CambiarTema(SolicitudTema solicitud, CancellationToken ct) => servicio.CambiarTemaAsync(solicitud, ct);
 }

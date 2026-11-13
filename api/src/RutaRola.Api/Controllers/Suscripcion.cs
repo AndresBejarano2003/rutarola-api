@@ -20,6 +20,17 @@ public class SuscripcionController(ServicioSuscripcion servicio) : ControladorAp
     [AllowAnonymous]
     public IReadOnlyList<PlanDto> Planes() => ServicioSuscripcion.Planes();
 
+    /// <summary>Días de prueba que recibe hoy una empresa nueva (registro y precios públicos).</summary>
+    [HttpGet("condiciones")]
+    [AllowAnonymous]
+    public Task<CondicionesRegistroDto> Condiciones([FromServices] ServicioParametrosPlataforma parametros, CancellationToken ct) =>
+        parametros.CondicionesAsync(ct);
+
+    /// <summary>La prueba o el plan venció y el administrador no quiere pagar: sigue en Gratis e inactiva lo que sobre.</summary>
+    [HttpPost("continuar-gratis")]
+    [RequierePermiso(Permisos.SuscripcionGestionar)]
+    public Task<DecisionGratisDto> ContinuarGratis(CancellationToken ct) => servicio.ContinuarGratisAsync(ct);
+
     [HttpGet]
     [RequierePermiso(Permisos.SuscripcionLeer)]
     public Task<SuscripcionDto> Obtener(CancellationToken ct) => servicio.ObtenerAsync(ct);
@@ -105,4 +116,17 @@ public class CodigosPromocionalesController(ServicioCodigosPromocionales servici
 
     [HttpGet("{id:guid}/usos")]
     public Task<IReadOnlyList<UsoCodigoDto>> Usos(Guid id, CancellationToken ct) => servicio.UsosAsync(id, ct);
+}
+
+/// <summary>Parámetros globales de la plataforma (SuperAdmin): días de la prueba gratuita.</summary>
+[Route("api/v1/plataforma/parametros")]
+[RequierePermiso(Permisos.EmpresasGestionar)]
+public class ParametrosPlataformaController(ServicioParametrosPlataforma servicio) : ControladorApi
+{
+    [HttpGet]
+    public Task<IReadOnlyList<ParametroPlataformaDto>> Listar(CancellationToken ct) => servicio.ListarAsync(ct);
+
+    [HttpPut("{clave}")]
+    public Task<ParametroPlataformaDto> Actualizar(string clave, SolicitudParametroPlataforma solicitud, CancellationToken ct) =>
+        servicio.ActualizarAsync(clave, solicitud, ct);
 }

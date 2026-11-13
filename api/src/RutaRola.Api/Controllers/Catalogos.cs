@@ -17,6 +17,34 @@ public class ColegiosController(ServicioColegios servicio)
 public class VehiculosController(ServicioVehiculos servicio)
     : ControladorCrud<VehiculoDto, SolicitudVehiculo, FiltrosVehiculo>(servicio);
 
+/// <summary>Historial de documentos del vehículo con su PDF (<c>operacion/vehiculos/documentos-vehiculo-http.ts</c>).</summary>
+[Route("api/v1/vehiculos/{idVehiculo:guid}/documentos")]
+[PermisosCrud(Permisos.VehiculosLeer, Permisos.VehiculosGestionar)]
+public class DocumentosVehiculoController(ServicioDocumentosVehiculo servicio) : ControladorApi
+{
+    [HttpGet]
+    public Task<IReadOnlyList<DocumentoHistorialDto>> Listar(Guid idVehiculo, CancellationToken ct) => servicio.ListarAsync(idVehiculo, ct);
+
+    [HttpGet("{id:guid}")]
+    public Task<DocumentoHistorialDto> Obtener(Guid idVehiculo, Guid id, CancellationToken ct) => servicio.ObtenerAsync(idVehiculo, id, ct);
+
+    [HttpPost]
+    [ProducesResponseType<DocumentoHistorialDto>(StatusCodes.Status201Created)]
+    public async Task<IActionResult> Crear(Guid idVehiculo, SolicitudDocumentoHistorial solicitud, CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, await servicio.CrearAsync(idVehiculo, solicitud, ct));
+
+    [HttpPut("{id:guid}")]
+    public Task<DocumentoHistorialDto> Actualizar(Guid idVehiculo, Guid id, SolicitudDocumentoHistorial solicitud, CancellationToken ct) =>
+        servicio.ActualizarAsync(idVehiculo, id, solicitud, ct);
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Eliminar(Guid idVehiculo, Guid id, CancellationToken ct)
+    {
+        await servicio.EliminarAsync(idVehiculo, id, ct);
+        return NoContent();
+    }
+}
+
 /// <summary>Conductores y monitoras con su acceso a la Ruta del día (<c>personas/empleados/empleados-http.ts</c>).</summary>
 [PermisosCrud(Permisos.EmpleadosLeer, Permisos.EmpleadosGestionar)]
 public class EmpleadosController(ServicioEmpleados servicio)

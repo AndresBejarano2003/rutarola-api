@@ -905,6 +905,80 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.ToTable("asignaciones_ruta", (string)null);
                 });
 
+            modelBuilder.Entity("RutaRola.Domain.Operacion.AvisoAusencia", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_aviso_ausencia");
+
+                    b.Property<DateOnly>("Fecha")
+                        .HasColumnType("date")
+                        .HasColumnName("fecha");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_actualizacion");
+
+                    b.Property<DateTime?>("FechaConfirmacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_confirmacion");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<Guid>("IdAcudiente")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_acudiente");
+
+                    b.Property<Guid?>("IdConfirmadoPor")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_confirmado_por");
+
+                    b.Property<Guid>("IdEmpresa")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_empresa");
+
+                    b.Property<Guid>("IdEstudiante")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_estudiante");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("motivo");
+
+                    b.Property<string>("NombreConfirmadoPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("nombre_confirmado_por");
+
+                    b.Property<string>("Nota")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("nota");
+
+                    b.Property<string>("Trayecto")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("trayecto");
+
+                    b.HasKey("Id")
+                        .HasName("pk_avisos_ausencia");
+
+                    b.HasIndex("IdAcudiente")
+                        .HasDatabaseName("ix_avisos_ausencia_id_acudiente");
+
+                    b.HasIndex("IdEmpresa", "Fecha")
+                        .HasDatabaseName("ix_avisos_ausencia_id_empresa_fecha");
+
+                    b.HasIndex("IdEstudiante", "Fecha")
+                        .HasDatabaseName("ix_avisos_ausencia_id_estudiante_fecha");
+
+                    b.ToTable("avisos_ausencia", (string)null);
+                });
+
             modelBuilder.Entity("RutaRola.Domain.Operacion.Colegio", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1148,6 +1222,76 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.ToTable("gps_vehiculos", (string)null);
                 });
 
+            modelBuilder.Entity("RutaRola.Domain.Operacion.HistorialDocumentoVehiculo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_historial_documento");
+
+                    b.Property<string>("Entidad")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entidad");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_actualizacion");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<DateOnly?>("FechaExpedicion")
+                        .HasColumnType("date")
+                        .HasColumnName("fecha_expedicion");
+
+                    b.Property<DateOnly>("FechaVencimiento")
+                        .HasColumnType("date")
+                        .HasColumnName("fecha_vencimiento");
+
+                    b.Property<Guid?>("IdArchivo")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_archivo");
+
+                    b.Property<Guid>("IdEmpresa")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_empresa");
+
+                    b.Property<Guid>("IdVehiculo")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_vehiculo");
+
+                    b.Property<string>("NumeroDocumento")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("numero_documento");
+
+                    b.Property<string>("Observaciones")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("observaciones");
+
+                    b.Property<string>("TipoDocumento")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("tipo_documento");
+
+                    b.HasKey("Id")
+                        .HasName("pk_historial_documentos_vehiculo");
+
+                    b.HasIndex("IdArchivo")
+                        .HasDatabaseName("ix_historial_documentos_vehiculo_id_archivo");
+
+                    b.HasIndex("IdEmpresa")
+                        .HasDatabaseName("ix_historial_documentos_vehiculo_id_empresa");
+
+                    b.HasIndex("IdVehiculo", "TipoDocumento", "FechaVencimiento")
+                        .HasDatabaseName("ix_historial_documentos_vehiculo_id_vehiculo_tipo_documento_fe");
+
+                    b.ToTable("historial_documentos_vehiculo", (string)null);
+                });
+
             modelBuilder.Entity("RutaRola.Domain.Operacion.ParadaViaje", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1374,6 +1518,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Property<DateTime>("FechaCreacion")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_creacion");
+
+                    b.Property<string>("Foto")
+                        .HasColumnType("text")
+                        .HasColumnName("foto");
 
                     b.Property<Guid>("IdEmpresa")
                         .HasColumnType("uuid")
@@ -2123,6 +2271,14 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("character varying(20)")
                         .HasColumnName("telefono");
 
+                    b.Property<string>("Tema")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("OSCURO")
+                        .HasColumnName("tema");
+
                     b.HasKey("Id")
                         .HasName("pk_empresas");
 
@@ -2131,6 +2287,104 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasDatabaseName("ix_empresas_nit");
 
                     b.ToTable("empresas", (string)null);
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Seguridad.FormatoDocumentos", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_formato_documentos");
+
+                    b.Property<string>("Ciudad")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("ciudad");
+
+                    b.Property<string>("ColorPrincipal")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color_principal");
+
+                    b.Property<string>("Correo")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("correo");
+
+                    b.Property<string>("Direccion")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("direccion");
+
+                    b.Property<string>("Eslogan")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("eslogan");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_actualizacion");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<Guid>("IdEmpresa")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_empresa");
+
+                    b.Property<string>("Logo")
+                        .HasColumnType("text")
+                        .HasColumnName("logo");
+
+                    b.Property<string>("Nit")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("nit");
+
+                    b.Property<string>("NombreComercial")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("nombre_comercial");
+
+                    b.Property<string>("NotaCotizacion")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("nota_cotizacion");
+
+                    b.Property<string>("NotaFactura")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("nota_factura");
+
+                    b.Property<string>("NotaRecibo")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("nota_recibo");
+
+                    b.Property<string>("PiePagina")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("pie_pagina");
+
+                    b.Property<string>("SitioWeb")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("sitio_web");
+
+                    b.Property<string>("Telefono")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("telefono");
+
+                    b.HasKey("Id")
+                        .HasName("pk_formatos_documentos");
+
+                    b.HasIndex("IdEmpresa")
+                        .IsUnique()
+                        .HasDatabaseName("ix_formatos_documentos_id_empresa");
+
+                    b.ToTable("formatos_documentos", (string)null);
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Seguridad.Permiso", b =>
@@ -2902,11 +3156,53 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.ToTable("pagos_suscripcion", (string)null);
                 });
 
+            modelBuilder.Entity("RutaRola.Domain.Suscripciones.ParametroPlataforma", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_parametro_plataforma");
+
+                    b.Property<string>("Clave")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("clave");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_actualizacion");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<string>("Valor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("valor");
+
+                    b.HasKey("Id")
+                        .HasName("pk_parametros_plataforma");
+
+                    b.HasIndex("Clave")
+                        .IsUnique()
+                        .HasDatabaseName("ix_parametros_plataforma_clave");
+
+                    b.ToTable("parametros_plataforma", (string)null);
+                });
+
             modelBuilder.Entity("RutaRola.Domain.Suscripciones.Suscripcion", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id_suscripcion");
+
+                    b.Property<int>("DiasPrueba")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("dias_prueba");
 
                     b.Property<string>("Estado")
                         .IsRequired()
@@ -2930,6 +3226,14 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_inicio");
 
+                    b.Property<DateTime?>("FechaUltimoPago")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_ultimo_pago");
+
+                    b.Property<DateTime?>("FechaVencimiento")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_vencimiento");
+
                     b.Property<Guid>("IdEmpresa")
                         .HasColumnType("uuid")
                         .HasColumnName("id_empresa");
@@ -2938,6 +3242,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("nota");
+
+                    b.Property<bool>("PendienteDecision")
+                        .HasColumnType("boolean")
+                        .HasColumnName("pendiente_decision");
 
                     b.Property<string>("Periodo")
                         .HasMaxLength(30)
@@ -2949,6 +3257,11 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("plan");
+
+                    b.Property<string>("PlanVencido")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("plan_vencido");
 
                     b.Property<bool>("PruebaUsada")
                         .HasColumnType("boolean")
@@ -3319,6 +3632,34 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Navigation("Vehiculo");
                 });
 
+            modelBuilder.Entity("RutaRola.Domain.Operacion.AvisoAusencia", b =>
+                {
+                    b.HasOne("RutaRola.Domain.Personas.Acudiente", "Acudiente")
+                        .WithMany()
+                        .HasForeignKey("IdAcudiente")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_avisos_ausencia_acudientes_id_acudiente");
+
+                    b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("IdEmpresa")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_avisos_ausencia_empresas_id_empresa");
+
+                    b.HasOne("RutaRola.Domain.Personas.Estudiante", "Estudiante")
+                        .WithMany()
+                        .HasForeignKey("IdEstudiante")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_avisos_ausencia_estudiantes_id_estudiante");
+
+                    b.Navigation("Acudiente");
+
+                    b.Navigation("Estudiante");
+                });
+
             modelBuilder.Entity("RutaRola.Domain.Operacion.Colegio", b =>
                 {
                     b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
@@ -3400,6 +3741,33 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Navigation("Vehiculo");
 
                     b.Navigation("Viaje");
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Operacion.HistorialDocumentoVehiculo", b =>
+                {
+                    b.HasOne("RutaRola.Domain.Comunicacion.Archivo", "Archivo")
+                        .WithMany()
+                        .HasForeignKey("IdArchivo")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_historial_documentos_vehiculo_archivos_id_archivo");
+
+                    b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("IdEmpresa")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_historial_documentos_vehiculo_empresas_id_empresa");
+
+                    b.HasOne("RutaRola.Domain.Operacion.Vehiculo", "Vehiculo")
+                        .WithMany()
+                        .HasForeignKey("IdVehiculo")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_historial_documentos_vehiculo_vehiculos_id_vehiculo");
+
+                    b.Navigation("Archivo");
+
+                    b.Navigation("Vehiculo");
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Operacion.ParadaViaje", b =>
@@ -3641,6 +4009,16 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_configuracion_sistema_empresas_id_empresa");
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Seguridad.FormatoDocumentos", b =>
+                {
+                    b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("IdEmpresa")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_formatos_documentos_empresas_id_empresa");
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Seguridad.RolPermiso", b =>

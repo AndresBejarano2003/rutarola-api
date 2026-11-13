@@ -60,6 +60,27 @@ public class PortalController(ServicioPortal servicio) : ControladorApi
 {
     [HttpGet]
     public Task<PortalAcudienteDto> Obtener(CancellationToken ct) => servicio.ObtenerAsync(ct);
+
+    /// <summary>Avisos de ausencia de hoy en adelante de los estudiantes del acudiente del token.</summary>
+    [HttpGet("avisos")]
+    public Task<IReadOnlyList<RutaRola.Application.Operacion.AvisoAusenciaDto>> Avisos(
+        [FromServices] RutaRola.Application.Operacion.ServicioAvisosAusencia avisos, CancellationToken ct) => avisos.DelAcudienteAsync(ct);
+
+    /// <summary>El acudiente avisa que su estudiante no viaja (hoy a 30 días). 409 si ya hay aviso ese día; 422 si el trayecto ya terminó.</summary>
+    [HttpPost("avisos")]
+    [ProducesResponseType<RutaRola.Application.Operacion.AvisoAusenciaDto>(StatusCodes.Status201Created)]
+    public async Task<IActionResult> CrearAviso(
+        RutaRola.Application.Operacion.SolicitudAvisoAusencia solicitud, [FromServices] RutaRola.Application.Operacion.ServicioAvisosAusencia avisos,
+        CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, await avisos.CrearAsync(solicitud, ct));
+
+    /// <summary>Retira el aviso (422 si la ruta ya lo confirmó o es de un día pasado).</summary>
+    [HttpDelete("avisos/{id:guid}")]
+    public async Task<IActionResult> CancelarAviso(Guid id, [FromServices] RutaRola.Application.Operacion.ServicioAvisosAusencia avisos, CancellationToken ct)
+    {
+        await avisos.CancelarAsync(id, ct);
+        return NoContent();
+    }
 }
 
 /// <summary>Registro de los mensajes de WhatsApp que envió el servidor (solo lectura).</summary>

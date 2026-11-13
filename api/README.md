@@ -379,10 +379,20 @@ contraseña o inactivar revoca sus sesiones.
 | `POST /pagos/wompi/eventos` | anónimo | Evento `transaction.updated`; checksum con `Wompi:SecretoEventos` (401 si no coincide). Valor y moneda deben coincidir con el pago. Idempotente. |
 | `GET/PUT /empresas/{id}/suscripcion`, `GET /empresas/{id}/suscripcion/pagos` | `empresas.gestionar` | Ajuste manual de la plataforma (plan, estado, vencimiento futuro, nota y `codigoPromocional` opcional solo en ACTIVA: registra el uso y anota el descuento). |
 | `GET/POST /plataforma/codigos-promocionales`, `GET/PUT/DELETE …/{id}`, `GET …/opciones`, `GET …/{id}/motivo-no-eliminar`, `GET …/{id}/usos` | `promociones.gestionar` (SuperAdmin) | Códigos promocionales. Filtros `texto`, `estado`, `vigencia` (PROGRAMADO/VIGENTE/VENCIDO). 409 código repetido o `DELETE` de un código usado o con pagos (se inactiva). |
-| `POST /auth/registro {empresa, administrador, aceptaTerminos}` | anónimo (límite por IP) | 201 `{sesion, tokens}`: crea empresa, administrador y prueba. 409 NIT/usuario/correo en uso. |
+| `POST /auth/registro {empresa, administrador, aceptaTerminos, pagarAhora}` | anónimo (límite por IP) | 201 `{sesion, tokens}`: crea empresa, administrador y prueba (con `pagarAhora`: Gratis con la decisión pendiente, para pagar de una vez). 409 NIT/usuario/correo en uso. |
+| `GET /suscripcion/condiciones` | anónimo | `{diasPrueba}` que recibe hoy una empresa nueva. |
+| `POST /suscripcion/continuar-gratis` | `suscripcion.gestionar` | Decide quedarse en Gratis: `{suscripcion, inactivados {vehiculos, estudiantes}}`. |
+| `GET/PUT /plataforma/parametros` | SuperAdmin | Parámetros de la plataforma (`parametros_plataforma`): `suscripcion.dias_prueba` 1–90 (15). |
+| `GET /empresas/resumen-membresias` | `empresas.gestionar` | Conteo por situación (PRUEBA, PRUEBA_POR_VENCER ≤ 3 d, ACTIVA, POR_VENCER ≤ 7 d, VENCIDA, GRATIS). `GET /empresas` filtra por `membresia` y `plan` y devuelve `membresia` (plan, situación, desde/hasta, días, último pago). |
 
-Tablas `suscripciones` (una por empresa) y `pagos_suscripcion` (`referencia` única). Toda empresa nueva recibe 3
-meses de Profesional (`PRUEBA`); al vencer sin pago pasa a GRATIS sin perder datos. Solo Wompi activa un plan
+Tablas `suscripciones` (una por empresa; `dias_prueba`, `pendiente_decision`, `plan_vencido`, `fecha_vencimiento`,
+`fecha_ultimo_pago`) y `pagos_suscripcion` (`referencia` única). Toda empresa nueva recibe una prueba Profesional de
+`suscripcion.dias_prueba` días (15, lo fija la plataforma) y la conserva aunque el parámetro cambie después. Al vencer la
+prueba o el plan pagado pasa a GRATIS con `pendiente_decision`: el administrador paga o sigue en Gratis. Bajar a un plan
+menor inactiva lo que sobre (primero conserva vehículos con asignación vigente y estudiantes en rutas activas, luego los
+más antiguos; un vehículo inactivado inactiva sus asignaciones); para activar otro hay que inactivar uno (422).
+Funciones del plan: `[RequiereFuncionPlan(f, soloEscritura)]` → 403 "Tu plan X no incluye …" (reportes, monitoreo,
+escrituras de programación; el mapa del portal exige `GPS_EN_VIVO`). Solo Wompi activa un plan
 (evento firmado o consulta del servidor), nunca el navegador. Pagar durante la prueba suma los días que quedan;
 renovar el mismo plan extiende; cambiar de plan empieza hoy. Límites: crear o activar vehículos y estudiantes por
 encima del plan → 422; lotes GPS sin `GPS_EN_VIVO` → 422; sin `RECORDATORIOS` el proceso no envía cobros. Una
@@ -397,6 +407,16 @@ ambos; `usos_maximos` null = sin límite; `usos_por_empresa`), `codigos_promocio
 `usos_codigo_promocional` (un uso por pago aprobado o activación manual). `pagos_suscripcion` guarda el código y
 `descuento_centavos`. Reglas en `ServicioCodigosPromocionales.EvaluarAsync`; el descuento es SOLO del primer mes
 (en el anual, una mensualidad; el valor fijo no supera un mes). Los pagos pendientes no cuentan como uso.
+
+## Avisos de ausencia, documentos de vehículos, PDF y tema (migración `MembresiasAvisosYDocumentos`)
+
+| Petición | Permiso | Respuesta |
+|---|---|---|
+| `GET/POST /portal/avisos`, `DELETE /portal/avisos/{id}` | acudiente | Aviso de que un estudiante propio no viaja (`fecha` hoy…+30, `motivo` NO_ASISTE/POR_SU_CUENTA, `trayecto` `""`/RECOGIDA/ENTREGA, `nota` ≤ 300). 409 uno por estudiante y día; 422 trayecto ya finalizado; se retira mientras no esté confirmado ni pasado. |
+| `GET /avisos-ausencia?fecha=&rutaId=` | administrador | Avisos del día para Operación › Asignaciones. Las paradas del recorrido traen `aviso`; marcar AUSENTE lo confirma (`confirmado_por`), Deshacer lo revierte. |
+| `GET/POST /vehiculos/{id}/documentos`, `GET/PUT/DELETE …/{idDocumento}` | vehículos | Historial (`historial_documentos_vehiculo`): tipo SOAT/TECNOMECANICA/TARJETA_OPERACION/POLIZAS/OTRO, número, entidad, expedición, vencimiento ≥ expedición, archivo PDF/imagen ≤ 2 MB (la lista sin contenido). El último por tipo es `vigente` y fija el vencimiento del vehículo. `vehiculos.foto` como las personas. |
+| `GET/PUT /configuracion/documentos` | configuración | Formato de los PDF (`formatos_documentos`, uno por empresa): logo ≤ 400 000 caracteres, nombre comercial, eslogan, contacto, color `#RRGGBB`, pie y notas por documento. |
+| `GET/PUT /empresas/actual/tema` | configuración | `OSCURO`/`CLARO` (`empresas.tema`), viaja en `sesion.empresa.tema`. |
 
 **Estado actual: Wompi y Brevo PAUSADOS.** `render.yaml` deja `Mensajeria__Correo=Simulado` y sin llaves de
 Wompi: `pagosEnLinea` = false, el frontend ofrece "Solicitar por Soporte" y la plataforma activa el plan en

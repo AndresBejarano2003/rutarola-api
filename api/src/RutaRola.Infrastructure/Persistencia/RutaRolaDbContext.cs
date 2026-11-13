@@ -89,6 +89,10 @@ public class RutaRolaDbContext(
     public DbSet<CodigoPromocional> CodigosPromocionales => Set<CodigoPromocional>();
     public DbSet<CodigoPromocionalEmpresa> CodigosPromocionalesEmpresas => Set<CodigoPromocionalEmpresa>();
     public DbSet<UsoCodigoPromocional> UsosCodigoPromocional => Set<UsoCodigoPromocional>();
+    public DbSet<ParametroPlataforma> ParametrosPlataforma => Set<ParametroPlataforma>();
+    public DbSet<HistorialDocumentoVehiculo> HistorialDocumentosVehiculo => Set<HistorialDocumentoVehiculo>();
+    public DbSet<AvisoAusencia> AvisosAusencia => Set<AvisoAusencia>();
+    public DbSet<FormatoDocumentos> FormatosDocumentos => Set<FormatoDocumentos>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {

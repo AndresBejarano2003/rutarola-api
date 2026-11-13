@@ -59,6 +59,10 @@ public interface IBaseDatos
     DbSet<CodigoPromocional> CodigosPromocionales { get; }
     DbSet<CodigoPromocionalEmpresa> CodigosPromocionalesEmpresas { get; }
     DbSet<UsoCodigoPromocional> UsosCodigoPromocional { get; }
+    DbSet<ParametroPlataforma> ParametrosPlataforma { get; }
+    DbSet<HistorialDocumentoVehiculo> HistorialDocumentosVehiculo { get; }
+    DbSet<AvisoAusencia> AvisosAusencia { get; }
+    DbSet<FormatoDocumentos> FormatosDocumentos { get; }
 
     /// <summary>Empresa del token (o <see cref="Guid.Empty"/>).</summary>
     Guid IdEmpresaActual { get; }

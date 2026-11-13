@@ -44,7 +44,7 @@ public class SuscripcionTests(BaseDatosPrueba bd)
         bd.Api.CreateClient().PostAsJsonAsync("/api/v1/pagos/wompi/eventos", evento, ClienteApi.Json);
 
     [Fact]
-    public async Task Una_empresa_nueva_tiene_tres_meses_de_Profesional_y_los_planes_son_publicos()
+    public async Task Una_empresa_nueva_tiene_quince_dias_de_Profesional_y_los_planes_son_publicos()
     {
         var planes = await (await bd.Api.CreateClient().GetAsync("/api/v1/suscripcion/planes")).LeerAsync<List<PlanDto>>();
         Assert.Equal(["Gratis", "Esencial", "Profesional", "Empresarial"], planes.Select(p => p.Nombre));
@@ -55,7 +55,8 @@ public class SuscripcionTests(BaseDatosPrueba bd)
         var admin = await bd.AdminNuevoAsync();
         var s = await (await admin.Cliente.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();
         Assert.Equal((PlanSuscripcion.Profesional, EstadoSuscripcion.Prueba), (s.Plan, s.Estado));
-        Assert.InRange(s.DiasRestantes!.Value, 89, 93);
+        Assert.InRange(s.DiasRestantes!.Value, 14, 15);
+        Assert.Equal((15, false), (s.DiasPrueba, s.PendienteDecision));
         Assert.Contains(FuncionPlan.GpsEnVivo, s.Funciones);
         Assert.True(s.PagosEnLinea);
         Assert.Equal((15, 400), (s.Limites.Vehiculos!.Value, s.Limites.Estudiantes!.Value));

@@ -10,7 +10,8 @@ public record SolicitudCambioContrasena(string? Actual, string? Nueva);
 /// <summary>El refresh token es opcional: también se revoca la sesión del access token, si viene.</summary>
 public record SolicitudCerrarSesion(string? RefreshToken);
 
-public record EmpresaSesion(Guid Id, string Nombre);
+/// <summary><c>tema</c>: OSCURO | CLARO, el que eligió la empresa en Configuración (lo aplica la app al entrar).</summary>
+public record EmpresaSesion(Guid Id, string Nombre, RutaRola.Domain.Enums.TemaApariencia Tema = RutaRola.Domain.Enums.TemaApariencia.Oscuro);
 
 /// <summary>
 /// Usuario autenticado; mismos campos que <c>Sesion</c> en <c>RutaRolaApp/src/app/core/auth.ts</c>

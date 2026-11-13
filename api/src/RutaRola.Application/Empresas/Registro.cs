@@ -8,8 +8,11 @@ public record EmpresaRegistro(string? Nombre, string? Nit, string? Ciudad, strin
 
 public record AdministradorRegistro(string? Nombre, string? Usuario, string? Email, string? Contrasena);
 
-/// <summary>Registro público de una empresa de transporte con su administrador (pantalla <c>/registro</c>).</summary>
-public record SolicitudRegistro(EmpresaRegistro? Empresa, AdministradorRegistro? Administrador, bool AceptaTerminos);
+/// <summary>
+/// Registro público de una empresa de transporte con su administrador (pantalla <c>/registro</c>).
+/// <c>pagarAhora</c>: sin prueba gratuita; entra en Gratis y la pantalla lo lleva a pagar el plan elegido.
+/// </summary>
+public record SolicitudRegistro(EmpresaRegistro? Empresa, AdministradorRegistro? Administrador, bool AceptaTerminos, bool PagarAhora = false);
 
 public class ValidadorSolicitudRegistro : AbstractValidator<SolicitudRegistro>
 {
@@ -37,8 +40,9 @@ public class ValidadorSolicitudRegistro : AbstractValidator<SolicitudRegistro>
 }
 
 /// <summary>
-/// Crea la empresa (con la prueba gratuita de <see cref="Suscripciones.CatalogoPlanes.MesesPrueba"/> meses del plan
-/// Profesional) y su administrador, y deja la sesión iniciada. 409 si el NIT, el usuario o el correo ya existen.
+/// Crea la empresa (con la prueba gratuita del plan Profesional por los días de
+/// <see cref="Suscripciones.ServicioParametrosPlataforma.DiasPrueba"/>, o sin prueba si eligió pagar de una vez) y su
+/// administrador, y deja la sesión iniciada. 409 si el NIT, el usuario o el correo ya existen.
 /// </summary>
 public class ServicioRegistro(ServicioEmpresas empresas, ServicioAutenticacion autenticacion)
 {
@@ -48,7 +52,7 @@ public class ServicioRegistro(ServicioEmpresas empresas, ServicioAutenticacion a
         var a = s.Administrador!;
         await empresas.CrearAsync(new SolicitudEmpresa(
             e.Nombre!.Trim(), e.Nit!.Trim(), null, e.Ciudad!.Trim(), e.Telefono!.Trim(), a.Email!.Trim(), null, EstadoRegistro.Activo,
-            new AdministradorInicial(a.Nombre!.Trim(), a.Usuario, a.Email, a.Contrasena)), ct);
+            new AdministradorInicial(a.Nombre!.Trim(), a.Usuario, a.Email, a.Contrasena)), ct, s.PagarAhora);
         return await autenticacion.IniciarSesionAsync(new SolicitudLogin(Texto.Usuario(a.Usuario), a.Contrasena), cliente, ct);
     }
 }

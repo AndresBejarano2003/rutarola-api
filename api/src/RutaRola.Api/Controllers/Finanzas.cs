@@ -20,6 +20,7 @@ public class CotizacionesController(ServicioCotizaciones servicio)
 
 /// <summary>Recordatorios automáticos de cobro (<c>finanzas/programacion/programaciones-http.ts</c>).</summary>
 [PermisosCrud(Permisos.ProgramacionesLeer, Permisos.ProgramacionesGestionar)]
+[RequiereFuncionPlan(Application.Suscripciones.FuncionPlan.Recordatorios, soloEscritura: true)]
 public class ProgramacionesController(ServicioProgramaciones servicio)
     : ControladorCrud<ProgramacionDto, SolicitudProgramacion, FiltrosProgramacion>(servicio)
 {
@@ -38,6 +39,7 @@ public class ProgramacionesController(ServicioProgramaciones servicio)
 
 /// <summary>Reportes financieros calculados en el servidor (<c>finanzas/reportes/reportes-http.ts</c>).</summary>
 [RequierePermiso(Permisos.ReportesLeer)]
+[RequiereFuncionPlan(Application.Suscripciones.FuncionPlan.Reportes)]
 public class ReportesController(ServicioReportes servicio) : ControladorApi
 {
     [HttpGet("ingresos")]

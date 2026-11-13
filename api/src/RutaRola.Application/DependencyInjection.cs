@@ -48,6 +48,10 @@ public static class DependencyInjection
         services.AddScoped<Soporte.ServicioSoporte>();
         services.AddScoped<Suscripciones.ServicioSuscripcion>();
         services.AddScoped<Suscripciones.ServicioCodigosPromocionales>();
+        services.AddScoped<Suscripciones.ServicioParametrosPlataforma>();
+        services.AddScoped<Operacion.ServicioAvisosAusencia>();
+        services.AddScoped<Operacion.ServicioDocumentosVehiculo>();
+        services.AddScoped<ServicioFormatoDocumentos>();
         services.AddScoped<Empresas.ServicioRegistro>();
         return services;
     }

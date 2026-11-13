@@ -259,7 +259,7 @@ public class ServicioAutenticacion(
         titular.IdAcudiente,
         titular.Foto ?? usuario.Foto ?? "",
         inicio,
-        usuario.Empresa is { } e ? new EmpresaSesion(e.Id, e.Nombre) : null,
+        usuario.Empresa is { } e ? new EmpresaSesion(e.Id, e.Nombre, e.Tema) : null,
         permisos);
 
     private static string Nombre(params string?[] partes) =>

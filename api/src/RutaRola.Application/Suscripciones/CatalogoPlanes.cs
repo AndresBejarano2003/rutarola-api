@@ -11,6 +11,18 @@ public static class FuncionPlan
     public const string Recordatorios = "RECORDATORIOS";
     public const string SoportePrioritario = "SOPORTE_PRIORITARIO";
     public const string Acompanamiento = "ACOMPANAMIENTO";
+    /// <summary>Reportes de ingresos, cartera y morosos (<c>GET /reportes/*</c>).</summary>
+    public const string Reportes = "REPORTES";
+
+    /// <summary>Nombre para los mensajes ("Tu plan Gratis no incluye …").</summary>
+    public static string Nombre(string funcion) => funcion switch
+    {
+        GpsEnVivo => "el GPS en vivo",
+        Recordatorios => "los recordatorios automáticos de cobro",
+        Reportes => "los reportes financieros",
+        SoportePrioritario => "el soporte prioritario",
+        _ => "esta función",
+    };
 }
 
 /// <summary>
@@ -30,12 +42,11 @@ public record DefinicionPlan(
 
 /// <summary>
 /// Planes de RutaRola (mismo catálogo en <c>sistema/membresias/planes.ts</c>, que lo lee de <c>GET /suscripcion/planes</c>).
-/// Quien se registra recibe <see cref="MesesPrueba"/> meses de <see cref="PlanPrueba"/>; al terminar sin pagar pasa a
-/// Gratis: conserva todo lo registrado y solo se limita crear o activar por encima de los límites.
+/// Quien se registra recibe los días de prueba de <see cref="PlanPrueba"/> que diga la plataforma
+/// (<see cref="ServicioParametrosPlataforma.DiasPrueba"/>); al terminar sin pagar elige pagar o pasar a Gratis.
 /// </summary>
 public static class CatalogoPlanes
 {
-    public const int MesesPrueba = 3;
     public const PlanSuscripcion PlanPrueba = PlanSuscripcion.Profesional;
     public const int MesesPagadosPorAnio = 10;
 
@@ -46,6 +57,7 @@ public static class CatalogoPlanes
         "Facturas, recibos y estado de cuenta",
         "Portal del acudiente con sus pagos y estudiantes",
         "Alertas de documentos y licencias por vencer",
+        "Tablero con indicadores del mes",
     ];
 
     public static readonly IReadOnlyList<DefinicionPlan> Todos =
@@ -53,17 +65,20 @@ public static class CatalogoPlanes
         new(PlanSuscripcion.Gratis, "Gratis", "Para empezar a organizar una ruta sin costo.", 0, 1, 20, [],
             [.. Base, "Soporte por tickets"]),
         new(PlanSuscripcion.Esencial, "Esencial", "Para pequeñas empresas que quieren cobrar a tiempo.", 89_900, 5, 120,
-            [FuncionPlan.Recordatorios],
-            ["Todo lo del plan Gratis", "Recordatorios automáticos de cobro por correo y WhatsApp", "Reportes de ingresos, cartera y morosos con exportación a CSV", "Tablero con indicadores del mes"]),
+            [FuncionPlan.Recordatorios, FuncionPlan.Reportes],
+            ["Todo lo del plan Gratis", "Recordatorios automáticos de cobro por correo y WhatsApp", "Reportes de ingresos, cartera y morosos con exportación a CSV"]),
         new(PlanSuscripcion.Profesional, "Profesional", "Para empresas en crecimiento que quieren dar tranquilidad a las familias.", 189_900, 15, 400,
-            [FuncionPlan.Recordatorios, FuncionPlan.GpsEnVivo, FuncionPlan.SoportePrioritario],
+            [FuncionPlan.Recordatorios, FuncionPlan.Reportes, FuncionPlan.GpsEnVivo, FuncionPlan.SoportePrioritario],
             ["Todo lo del plan Esencial", "GPS en vivo desde los teléfonos del conductor y la monitora", "Mapa del recorrido para los acudientes", "Monitoreo de todas las rutas en tiempo real e historial con trayecto", "Soporte prioritario"],
             Destacado: true),
         new(PlanSuscripcion.Empresarial, "Empresarial", "Para flotas grandes o varias sedes.", 389_900, null, null,
-            [FuncionPlan.Recordatorios, FuncionPlan.GpsEnVivo, FuncionPlan.SoportePrioritario, FuncionPlan.Acompanamiento],
+            [FuncionPlan.Recordatorios, FuncionPlan.Reportes, FuncionPlan.GpsEnVivo, FuncionPlan.SoportePrioritario, FuncionPlan.Acompanamiento],
             ["Todo lo del plan Profesional", "Vehículos y estudiantes sin límite", "Capacitación del equipo y acompañamiento en la puesta en marcha", "Atención de incidentes críticos en 8 horas"],
             PrecioDesde: true),
     ];
 
     public static DefinicionPlan De(PlanSuscripcion plan) => Todos.First(p => p.Plan == plan);
+
+    /// <summary>El primer plan (el más barato) que incluye la función.</summary>
+    public static DefinicionPlan DesdeConFuncion(string funcion) => Todos.First(p => p.Tiene(funcion));
 }

@@ -13,6 +13,33 @@ public class Empresa : Entidad
     public string? Email { get; set; }
     public string? LogoUrl { get; set; }
     public bool Activo { get; set; } = true;
+    /// <summary>Tema de la aplicación para los usuarios de la empresa: OSCURO (por defecto) o CLARO.</summary>
+    public TemaApariencia Tema { get; set; } = TemaApariencia.Oscuro;
+}
+
+/// <summary>
+/// Encabezado y pie de los PDF de la empresa (facturas, recibos, cotizaciones). Una fila por empresa; sin fila se
+/// usan los datos de contacto de la empresa.
+/// </summary>
+public class FormatoDocumentos : EntidadEmpresa
+{
+    /// <summary>Data URL PNG/JPG/WebP/SVG; null = sin logo.</summary>
+    public string? Logo { get; set; }
+    public string? NombreComercial { get; set; }
+    public string? Eslogan { get; set; }
+    public string? Nit { get; set; }
+    public string? Direccion { get; set; }
+    public string? Ciudad { get; set; }
+    public string? Telefono { get; set; }
+    public string? Correo { get; set; }
+    public string? SitioWeb { get; set; }
+    /// <summary>#RRGGBB de títulos y bordes.</summary>
+    public string ColorPrincipal { get; set; } = "#1F2937";
+    /// <summary>Texto al pie de todos los documentos (resolución, cuentas bancarias…).</summary>
+    public string? PiePagina { get; set; }
+    public string? NotaFactura { get; set; }
+    public string? NotaRecibo { get; set; }
+    public string? NotaCotizacion { get; set; }
 }
 
 /// <summary>
