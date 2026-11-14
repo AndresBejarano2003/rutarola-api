@@ -58,6 +58,12 @@ public enum PlanSuscripcion { Gratis, Esencial, Profesional, Empresarial }
 /// <summary>PRUEBA (días de Profesional al registrarse, parámetro de la plataforma), ACTIVA (pagada hasta <c>FechaFin</c>) o GRATIS (sin pago vigente).</summary>
 public enum EstadoSuscripcion { Prueba, Activa, Gratis }
 public enum PeriodoPago { Mensual, Anual }
+/// <summary>
+/// Cómo empieza una empresa que se registra: GRATIS (plan Gratis sin vencimiento, hasta que decida pagar o probar),
+/// PRUEBA (días de Profesional que fija la plataforma; al vencer sin pago queda en Gratis) o PAGAR (Gratis con la
+/// pasarela abierta para pagar el plan elegido).
+/// </summary>
+public enum ComienzoRegistro { Prueba, Gratis, Pagar }
 /// <summary>Estado de un pago en línea (Wompi: PENDING, APPROVED, DECLINED, VOIDED, ERROR).</summary>
 public enum EstadoPagoSuscripcion { Pendiente, Aprobado, Rechazado, Anulado, Error }
 /// <summary>Descuento de un código promocional: PORCENTAJE (1–100 % del primer mes) o VALOR_FIJO (pesos, máximo un mes).</summary>

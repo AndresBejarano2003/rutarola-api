@@ -31,6 +31,11 @@ public class SuscripcionController(ServicioSuscripcion servicio) : ControladorAp
     [RequierePermiso(Permisos.SuscripcionGestionar)]
     public Task<DecisionGratisDto> ContinuarGratis(CancellationToken ct) => servicio.ContinuarGratisAsync(ct);
 
+    /// <summary>Empresa en Gratis que no ha usado la prueba: inicia los días de Profesional que fija la plataforma.</summary>
+    [HttpPost("prueba")]
+    [RequierePermiso(Permisos.SuscripcionGestionar)]
+    public Task<SuscripcionDto> IniciarPrueba(CancellationToken ct) => servicio.IniciarPruebaAsync(ct);
+
     [HttpGet]
     [RequierePermiso(Permisos.SuscripcionLeer)]
     public Task<SuscripcionDto> Obtener(CancellationToken ct) => servicio.ObtenerAsync(ct);

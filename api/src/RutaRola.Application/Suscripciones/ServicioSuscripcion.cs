@@ -136,6 +136,18 @@ public class ServicioSuscripcion(
     };
 
     /// <summary>
+    /// Registro en el plan Gratis: la empresa lo eligió, así que no vence ni abre la pasarela. Se queda en Gratis hasta
+    /// que pague un plan o inicie la prueba (no la ha usado: <see cref="IniciarPruebaAsync"/>).
+    /// </summary>
+    public static Suscripcion Gratis(Guid idEmpresa, DateTime ahora) => new()
+    {
+        IdEmpresa = idEmpresa,
+        Plan = PlanSuscripcion.Gratis,
+        Estado = EstadoSuscripcion.Gratis,
+        FechaInicio = ahora,
+    };
+
+    /// <summary>
     /// "Pagar de una vez" al registrarse: sin prueba, en Gratis y con la pasarela pendiente (al entrar ve los planes
     /// para pagar; si no paga, sigue en Gratis).
     /// </summary>
@@ -409,6 +421,36 @@ public class ServicioSuscripcion(
         s.PendienteDecision = false;
         await db.SaveChangesAsync(ct);
         return new DecisionGratisDto(await DtoAsync(s, ct), inactivados);
+    }
+
+    /// <summary>
+    /// Una empresa en Gratis que nunca usó la prueba (se registró en Gratis) la inicia: plan Profesional por los días que
+    /// dice HOY la plataforma. Al vencer sin pago vuelve a Gratis como cualquier prueba. 422 si ya la usó o tiene un plan.
+    /// </summary>
+    public async Task<SuscripcionDto> IniciarPruebaAsync(CancellationToken ct = default)
+    {
+        var s = await PropiaAsync(ct);
+        if (s.Estado != EstadoSuscripcion.Gratis)
+        {
+            throw new ErrorNegocio("Tu empresa ya tiene un plan vigente.", CodigoError.Validacion);
+        }
+        if (s.PruebaUsada)
+        {
+            throw new ErrorNegocio("Tu empresa ya usó la prueba gratuita. Elige un plan para mejorar tu membresía.", CodigoError.Validacion);
+        }
+        var dias = await ServicioParametrosPlataforma.DiasPruebaAsync(db, ct);
+        s.Plan = CatalogoPlanes.PlanPrueba;
+        s.Estado = EstadoSuscripcion.Prueba;
+        s.Periodo = null;
+        s.FechaInicio = Ahora;
+        s.FechaFin = Ahora.AddDays(dias);
+        s.PruebaUsada = true;
+        s.DiasPrueba = dias;
+        s.PendienteDecision = false;
+        s.PlanVencido = null;
+        s.FechaVencimiento = null;
+        await db.SaveChangesAsync(ct);
+        return await DtoAsync(s, ct);
     }
 
     /// <summary>

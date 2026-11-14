@@ -156,8 +156,12 @@ public class ServicioEmpresas(IBaseDatos db, IPasswordHasher<Usuario> hasher, Ti
         return ids.Where(id => Suscripciones.ServicioSuscripcion.Situacion(suscripciones.GetValueOrDefault(id), ahora) == situacion).ToList();
     }
 
-    /// <param name="sinPrueba">Registro con "Pagar de una vez": sin prueba, en Gratis con la pasarela pendiente.</param>
-    public async Task<EmpresaDto> CrearAsync(SolicitudEmpresa solicitud, CancellationToken ct = default, bool sinPrueba = false)
+    /// <param name="comienzo">
+    /// PRUEBA (por defecto, también al crearla la plataforma), GRATIS (registro en el plan Gratis, sin vencimiento) o
+    /// PAGAR (registro con "Pagar un plan ahora": en Gratis con la pasarela pendiente).
+    /// </param>
+    public async Task<EmpresaDto> CrearAsync(SolicitudEmpresa solicitud, CancellationToken ct = default,
+        Domain.Enums.ComienzoRegistro comienzo = Domain.Enums.ComienzoRegistro.Prueba)
     {
         db.UsarModoSistema();
         await ValidarNitLibreAsync(solicitud.Nit!, null, ct);
@@ -165,11 +169,13 @@ public class ServicioEmpresas(IBaseDatos db, IPasswordHasher<Usuario> hasher, Ti
         var empresa = new Empresa();
         Aplicar(empresa, solicitud);
         db.Empresas.Add(empresa);
-        // Toda empresa nueva arranca con la prueba gratuita de los días que dice HOY la plataforma (los conserva aunque
-        // el parámetro cambie), salvo que haya elegido pagar de una vez.
-        db.Suscripciones.Add(sinPrueba
-            ? Suscripciones.ServicioSuscripcion.SinPrueba(empresa.Id, Ahora)
-            : Suscripciones.ServicioSuscripcion.Prueba(empresa.Id, Ahora, await Suscripciones.ServicioParametrosPlataforma.DiasPruebaAsync(db, ct)));
+        // La prueba toma los días que dice HOY la plataforma (los conserva aunque el parámetro cambie).
+        db.Suscripciones.Add(comienzo switch
+        {
+            Domain.Enums.ComienzoRegistro.Gratis => Suscripciones.ServicioSuscripcion.Gratis(empresa.Id, Ahora),
+            Domain.Enums.ComienzoRegistro.Pagar => Suscripciones.ServicioSuscripcion.SinPrueba(empresa.Id, Ahora),
+            _ => Suscripciones.ServicioSuscripcion.Prueba(empresa.Id, Ahora, await Suscripciones.ServicioParametrosPlataforma.DiasPruebaAsync(db, ct)),
+        });
         foreach (var parametro in CatalogoConfiguracion.Parametros)
         {
             db.ConfiguracionSistema.Add(new ConfiguracionSistema { IdEmpresa = empresa.Id, Clave = parametro.Clave, Valor = parametro.ValorPorDefecto });

@@ -161,4 +161,43 @@ public class MembresiasTests(BaseDatosPrueba bd)
         Assert.Equal((PlanSuscripcion.Gratis, true, "", 0), (s.Plan, s.PendienteDecision, s.PlanVencido, s.DiasPrueba));
         Assert.Equal(TemaApariencia.Oscuro, login.Sesion.Empresa!.Tema);
     }
+
+    [Fact]
+    public async Task Registrarse_en_Gratis_no_vence_y_puede_iniciar_la_prueba_una_vez()
+    {
+        var usuario = ClienteApi.Unico("gra");
+        var nit = ClienteApi.NitUnico();
+        var login = await (await bd.Api.CreateClient().PostAsJsonAsync("/api/v1/auth/registro", new
+        {
+            empresa = new { nombre = "Rutas Libres", nit, ciudad = "Tunja", telefono = "3001112244" },
+            administrador = new { nombre = "Luis Mora", usuario, email = $"{usuario}@correo.co", contrasena = "Clave-123" },
+            aceptaTerminos = true,
+            comienzo = "GRATIS",
+        }, ClienteApi.Json)).LeerAsync<RespuestaLogin>(HttpStatusCode.Created);
+        var c = bd.Cliente(login.Tokens.AccessToken);
+
+        var s = await (await c.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();
+        Assert.Equal((PlanSuscripcion.Gratis, EstadoSuscripcion.Gratis, false, false, 0), (s.Plan, s.Estado, s.PendienteDecision, s.PruebaUsada, s.DiasPrueba));
+        Assert.Null(s.FechaFin);
+        Assert.Null(s.DiasRestantes);
+        // Nada que decidir: el Gratis lo eligió la empresa.
+        await (await c.PostAsync("/api/v1/suscripcion/continuar-gratis", null)).MensajeErrorAsync(HttpStatusCode.UnprocessableEntity);
+        var super = await bd.SuperAdminAsync();
+        var empresa = (await (await super.GetAsync($"/api/v1/empresas?texto={nit}")).LeerAsync<ListaPaginada<EmpresaDto>>())
+            .Items.Single(e => e.Id == login.Sesion.Empresa!.Id);
+        Assert.Equal("GRATIS", empresa.Membresia!.Situacion);
+
+        // Quiere probar: días de Profesional; la segunda vez ya no.
+        var prueba = await (await c.PostAsync("/api/v1/suscripcion/prueba", null)).LeerAsync<SuscripcionDto>();
+        Assert.Equal((PlanSuscripcion.Profesional, EstadoSuscripcion.Prueba, true, 15), (prueba.Plan, prueba.Estado, prueba.PruebaUsada, prueba.DiasPrueba));
+        Assert.Equal(15, prueba.DiasRestantes);
+        Assert.Contains("ya tiene un plan", await (await c.PostAsync("/api/v1/suscripcion/prueba", null)).MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
+
+        // Al vencer sin pago vuelve a Gratis (con la decisión) y no puede repetir la prueba.
+        await VencerAsync(login.Sesion.Empresa!.Id);
+        var vencida = await (await c.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();
+        Assert.Equal((PlanSuscripcion.Gratis, true), (vencida.Plan, vencida.PendienteDecision));
+        await (await c.PostAsync("/api/v1/suscripcion/continuar-gratis", null)).LeerAsync<DecisionGratisDto>();
+        Assert.Contains("ya usó la prueba", await (await c.PostAsync("/api/v1/suscripcion/prueba", null)).MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
+    }
 }
