@@ -24,7 +24,7 @@ public static class DatosOperacion
     };
 
     public static Dictionary<string, object?> Asignacion(Guid rutaId, Guid vehiculoId, Guid conductorId, Guid? monitoraId,
-        string? fechaInicio = null, string fechaFin = "", string estado = "ACTIVO") => new()
+        string? fechaInicio = null, string fechaFin = "", string estado = "ACTIVO", string horaInicio = "", string horaFin = "") => new()
     {
         ["rutaId"] = rutaId,
         ["vehiculoId"] = vehiculoId,
@@ -32,6 +32,8 @@ public static class DatosOperacion
         ["monitoraId"] = monitoraId?.ToString() ?? "",
         ["fechaInicio"] = fechaInicio ?? Hoy.AddDays(-30).ToString("yyyy-MM-dd"),
         ["fechaFin"] = fechaFin,
+        ["horaInicio"] = horaInicio,
+        ["horaFin"] = horaFin,
         ["estado"] = estado,
         ["observaciones"] = "",
     };

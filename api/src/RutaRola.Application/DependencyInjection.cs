@@ -53,6 +53,8 @@ public static class DependencyInjection
         services.AddScoped<Suscripciones.ServicioParametrosPlataforma>();
         services.AddScoped<Operacion.ServicioAvisosAusencia>();
         services.AddScoped<Operacion.ServicioDocumentosVehiculo>();
+        services.AddScoped<Operacion.ServicioNovedadesVehiculo>();
+        services.AddScoped<Operacion.ServicioGastosVehiculo>();
         services.AddScoped<ServicioFormatoDocumentos>();
         services.AddScoped<Empresas.ServicioRegistro>();
         return services;

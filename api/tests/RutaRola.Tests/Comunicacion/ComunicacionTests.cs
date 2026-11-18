@@ -71,7 +71,8 @@ public class ComunicacionTests(BaseDatosPrueba bd)
         var cotizacion = await c.CrearAsync<CotizacionDto>("cotizaciones", new
         {
             fecha = DatosOperacion.Hoy, registrados = false, acudienteId = "", nombreAcudiente = "Camila Torres", telefonoAcudiente = "3209988776",
-            estudiantes = new[] { new { estudianteId = (Guid?)null, nombre = "Lucía Torres" } }, valorPorEstudiante = 380000, estado = "PENDIENTE",
+            estudiantes = new[] { new { estudianteId = (Guid?)null, nombre = "Lucía Torres", valor = 380000 } },
+            periodoInicio = DatosFinanzas.Periodo(), periodoFin = DatosFinanzas.Periodo(), estado = "PENDIENTE",
             observaciones = "",
         });
         await ResumenAsync(c);
@@ -184,7 +185,8 @@ public class ComunicacionTests(BaseDatosPrueba bd)
         await c.CrearAsync<CotizacionDto>("cotizaciones", new
         {
             fecha = DatosOperacion.Hoy, registrados = true, acudienteId = e.Acudiente.Id, nombreAcudiente = "", telefonoAcudiente = "",
-            estudiantes = new[] { new { estudianteId = (Guid?)juan.Id, nombre = "Juan" } }, valorPorEstudiante = 400000, estado = "APROBADA", observaciones = "",
+            estudiantes = new[] { new { estudianteId = (Guid?)juan.Id, nombre = "Juan", valor = 400000 } },
+            periodoInicio = DatosFinanzas.Periodo(), periodoFin = DatosFinanzas.Periodo(), estado = "APROBADA", observaciones = "",
         });
         // El conductor inicia la recogida y sube a Juan.
         var recorrido = await (await e.ClienteConductor.IniciarAsync(e.Asignacion.Id)).LeerAsync<RecorridoDto>(HttpStatusCode.Created);

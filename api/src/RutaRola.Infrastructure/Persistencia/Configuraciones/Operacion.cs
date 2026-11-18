@@ -29,8 +29,9 @@ internal class ColegioCursoConfig : IEntityTypeConfiguration<ColegioCurso>
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id_curso").ValueGeneratedNever();
         b.Property(x => x.Grado).HasMaxLength(20);
+        b.Property(x => x.Jornada).HasMaxLength(20).HasDefaultValue("Única");
         b.HasOne(x => x.Colegio).WithMany(c => c.Cursos).HasForeignKey(x => x.IdColegio).OnDelete(DeleteBehavior.Cascade);
-        b.HasIndex(x => new { x.IdColegio, x.Grado }).IsUnique();
+        b.HasIndex(x => new { x.IdColegio, x.Grado, x.Jornada }).IsUnique();
     }
 }
 
@@ -93,6 +94,23 @@ internal class AvisoAusenciaConfig : IEntityTypeConfiguration<AvisoAusencia>
     }
 }
 
+internal class NovedadVehiculoConfig : IEntityTypeConfiguration<NovedadVehiculo>
+{
+    public void Configure(EntityTypeBuilder<NovedadVehiculo> b)
+    {
+        b.Tabla("novedades_vehiculo", "id_novedad");
+        b.Property(x => x.NombreReporta).HasMaxLength(150);
+        b.Property(x => x.Descripcion).HasMaxLength(1000);
+        b.Property(x => x.Respuesta).HasMaxLength(1000);
+        b.Property(x => x.NombreAtiende).HasMaxLength(150);
+        b.HasOne(x => x.Vehiculo).WithMany().HasForeignKey(x => x.IdVehiculo).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Empleado).WithMany().HasForeignKey(x => x.IdEmpleado);
+        b.HasOne(x => x.Archivo).WithMany().HasForeignKey(x => x.IdArchivo);
+        b.HasIndex(x => new { x.IdVehiculo, x.Estado });
+        b.HasIndex(x => new { x.IdEmpresa, x.Estado });
+    }
+}
+
 internal class RutaConfig : IEntityTypeConfiguration<Ruta>
 {
     public void Configure(EntityTypeBuilder<Ruta> b)
@@ -130,9 +148,8 @@ internal class AsignacionRutaConfig : IEntityTypeConfiguration<AsignacionRuta>
         b.HasOne(x => x.Vehiculo).WithMany().HasForeignKey(x => x.IdVehiculo);
         b.HasOne(x => x.Conductor).WithMany().HasForeignKey(x => x.IdConductor);
         b.HasOne(x => x.Monitora).WithMany().HasForeignKey(x => x.IdMonitora);
-        // Una sola asignación activa por ruta.
-        b.HasIndex(x => x.IdRuta, "activa").IsUnique().HasFilter("activo").HasDatabaseName("ix_asignaciones_ruta_activa");
-        b.HasIndex(x => x.IdRuta);
+        // Varias asignaciones por ruta si no se cruzan en fechas y horario (lo valida ServicioAsignaciones).
+        b.HasIndex(x => new { x.IdRuta, x.FechaInicio });
     }
 }
 

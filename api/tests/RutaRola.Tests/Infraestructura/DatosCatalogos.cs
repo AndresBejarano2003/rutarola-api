@@ -28,9 +28,9 @@ public static class DatosCatalogos
         telefono = "6088712345",
         cursos = cursos ?? new object[]
         {
-            new { grado = "1°", horaEntrada = "06:30", horaSalida = "13:00", estado = "ACTIVO" },
-            new { grado = "Jardín", horaEntrada = "07:00", horaSalida = "12:00", estado = "ACTIVO" },
-            new { grado = "7°", horaEntrada = "06:30", horaSalida = "13:00", estado = "INACTIVO" },
+            new { grado = "1°", jornada = "Mañana", horaEntrada = "06:30", horaSalida = "13:00", estado = "ACTIVO" },
+            new { grado = "Jardín", jornada = "Mañana", horaEntrada = "07:00", horaSalida = "12:00", estado = "ACTIVO" },
+            new { grado = "7°", jornada = "Mañana", horaEntrada = "06:30", horaSalida = "13:00", estado = "INACTIVO" },
         },
         estado = "ACTIVO",
     };

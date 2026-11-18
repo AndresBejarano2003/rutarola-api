@@ -8,9 +8,11 @@ namespace RutaRola.Application.Soporte;
 /// NUEVO → EN_REVISION → EN_PROCESO → EN_QA → EN_PRUEBAS → VALIDACION_CLIENTE → RESUELTO → CERRADO
 ///            ↕ ESPERANDO_CLIENTE        ↖ devuelto ↙          ↖ el cliente rechaza
 /// NUEVO / EN_REVISION → RECHAZADO (no procede); el cliente cancela mientras no esté resuelto.
+/// Cualquier estado abierto → CERRADO ("Terminar ticket", p. ej. la empresa no responde): exige justificación.
 /// </code>
 /// Errores y mejoras pasan SIEMPRE por QA, pruebas y validación del cliente; consultas y capacitaciones
-/// pueden resolverse desde la revisión o el proceso. Las devoluciones y cierres piden comentario.
+/// pueden resolverse desde la revisión o el proceso. Las devoluciones y cierres piden comentario. Un seguimiento
+/// (comentario o nota interna de la plataforma) no cambia el estado.
 /// </summary>
 public static class ReglasTicket
 {
@@ -18,6 +20,8 @@ public static class ReglasTicket
     public const int TamanoMaximoAdjunto = 1024 * 1024;
     /// <summary>Un ticket RESUELTO sin respuesta del cliente se cierra solo después de estos días.</summary>
     public const int DiasCierreAutomatico = 7;
+    /// <summary>Días sin respuesta de la empresa (esperando su información) desde los que se sugiere terminar el ticket.</summary>
+    public const int DiasSinRespuesta = 15;
 
     /// <summary>Tiempo objetivo de solución (SLA) desde la creación.</summary>
     public static TimeSpan Objetivo(PrioridadTicket prioridad) => prioridad switch
@@ -42,13 +46,13 @@ public static class ReglasTicket
 
     private static readonly Dictionary<EstadoTicket, EstadoTicket[]> Transiciones = new()
     {
-        [EstadoTicket.Nuevo] = [EstadoTicket.EnRevision, EstadoTicket.Rechazado],
-        [EstadoTicket.EnRevision] = [EstadoTicket.EnProceso, EstadoTicket.EsperandoCliente, EstadoTicket.Resuelto, EstadoTicket.Rechazado],
-        [EstadoTicket.EsperandoCliente] = [EstadoTicket.EnRevision, EstadoTicket.EnProceso],
-        [EstadoTicket.EnProceso] = [EstadoTicket.EnQa, EstadoTicket.EsperandoCliente, EstadoTicket.EnRevision, EstadoTicket.Resuelto],
-        [EstadoTicket.EnQa] = [EstadoTicket.EnPruebas, EstadoTicket.EnProceso],
-        [EstadoTicket.EnPruebas] = [EstadoTicket.ValidacionCliente, EstadoTicket.EnProceso],
-        [EstadoTicket.ValidacionCliente] = [EstadoTicket.Resuelto, EstadoTicket.EnProceso],
+        [EstadoTicket.Nuevo] = [EstadoTicket.EnRevision, EstadoTicket.Rechazado, EstadoTicket.Cerrado],
+        [EstadoTicket.EnRevision] = [EstadoTicket.EnProceso, EstadoTicket.EsperandoCliente, EstadoTicket.Resuelto, EstadoTicket.Rechazado, EstadoTicket.Cerrado],
+        [EstadoTicket.EsperandoCliente] = [EstadoTicket.EnRevision, EstadoTicket.EnProceso, EstadoTicket.Cerrado],
+        [EstadoTicket.EnProceso] = [EstadoTicket.EnQa, EstadoTicket.EsperandoCliente, EstadoTicket.EnRevision, EstadoTicket.Resuelto, EstadoTicket.Cerrado],
+        [EstadoTicket.EnQa] = [EstadoTicket.EnPruebas, EstadoTicket.EnProceso, EstadoTicket.Cerrado],
+        [EstadoTicket.EnPruebas] = [EstadoTicket.ValidacionCliente, EstadoTicket.EnProceso, EstadoTicket.Cerrado],
+        [EstadoTicket.ValidacionCliente] = [EstadoTicket.Resuelto, EstadoTicket.EnProceso, EstadoTicket.Cerrado],
         [EstadoTicket.Resuelto] = [EstadoTicket.Cerrado, EstadoTicket.EnRevision],
         [EstadoTicket.Cerrado] = [],
         [EstadoTicket.Rechazado] = [],
@@ -74,9 +78,14 @@ public static class ReglasTicket
         _ => 7,
     };
 
-    /// <summary>Rechazar, pedir información, resolver o devolver a una etapa anterior exige explicar por qué.</summary>
+    /// <summary>
+    /// Rechazar, pedir información, resolver, terminar sin resolver (cerrar algo que no está RESUELTO) o devolver a una
+    /// etapa anterior exige explicar por qué.
+    /// </summary>
     public static bool RequiereComentario(EstadoTicket desde, EstadoTicket hacia) =>
-        hacia is EstadoTicket.Rechazado or EstadoTicket.EsperandoCliente or EstadoTicket.Resuelto || Etapa(hacia) < Etapa(desde);
+        hacia is EstadoTicket.Rechazado or EstadoTicket.EsperandoCliente or EstadoTicket.Resuelto
+        || (hacia == EstadoTicket.Cerrado && desde != EstadoTicket.Resuelto)
+        || Etapa(hacia) < Etapa(desde);
 
     public static AccionesClienteDto AccionesCliente(EstadoTicket estado) => new(
         Comentar: !Finalizados.Contains(estado),

@@ -15,6 +15,8 @@ namespace RutaRola.Application.Comun;
 /// </summary>
 public interface IBaseDatos
 {
+    /// <summary>Para transacciones de varias escrituras (todo o nada).</summary>
+    Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade Database { get; }
     DbSet<Empresa> Empresas { get; }
     DbSet<Usuario> Usuarios { get; }
     DbSet<Rol> Roles { get; }
@@ -40,10 +42,12 @@ public interface IBaseDatos
     DbSet<GpsVehiculo> GpsVehiculos { get; }
     DbSet<Factura> Facturas { get; }
     DbSet<FacturaDetalle> FacturasDetalle { get; }
+    DbSet<PagoDetalle> PagosDetalle { get; }
     DbSet<Pago> Pagos { get; }
     DbSet<Cotizacion> Cotizaciones { get; }
     DbSet<CotizacionEstudiante> CotizacionesEstudiantes { get; }
     DbSet<Gasto> Gastos { get; }
+    DbSet<NovedadVehiculo> NovedadesVehiculo { get; }
     DbSet<ProgramacionCobro> ProgramacionesCobro { get; }
     DbSet<PlantillaMensaje> PlantillasMensaje { get; }
     DbSet<EnvioProgramacion> EnviosProgramacion { get; }

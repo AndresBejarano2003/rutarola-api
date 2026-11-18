@@ -17,7 +17,9 @@ public record ReciboPortalDto(
 
 public record ReciboCuotaDto(Guid Id, string Numero, DateOnly FechaPago, MetodoPago MedioPago);
 
-public record CuotaPortalDto(string Periodo, decimal Valor, EstadoCuota Estado, DateOnly FechaLimite, int DiasMora, ReciboCuotaDto? Recibo);
+/// <summary><c>valor</c> = la cuota del mes; <c>abonado</c> = lo pagado con abonos; <c>saldo</c> = lo que falta. <c>recibo</c>: el último que aplicó a ese mes.</summary>
+public record CuotaPortalDto(
+    string Periodo, decimal Valor, EstadoCuota Estado, DateOnly FechaLimite, int DiasMora, ReciboCuotaDto? Recibo, decimal Abonado = 0, decimal Saldo = 0);
 
 public record FacturaPortalDto(
     Guid Id, string Numero, DateOnly FechaEmision, Guid EstudianteId, string Estudiante, string Concepto, decimal ValorMensual, string PeriodoInicio,
@@ -44,8 +46,10 @@ public record EstudiantePortalDto(
     HorarioDto? Horario, string Estado, TransporteEstudianteDto? Transporte, IReadOnlyList<RecorridoHoyDto> Hoy, string Foto,
     IReadOnlyList<AvisoAusenciaDto> Avisos);
 
+/// <summary><c>valorMensual</c> = suma de los estudiantes; <c>meses</c> del servicio de <c>periodoInicio</c> a <c>periodoFin</c>.</summary>
 public record CotizacionPortalDto(
-    Guid Id, string Numero, DateOnly Fecha, IReadOnlyList<string> Estudiantes, decimal ValorPorEstudiante, decimal ValorTotal, EstadoCotizacion Estado);
+    Guid Id, string Numero, DateOnly Fecha, IReadOnlyList<string> Estudiantes, decimal ValorMensual, decimal ValorTotal, EstadoCotizacion Estado,
+    string PeriodoInicio = "", string PeriodoFin = "", int Meses = 1);
 
 public record ProximoPagoDto(string NumeroFactura, string Estudiante, string Periodo, decimal Valor, DateOnly FechaLimite, EstadoCuota Estado);
 
@@ -91,9 +95,10 @@ public class ServicioPortal(
 
         var lista = estudiantes.Select(e =>
             {
-                var curso = e.Colegio.Cursos.FirstOrDefault(c => c.Activo && c.Grado == e.Grado);
+                var curso = e.Colegio.Cursos.FirstOrDefault(c => c.Activo && c.Grado == e.Grado && c.Jornada == e.Jornada)
+                    ?? e.Colegio.Cursos.FirstOrDefault(c => c.Activo && c.Grado == e.Grado);
                 var ruta = rutas.FirstOrDefault(r => r.Estudiantes.Any(x => x.IdEstudiante == e.Id));
-                var asignacion = ruta is null ? null : asignaciones.FirstOrDefault(a => a.IdRuta == ruta.Id);
+                var asignacion = ruta is null ? null : ReglasAsignacion.Vigente(asignaciones, ruta.Id, hoy, Fechas.HoraColombia(reloj));
                 return new EstudiantePortalDto(
                     e.Id, e.NombreCompleto, Iniciales(e.PrimerNombre, e.PrimerApellido), Catalogos.NombreGrado(e.Grado), e.Jornada, e.Direccion,
                     e.Colegio.RazonSocial, e.Colegio.Direccion, curso is null ? null : new HorarioDto(curso.HoraEntrada, curso.HoraSalida),
@@ -118,7 +123,7 @@ public class ServicioPortal(
 
         var facturas = await db.Facturas.AsNoTracking().Where(f => f.IdAcudiente == idAcudiente).ToListAsync(ct);
         var idsFacturas = facturas.Select(f => f.Id).ToList();
-        var recibos = await db.Pagos.AsNoTracking().Where(p => p.IdFactura != null && idsFacturas.Contains(p.IdFactura.Value)).ToListAsync(ct);
+        var recibos = await db.Pagos.AsNoTracking().Include(p => p.Detalle).Where(p => p.IdFactura != null && idsFacturas.Contains(p.IdFactura.Value)).ToListAsync(ct);
         var diaLimite = await db.ProgramacionesCobro.AsNoTracking().Where(p => idsFacturas.Contains(p.IdFactura))
             .ToDictionaryAsync(p => p.IdFactura, p => p.DiaLimitePago, ct);
         var (facturasPortal, recibosPortal, resumen) = EstadoCuenta(facturas, recibos, diaLimite, hoy, await parametros.DiaLimitePagoAsync(ct));
@@ -130,8 +135,8 @@ public class ServicioPortal(
             new AcudientePortalDto(acudiente.NombreCompleto, acudiente.Telefono, acudiente.Correo ?? "", acudiente.Direccion ?? ""),
             lista, facturasPortal, recibosPortal,
             cotizaciones.Select(c => new CotizacionPortalDto(
-                c.Id, c.Numero, c.Fecha, c.Estudiantes.OrderBy(e => e.Orden).Select(e => e.Nombre).ToList(), c.ValorPorEstudiante, c.ValorTotal,
-                c.Estado)).ToList(),
+                c.Id, c.Numero, c.Fecha, c.Estudiantes.OrderBy(e => e.Orden).Select(e => e.Nombre).ToList(), c.ValorMensual, c.ValorTotal,
+                c.Estado, Periodos.Texto(c.PeriodoInicio), Periodos.Texto(c.PeriodoFin), Periodos.Entre(c.PeriodoInicio, c.PeriodoFin).Count())).ToList(),
             resumen,
             // La empresa comparte la ubicación Y su plan incluye el GPS en vivo.
             await parametros.AcudientesVenUbicacionAsync(ct) && await suscripcion.TieneFuncionAsync(Suscripciones.FuncionPlan.GpsEnVivo, ct));
@@ -149,40 +154,46 @@ public class ServicioPortal(
     };
 
     /// <summary>
-    /// <c>calcularEstadoCuenta</c> (<c>portal/estado-cuenta.ts</c>): cada mes de una factura vigente queda PAGADA
-    /// (recibo válido), VENCIDA / PENDIENTE (mes iniciado, según la fecha límite) o PROGRAMADA (mes futuro). Las
-    /// facturas anuladas no tienen cuotas por cobrar y los recibos anulados no cuentan.
+    /// <c>calcularEstadoCuenta</c> (<c>portal/estado-cuenta.ts</c>): cada mes que se cobra de una factura vigente (sin los
+    /// meses desde el retiro) queda PAGADA (los recibos válidos cubren su valor), VENCIDA / PENDIENTE (mes iniciado con
+    /// saldo, según la fecha límite) o PROGRAMADA (mes futuro); un abono deja pendiente solo el saldo. Las facturas anuladas
+    /// no tienen cuotas por cobrar y los recibos anulados no cuentan.
     /// </summary>
     public static (IReadOnlyList<FacturaPortalDto> Facturas, IReadOnlyList<ReciboPortalDto> Recibos, ResumenCuentaDto Resumen) EstadoCuenta(
         IReadOnlyList<Factura> facturas, IReadOnlyList<Pago> recibos, IReadOnlyDictionary<Guid, int> diaLimite, DateOnly hoy,
         int diaLimitePredeterminado = Cobro.DiaLimitePredeterminado)
     {
         var mesActual = Periodos.De(hoy);
-        var validos = recibos.Where(r => r.Estado == EstadoPago.Vigente && r.Periodo is not null)
-            .GroupBy(r => (r.IdFactura!.Value, r.Periodo!.Value)).ToDictionary(g => g.Key, g => g.First());
+        var aplicados = recibos.Where(r => r.Estado == EstadoPago.Vigente && r.IdFactura is not null)
+            .SelectMany(r => r.Detalle.Select(d => (Recibo: r, d.Periodo, d.Valor)))
+            .ToList();
 
         var facturasPortal = facturas
             .Select(f =>
             {
+                var delaFactura = aplicados.Where(a => a.Recibo.IdFactura == f.Id).ToList();
                 var cuotas = f.Estado != EstadoFactura.Vigente
                     ? []
-                    : Periodos.Entre(f.PeriodoInicio, f.PeriodoFin).Select(p =>
+                    : ReglasCuotas.Cuotas(f, delaFactura.Select(a => new PagoMes(a.Periodo, a.Valor))).Select(c =>
                     {
-                        var recibo = validos.GetValueOrDefault((f.Id, p));
+                        var p = c.Periodo;
+                        var recibo = delaFactura.Where(a => a.Periodo == p).Select(a => a.Recibo)
+                            .OrderByDescending(r => r.FechaPago).ThenByDescending(r => r.Numero, StringComparer.Ordinal).FirstOrDefault();
                         var limite = Cobro.FechaLimite(p, diaLimite.TryGetValue(f.Id, out var dia) ? dia : null, diaLimitePredeterminado);
                         var mora = hoy.DayNumber - limite.DayNumber;
-                        var estado = recibo is not null ? EstadoCuota.Pagada
+                        var estado = c.Pagada ? EstadoCuota.Pagada
                             : p > mesActual ? EstadoCuota.Programada
                             : mora > 0 ? EstadoCuota.Vencida
                             : EstadoCuota.Pendiente;
                         return new CuotaPortalDto(
-                            Periodos.Texto(p), f.ValorMensual, estado, limite, estado is EstadoCuota.Vencida or EstadoCuota.Pendiente ? mora : 0,
-                            recibo is null ? null : new ReciboCuotaDto(recibo.Id, recibo.Numero, recibo.FechaPago, recibo.MetodoPago));
+                            Periodos.Texto(p), c.Valor, estado, limite, estado is EstadoCuota.Vencida or EstadoCuota.Pendiente ? mora : 0,
+                            recibo is null ? null : new ReciboCuotaDto(recibo.Id, recibo.Numero, recibo.FechaPago, recibo.MetodoPago),
+                            c.Pagado, c.Saldo);
                     }).ToList();
-                decimal Suma(EstadoCuota e) => cuotas.Where(c => c.Estado == e).Sum(c => c.Valor);
                 return new FacturaPortalDto(
                     f.Id, f.NumeroFactura, f.FechaEmision, f.IdEstudiante, f.NombreEstudiante, f.Concepto, f.ValorMensual, Periodos.Texto(f.PeriodoInicio),
-                    Periodos.Texto(f.PeriodoFin), f.ValorTotal, Suma(EstadoCuota.Pagada), Suma(EstadoCuota.Vencida),
+                    Periodos.Texto(f.PeriodoFin), f.ValorMensual * cuotas.Count, cuotas.Sum(c => Math.Min(c.Abonado, c.Valor)),
+                    cuotas.Where(c => c.Estado == EstadoCuota.Vencida).Sum(c => c.Saldo),
                     EstadoRegistro.Texto(f.Estado == EstadoFactura.Vigente), cuotas);
             })
             // Vigentes primero; luego por fecha de emisión (más reciente primero).
@@ -198,7 +209,7 @@ public class ServicioPortal(
 
         var sinPagar = facturasPortal
             .SelectMany(f => f.Cuotas.Where(c => c.Estado != EstadoCuota.Pagada)
-                .Select(c => new ProximoPagoDto(f.Numero, f.Estudiante, c.Periodo, c.Valor, c.FechaLimite, c.Estado)))
+                .Select(c => new ProximoPagoDto(f.Numero, f.Estudiante, c.Periodo, c.Saldo, c.FechaLimite, c.Estado)))
             .OrderBy(c => Urgencia(c.Estado)).ThenBy(c => c.FechaLimite)
             .ToList();
         var vencidas = sinPagar.Where(c => c.Estado == EstadoCuota.Vencida).ToList();

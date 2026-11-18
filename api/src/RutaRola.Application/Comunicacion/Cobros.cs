@@ -60,9 +60,11 @@ public class ServicioCobros(
             .Where(p => p.Activo && p.Factura.Estado == EstadoFactura.Vigente && p.Factura.PeriodoInicio <= periodo && periodo <= p.Factura.PeriodoFin)
             .ToListAsync(ct);
         var ids = programaciones.Select(p => p.IdFactura).ToList();
-        var pagadas = (await db.Pagos.AsNoTracking()
-            .Where(p => p.Estado == EstadoPago.Vigente && p.IdFactura != null && ids.Contains(p.IdFactura.Value) && p.Periodo == periodo)
-            .Select(p => p.IdFactura!.Value).ToListAsync(ct)).ToHashSet();
+        // Pagada = sin saldo ese mes (un abono parcial sigue recibiendo el recordatorio); con retiro ese mes ya no se cobra.
+        var pagos = await ReglasCuotas.PagosAsync(db, ids, ct);
+        var pagadas = programaciones
+            .Where(p => ReglasCuotas.Cuotas(p.Factura, pagos.GetValueOrDefault(p.IdFactura) ?? []).FirstOrDefault(c => c.Periodo == periodo) is not { Pagada: false })
+            .Select(p => p.IdFactura).ToHashSet();
         var idsProgramaciones = programaciones.Select(p => p.Id).ToList();
         var enviados = (await db.EnviosProgramacion.AsNoTracking()
             .Where(e => idsProgramaciones.Contains(e.IdProgramacion) && e.Periodo == periodo)

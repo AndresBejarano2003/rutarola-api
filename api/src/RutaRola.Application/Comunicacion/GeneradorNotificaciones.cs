@@ -166,14 +166,27 @@ public class GeneradorNotificaciones(
             reloj.GetUtcNow().UtcDateTime));
 
         // Pagos recibidos
-        var recibos = await db.Pagos.AsNoTracking()
+        var recibos = await db.Pagos.AsNoTracking().Include(p => p.Detalle)
             .Where(p => p.Estado == EstadoPago.Vigente && p.IdFactura != null && p.FechaCreacion >= desde).ToListAsync(ct);
         foreach (var r in recibos)
         {
             resultado.Add(new($"recibo:{r.Id}", CategoriaNotificacion.Pagos, NivelNotificacion.Exito, $"Pago recibido · {r.Numero}",
-                $"{r.NombreAcudiente} pagó {Cobro.Pesos(r.Valor)} de {Periodos.Nombre(r.Periodo ?? r.FechaPago, true)} por {r.NombreEstudiante} " +
+                $"{r.NombreAcudiente} pagó {Cobro.Pesos(r.Valor)} de {MesesRecibo(r)} por {r.NombreEstudiante} " +
                 $"(factura {r.NumeroFactura}). Medio de pago: {NombreMedio(r.MetodoPago)}.",
                 "/finanzas/recibos", "Ver recibos", r.FechaCreacion));
+        }
+
+        // Novedades del vehículo reportadas por el conductor o la monitora (las que siguen abiertas)
+        var novedades = await db.NovedadesVehiculo.AsNoTracking().Include(n => n.Vehiculo)
+            .Where(n => n.IdEmpleado != null && n.Estado != EstadoNovedadVehiculo.Resuelta && n.FechaCreacion >= desde).ToListAsync(ct);
+        foreach (var n in novedades)
+        {
+            resultado.Add(new($"novedad-vehiculo:{n.Id}", CategoriaNotificacion.Operacion,
+                n.Gravedad == GravedadNovedad.Alta ? NivelNotificacion.Critica : NivelNotificacion.Advertencia,
+                $"Novedad en el vehículo {n.Vehiculo.Placa} · {NombreNovedad(n.Tipo)}",
+                $"{n.NombreReporta} reportó: {Recortar(n.Descripcion, 160)}" +
+                (n.Gravedad == GravedadNovedad.Alta ? " Gravedad alta: revisa si el vehículo puede salir." : ""),
+                $"/operacion/vehiculos?novedad={n.Id}", "Ver novedad", n.FechaCreacion));
         }
 
         // Acudientes en mora (la clave cambia si se vence otra cuota → nueva notificación)
@@ -199,7 +212,8 @@ public class GeneradorNotificaciones(
                     $"a {Periodos.Nombre(f.PeriodoFin, true)}.",
                     "/finanzas/facturas", "Ver facturas", f.FechaCreacion));
             }
-            if (f.Estado != EstadoFactura.Vigente)
+            // Con retiro el fin es una decisión ya tomada: no se avisa como contrato por terminar.
+            if (f.Estado != EstadoFactura.Vigente || f.PeriodoRetiro is not null)
             {
                 continue;
             }
@@ -337,6 +351,27 @@ public class GeneradorNotificaciones(
 
         return resultado;
     }
+
+    public static string NombreNovedad(TipoNovedadVehiculo t) => t switch
+    {
+        TipoNovedadVehiculo.Averia => "Avería",
+        TipoNovedadVehiculo.Dano => "Daño",
+        TipoNovedadVehiculo.Llantas => "Llantas",
+        TipoNovedadVehiculo.Mantenimiento => "Mantenimiento",
+        TipoNovedadVehiculo.Limpieza => "Aseo",
+        TipoNovedadVehiculo.Documentos => "Documentos",
+        _ => "Otra",
+    };
+
+    /// <summary>"enero y febrero de 2026" (meses del recibo; los recibos antiguos sin detalle usan su periodo).</summary>
+    private static string MesesRecibo(Domain.Finanzas.Pago r)
+    {
+        var meses = r.Detalle.Select(d => d.Periodo).Distinct().Order().Select(p => Periodos.Nombre(p, true)).ToList();
+        if (meses.Count == 0) return Periodos.Nombre(r.Periodo ?? r.FechaPago, true);
+        return meses.Count == 1 ? meses[0] : string.Join(", ", meses.Take(meses.Count - 1)) + " y " + meses[^1];
+    }
+
+    private static string Recortar(string texto, int maximo) => texto.Length <= maximo ? texto : texto[..(maximo - 1)].TrimEnd() + "…";
 
     private static string Plural(int n, string uno, string varios) => $"{n} {(n == 1 ? uno : varios)}";
 

@@ -25,6 +25,8 @@ public class ColegioCurso
     public Guid IdColegio { get; set; }
     public Colegio Colegio { get; set; } = null!;
     public string Grado { get; set; } = "";
+    /// <summary>Mañana, Tarde o Única: un grado puede ofrecerse en varias jornadas con distinto horario.</summary>
+    public string Jornada { get; set; } = "Única";
     public TimeOnly HoraEntrada { get; set; }
     public TimeOnly HoraSalida { get; set; }
     public bool Activo { get; set; } = true;
@@ -90,6 +92,33 @@ public class AvisoAusencia : EntidadEmpresa
     public DateTime? FechaConfirmacion { get; set; }
 }
 
+/// <summary>
+/// Novedad del vehículo reportada por el conductor o la monitora desde su app (avería, daño, llantas…). El
+/// administrador la ve en el vehículo y en la campana, la pasa a EN_PROCESO y la cierra como RESUELTA con su respuesta.
+/// </summary>
+public class NovedadVehiculo : EntidadEmpresa
+{
+    public Guid IdVehiculo { get; set; }
+    public Vehiculo Vehiculo { get; set; } = null!;
+    /// <summary>Empleado que la reportó (null si la registró el administrador).</summary>
+    public Guid? IdEmpleado { get; set; }
+    public Empleado? Empleado { get; set; }
+    /// <summary>Snapshot del nombre de quien reportó.</summary>
+    public string NombreReporta { get; set; } = "";
+    public TipoNovedadVehiculo Tipo { get; set; }
+    public GravedadNovedad Gravedad { get; set; } = GravedadNovedad.Media;
+    public string Descripcion { get; set; } = "";
+    public int? Kilometraje { get; set; }
+    public EstadoNovedadVehiculo Estado { get; set; } = EstadoNovedadVehiculo.Pendiente;
+    /// <summary>Qué se hizo (obligatoria al resolver).</summary>
+    public string? Respuesta { get; set; }
+    public string? NombreAtiende { get; set; }
+    public DateTime? FechaAtencion { get; set; }
+    /// <summary>Foto o PDF de soporte.</summary>
+    public Guid? IdArchivo { get; set; }
+    public Archivo? Archivo { get; set; }
+}
+
 /// <summary>SOAT, técnico-mecánica, tarjeta de operación y pólizas: uno vigente por tipo.</summary>
 public class DocumentoVehiculo
 {
@@ -129,7 +158,10 @@ public class RutaEstudiante
     public bool Activo { get; set; } = true;
 }
 
-/// <summary>Quién cubre una ruta y cuándo: vehículo + conductor + monitora entre dos fechas.</summary>
+/// <summary>
+/// Quién cubre una ruta y cuándo: vehículo + conductor + monitora entre dos fechas y, opcionalmente, en un horario
+/// (p. ej. una semana un equipo y la siguiente otro, o dos equipos el mismo día en horas distintas).
+/// </summary>
 public class AsignacionRuta : EntidadEmpresa
 {
     public Guid IdRuta { get; set; }
@@ -143,6 +175,9 @@ public class AsignacionRuta : EntidadEmpresa
     public DateOnly FechaInicio { get; set; }
     /// <summary>Null = indefinida.</summary>
     public DateOnly? FechaFin { get; set; }
+    /// <summary>Horario del turno (ambas o ninguna); null = toda la jornada de la ruta.</summary>
+    public TimeOnly? HoraInicio { get; set; }
+    public TimeOnly? HoraFin { get; set; }
     public string? Observaciones { get; set; }
     public bool Activo { get; set; } = true;
 }

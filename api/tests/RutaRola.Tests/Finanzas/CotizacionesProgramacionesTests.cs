@@ -21,8 +21,15 @@ public class CotizacionesProgramacionesTests(BaseDatosPrueba bd)
         ["acudienteId"] = acudienteId,
         ["nombreAcudiente"] = registrados ? "" : "Camila Torres Ramírez",
         ["telefonoAcudiente"] = registrados ? "" : "3209988776",
-        ["estudiantes"] = estudiantes,
-        ["valorPorEstudiante"] = valor,
+        // Cada estudiante con su valor mensual (el que no lo trae usa el valor dado).
+        ["estudiantes"] = estudiantes.Select(e =>
+        {
+            var d = JsonSerializer.SerializeToElement(e).EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value);
+            d.TryAdd("valor", valor);
+            return d;
+        }).ToArray(),
+        ["periodoInicio"] = DatosOperacion.Hoy.ToString("yyyy-MM"),
+        ["periodoFin"] = DatosOperacion.Hoy.ToString("yyyy-MM"),
         ["valorTotal"] = 1,
         ["estado"] = "PENDIENTE",
         ["observaciones"] = "",

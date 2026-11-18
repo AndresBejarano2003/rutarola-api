@@ -167,7 +167,7 @@ Todos con el contrato CRUD (ver Convenciones) y solo para el administrador de la
 
 | Recurso | Filtros | Reglas (mismos mensajes que el modo local) |
 |---|---|---|
-| `/colegios` | `texto` (razón social, NIT), `estado` | NIT único por empresa sin contar el dígito de verificación (409); cursos por grado con salida posterior a la entrada; no se elimina con estudiantes o rutas. |
+| `/colegios` | `texto` (razón social, NIT), `estado` | NIT único por empresa sin contar el dígito de verificación (409); cursos por **grado + jornada** (`colegios_cursos.jornada`; único por colegio, grado y jornada; salida posterior a la entrada); el grado del estudiante debe ser un curso activo de su colegio **en su jornada** (422); no se elimina con estudiantes o rutas. |
 | `/vehiculos` | `texto` (placa, interno, marca, línea), `tipo`, `estado` | Placa (`ABC123`, se normaliza) y número interno únicos (409); los cuatro vencimientos son filas de `documentos_vehiculo`; no se elimina con asignaciones. |
 | `/empleados` | `texto` (nombre, documento), `tipoEmpleado`, `estado` | Documento único; licencia obligatoria para conductores; contrato adjunto; credenciales; no se elimina con asignaciones. |
 | `/acudientes` | `texto`, `estado` | Documento único; credenciales del portal; no se elimina con estudiantes a cargo o facturas. |
@@ -178,8 +178,8 @@ Todos con el contrato CRUD (ver Convenciones) y solo para el administrador de la
 
 | Recurso | Filtros | Reglas |
 |---|---|---|
-| `/rutas` | `texto` (código, nombre, sector), `colegioId`, `jornada`, `estado`, `estudianteId` | Código único sin distinguir mayúsculas (409); `estudianteIds` en orden de recogida (`rutas_estudiantes.orden_recogida`), del colegio de la ruta (422) y sin otra ruta activa de la misma jornada (422); no se elimina con asignaciones. |
-| `/asignaciones` | `rutaId`, `vehiculoId`, `empleadoId` (conductor o monitora), `estado` | `fechaFin` y `monitoraId` vacíos = sin fin / sin monitora. Si queda activa: ruta, vehículo y personal activos; tipo de empleado correcto; capacidad; licencia y documentos sin vencer (422); una activa por ruta y nadie (ni el vehículo) en dos rutas de la misma jornada (409). No se elimina con recorridos. |
+| `/rutas` | `texto` (código, nombre, sector), `colegioId`, `jornada`, `estado`, `estudianteId` | **Código consecutivo del servidor** (`R-01`, `R-02`…; el del cuerpo se ignora y no se edita; índice único → 409, reintentar); `estudianteIds` en orden de recogida (`rutas_estudiantes.orden_recogida`), del colegio **y la jornada** de la ruta (422) y sin otra ruta activa de la misma jornada (422); no se elimina con asignaciones. |
+| `/asignaciones` | `rutaId`, `vehiculoId`, `empleadoId` (conductor o monitora), `estado` | `fechaFin`, `monitoraId`, `horaInicio` y `horaFin` vacíos = sin fin / sin monitora / toda la jornada (columnas `hora_inicio`/`hora_fin`; las dos o ninguna, fin > inicio). Si queda activa: ruta, vehículo y personal activos; tipo de empleado correcto; capacidad; licencia y documentos sin vencer (422). **Sin cruces** (409): dos asignaciones activas de la misma ruta, o del mismo vehículo, conductor o monitora, se cruzan si se tocan en fechas Y en horario (`ReglasAsignacion.HorarioSeCruza`: con horas en ambas se comparan; si una no tiene, ocupa la jornada). La del momento es `ReglasAsignacion.Vigente` (turno en curso, el siguiente o el primero). No se elimina con recorridos. |
 
 **Recorridos** (`/recorridos`, tablas `viajes_ruta` / `paradas_viaje` / `eventos`). El empleado sale del token:
 
@@ -297,9 +297,12 @@ licencias por vencer (conductores, tablero, notificaciones).
 
 | Recurso | Filtros | Reglas |
 |---|---|---|
-| `/facturas` (tabla `facturas` + `facturas_detalle`) | `texto`, `acudienteId`, `estudianteId`, `estado` | `numero` FAC-0001 del servidor. `valorContratacion` = valor **mensual** entre `periodoInicio` y `periodoFin` (`YYYY-MM`); el detalle tiene una línea por mes y `valorTotal`. El estudiante debe ser del acudiente (422); sin facturas vigentes que se crucen para el mismo estudiante (409). Snapshot de nombres. No se elimina con recibos o programación (anularla = INACTIVO). |
-| `/recibos` (tabla `pagos`) | `texto`, `facturaId`, `medioPago`, `estado`, `desde`, `hasta` | `numero` REC-0001. Factura vigente y mes dentro de su periodo (422); un recibo vigente por factura + mes (409); fecha de pago no futura. Snapshot de la factura. Anular = INACTIVO. |
-| `/cotizaciones` (+ `cotizaciones_estudiantes`) | `texto`, `estado`, `desde`, `hasta` | `numero` COT-0001; `valorTotal = valorPorEstudiante × estudiantes`. Registrados: nombres y teléfono salen del acudiente y estudiantes de la empresa (404 si no existen). Estados PENDIENTE/APROBADA/RECHAZADA. |
+| `/facturas` (tabla `facturas` + `facturas_detalle`) | `texto`, `acudienteId`, `estudianteId`, `estado` | `numero` FAC-0001 del servidor. `valorContratacion` = valor **mensual** entre `periodoInicio` y `periodoFin` (`YYYY-MM`); el detalle tiene una línea por **mes que se cobra** y `valorTotal`. El estudiante debe ser del acudiente (422); sin facturas vigentes que se crucen para el mismo estudiante (409). Snapshot de nombres. No se elimina con recibos o programación (anularla = INACTIVO). `periodoRetiro`/`motivoRetiro` (`''` = sin retiro), `cotizacionId`/`numeroCotizacion` si salió de una cotización. |
+| `GET /facturas/{id}/cuotas?sinRecibo=` | `facturas.leer` | Estado de cuenta `[{periodo, valor, pagado, saldo, fechaLimite, estado PAGADA/VENCIDA/PENDIENTE/PROGRAMADA}]` de los meses que se cobran; `sinRecibo` excluye un recibo (al editarlo). |
+| `PUT /facturas/{id}/retiro {periodoRetiro, motivo}` | `facturas.gestionar` | **Retiro**: desde `periodoRetiro` la factura deja de cobrar (detalle, cuotas, reportes, mora, recordatorios, portal, tablero). Entre el 2.º mes y `periodoFin`, factura vigente y sin pagos desde ese mes (422); motivo obligatorio ≤ 300; `periodoRetiro: ""` lo quita. Inactivar un estudiante o acudiente lo registra solo (`ServicioFacturas.RetirarAsync`: desde el mes siguiente a hoy o al último pagado). |
+| `/recibos` (tabla `pagos` + `pagos_detalle`) | `texto`, `facturaId`, `medioPago`, `estado`, `desde`, `hasta` | `numero` REC-0001. Factura vigente; fecha de pago no futura. `aplicacion` MESES (`periodos` = uno o varios meses que se cobran y no están pagados; 422/409) o SALDO (abono a los meses más antiguos con saldo). `ReglasCuotas.Distribuir` reparte el valor del más antiguo al más reciente: completa meses y el resto queda como **abono** del siguiente; `pagos_detalle` guarda lo aplicado a cada mes (`meses` en el DTO). Un mes está pagado solo si lo aplicado por recibos vigentes cubre su valor; si no, queda pendiente con su saldo. 422 si el valor supera el saldo elegido. Snapshot de la factura. Anular = INACTIVO (deja de contar). Los recibos anteriores sin detalle cuentan su valor en su `periodo` (la migración `FinanzasAbonosRetirosYCotizaciones` copia una línea por recibo). |
+| `/cotizaciones` (+ `cotizaciones_estudiantes`) | `texto`, `estado`, `desde`, `hasta` | `numero` COT-0001. Cada estudiante con **su colegio** (`id_colegio` o `nombre_colegio` escrito; los registrados toman el de su registro) y **su valor mensual** (`valor` > 0). `periodoInicio`–`periodoFin` (fin ≥ inicio, 422): `valorMensual` = suma, `meses`, `valorTotal` = mensual × meses. Registrados: nombres y teléfono salen del acudiente y estudiantes de la empresa (404 si no existen). Estados PENDIENTE/APROBADA/RECHAZADA. Facturada (`facturas` no vacío): 409 al modificarla y no se elimina. |
+| `POST /cotizaciones/{id}/facturar {fechaEmision?, concepto}` | `cotizaciones.gestionar` + `facturas.gestionar` | En una transacción la aprueba y crea **una factura vigente por estudiante** (su valor, los meses de la cotización, `id_cotizacion`, `fecha_facturacion`) con las reglas de facturas; 422 si no es de acudiente y estudiantes registrados; 409 si ya se facturó. → `{cotizacion, facturas}`. El envío por WhatsApp/correo lo hace el navegador (`wa.me` / `mailto`) mientras el correo real está en pausa. |
 | `/programaciones` (+ `plantillas_mensaje`, `plantillas_mensaje_archivos`) | `texto`, `facturaId`, `estado` | Una por factura (409); activa = al menos un canal; por canal habilitado exactamente una plantilla EN_USO (422). Las plantillas se sincronizan por `id` (sin id = nueva); adjuntos PDF/imagen ≤ 2 MB. `GET /{id}/envios` y `GET /envios/conteo?ids=` leen `envios_programacion` (los crea el proceso de cobro, fase 7). |
 
 | Petición | Permiso | Respuesta |
@@ -312,7 +315,20 @@ licencias por vencer (conductores, tablero, notificaciones).
 El índice `ix_plantillas_mensaje_en_uso` (programación, canal, estado) **no es único**: al cambiar cuál plantilla
 está EN USO, EF actualiza las filas una por una y un índice único fallaría a mitad del cambio; la regla la valida el
 servicio. Los consecutivos se calculan con el mayor número existente: dos altas simultáneas chocan con el índice
-único y la segunda recibe 409 (reintentar). **Gastos** aún no tiene contrato en el frontend, así que no tiene endpoint.
+único y la segunda recibe 409 (reintentar).
+
+Las reglas de las cuotas viven en `Application/Finanzas/Cuotas.cs` (`ReglasCuotas`: `MesesCobrables`, `Cuotas`,
+`Distribuir`, `PagosAsync`), iguales a `finanzas/cuotas.ts` del frontend, y las usan recibos, reportes
+(pendientes/morosos con `valorMes`, `abonado` y `valor` = saldo), cobros, cronograma, portal (`abonado`, `saldo`),
+tablero (recaudo por lo aplicado a cada mes) y notificaciones (no avisa fin de contrato si hay retiro).
+
+## Vehículos: novedades y gastos (migración `NovedadesYGastosVehiculo`)
+
+| Petición | Permiso | Respuesta |
+|---|---|---|
+| `GET /novedades-vehiculo?vehiculoId&estado&tipo&abiertas`, `GET …/{id}`, `POST`, `PUT …/{id}/estado {estado, respuesta}` | `vehiculos.leer` / `vehiculos.gestionar` | Tabla `novedades_vehiculo`. Máx. 200, abiertas y graves primero; detalle con el archivo. PENDIENTE → EN_PROCESO → RESUELTA (exige respuesta, 400). |
+| `GET /novedades-vehiculo/mis-vehiculos`, `GET …/mias`, `GET …/mias/{id}`, `POST …/mias` | `novedades.reportar` (conductor/monitora) | Vehículos de sus asignaciones vigentes o próximas (422 otro). Tipo AVERIA/DANO/LLANTAS/MANTENIMIENTO/LIMPIEZA/DOCUMENTOS/OTRO, gravedad BAJA/MEDIA/ALTA, descripción ≥ 10, archivo PDF/imagen ≤ 2 MB. Las nuevas llegan a la campana de los administradores (CRITICA si ALTA). |
+| `/gastos` (CRUD) + `GET /gastos/resumen?<filtros>` | `gastos.leer` / `gastos.gestionar` | Tabla `gastos` (+ `tipo`, `cantidad` = galones, `kilometraje`, `proveedor`, `referencia`, `id_archivo`). Filtros `vehiculoId`, `tipo`, `desde`, `hasta`, `texto`; más recientes primero. 400 sin vehículo/tipo/fecha, valor ≤ 0, combustible sin galones; 422 fecha futura; 404 vehículo ajeno. `ResumenGastos` (`ReglasGastos.Resumir` = `resumirGastos`): totales por tipo y vehículo, promedio mensual, km recorridos, costo/km, km/galón. Un vehículo con gastos no se elimina (409). |
 
 ## Comunicación (fase 7)
 
@@ -354,13 +370,15 @@ eventos del recorrido (recogido, entregado, no asistió).
 | `POST /soporte/tickets` | `soporte.solicitar` | 201. Consecutivo global `SOP-0001`; tipo, módulo, prioridad (no CRÍTICA), asunto 5–120, descripción 20–2000, ≤ 3 adjuntos de 1 MB. |
 | `POST /soporte/tickets/{id}/comentarios`, `…/validacion {funciona, comentario}`, `…/confirmacion {calificacion 1–5}`, `…/reapertura`, `…/cancelacion` | `soporte.solicitar` | El ticket actualizado. Responder en ESPERANDO_CLIENTE lo devuelve a EN_REVISION. 422 si la acción no aplica al estado. |
 | `GET /plataforma/tickets?texto&estado&empresaId&prioridad&tipo&responsableId&vencidos`, `GET …/resumen`, `GET …/responsables`, `GET …/{id}` | `soporte.gestionar` (SuperAdmin) | Bandeja de todas las empresas, tarjetas de resumen y detalle con notas internas. |
-| `POST /plataforma/tickets/{id}/estado {estado, comentario}`, `…/respuestas {texto, interna, adjuntos}`, `PUT …/asignacion {responsableId, prioridad}`, `POST …/reuniones`, `PUT …/reuniones/{idReunion}` | `soporte.gestionar` | Transiciones de `ReglasTicket` (422 si no se permite o falta el comentario). Una reunión VIRTUAL exige enlace; REALIZADA exige acta. |
+| `POST /plataforma/tickets/{id}/estado {estado, comentario}`, `…/respuestas {texto, interna, adjuntos}` (seguimiento: no cambia el estado), `PUT …/asignacion {responsableId, prioridad}`, `POST …/reuniones`, `PUT …/reuniones/{idReunion}` | `soporte.gestionar` | Transiciones de `ReglasTicket` (422 si no se permite o falta el comentario). Una reunión VIRTUAL exige enlace; REALIZADA exige acta. |
 | `GET …/adjuntos/{idAdjunto}` (ambos lados) | igual que el ticket | El archivo. |
 
 Tablas `tickets_soporte`, `eventos_ticket`, `reuniones_ticket`, `adjuntos_ticket` (en cascada desde el ticket,
 filtradas por su empresa). Flujo: NUEVO → EN_REVISION → EN_PROCESO → EN_QA → EN_PRUEBAS → VALIDACION_CLIENTE →
 RESUELTO → CERRADO, más ESPERANDO_CLIENTE, retrocesos, RECHAZADO y CANCELADO. ERROR y MEJORA solo se resuelven
-desde VALIDACION_CLIENTE. SLA desde la creación: crítica 8 h, alta 24 h, media 72 h, baja 7 días. `AvisosSoporte`
+desde VALIDACION_CLIENTE. La plataforma puede **terminar** (CERRADO) cualquier ticket abierto con un comentario de
+justificación obligatorio (422 sin él), que la empresa ve en el historial y le llega como "Tu solicitud se cerró";
+`ReglasTicket.DiasSinRespuesta` (15) marca los que llevan ese tiempo en ESPERANDO_CLIENTE. SLA desde la creación: crítica 8 h, alta 24 h, media 72 h, baja 7 días. `AvisosSoporte`
 envía correo al equipo y al solicitante, y una notificación de campana por cada respuesta pública, sin hacer
 fallar la petición. `ProcesoComunicacion` cierra los RESUELTO con más de 7 días.
 
@@ -481,7 +499,8 @@ Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
    (`posicion`, `recorridoActualizado`); un recorrido abierto de otro día ya no bloquea el de hoy.
 6. ✅ Finanzas: facturas (+detalle mensual), recibos, cotizaciones, programaciones de cobro (+plantillas y adjuntos,
    historial de envíos), reportes (ingresos, pendientes, morosos) y tablero; datos demo por sección; el frontend usa
-   estos módulos por HTTP. Gastos queda pendiente (sin pantalla en el frontend).
+   estos módulos por HTTP. Después: abonos y recibos de varios meses (`pagos_detalle`), retiros, cotizaciones por
+   estudiante con meses y conversión a facturas, y gastos y novedades de vehículos.
 7. ✅ Comunicación: notificaciones generadas por el servidor (bandeja por usuario), proceso periódico de
    recordatorios de cobro con registro de WhatsApp (canales simulados hasta conectar proveedor) y portal del
    acudiente; datos demo con fechas históricas; el frontend usa notificaciones y portal por HTTP.

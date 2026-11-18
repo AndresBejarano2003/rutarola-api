@@ -45,6 +45,67 @@ public class DocumentosVehiculoController(ServicioDocumentosVehiculo servicio) :
     }
 }
 
+/// <summary>
+/// Gastos de los vehículos (<c>operacion/vehiculos/gastos-vehiculo/gastos-vehiculo-http.ts</c>): CRUD +
+/// <c>GET /gastos/resumen?vehiculoId=&amp;tipo=&amp;desde=&amp;hasta=</c> (tablero).
+/// </summary>
+[PermisosCrud(Permisos.GastosLeer, Permisos.GastosGestionar)]
+public class GastosController(ServicioGastosVehiculo servicio)
+    : ControladorCrud<GastoVehiculoDto, SolicitudGastoVehiculo, FiltrosGastoVehiculo>(servicio)
+{
+    [HttpGet("resumen")]
+    public Task<ResumenGastosDto> Resumen([FromQuery] FiltrosGastoVehiculo filtros, CancellationToken ct) => servicio.ResumenAsync(filtros, ct);
+}
+
+/// <summary>
+/// Novedades de los vehículos (<c>operacion/vehiculos/novedades-vehiculo/novedades-vehiculo-http.ts</c>). El
+/// administrador lista, registra y atiende; el conductor/monitora usa <c>/novedades-vehiculo/mias</c>.
+/// </summary>
+[Route("api/v1/novedades-vehiculo")]
+public class NovedadesVehiculoController(ServicioNovedadesVehiculo servicio) : ControladorApi
+{
+    [HttpGet]
+    [RequierePermiso(Permisos.VehiculosLeer)]
+    public Task<IReadOnlyList<NovedadVehiculoDto>> Listar([FromQuery] FiltrosNovedadVehiculo filtros, CancellationToken ct) =>
+        servicio.ListarAsync(filtros, ct);
+
+    [HttpGet("{id:guid}")]
+    [RequierePermiso(Permisos.VehiculosLeer)]
+    public Task<NovedadVehiculoDto> Obtener(Guid id, CancellationToken ct) => servicio.ObtenerAsync(id, ct);
+
+    [HttpPost]
+    [RequierePermiso(Permisos.VehiculosGestionar)]
+    [ProducesResponseType<NovedadVehiculoDto>(StatusCodes.Status201Created)]
+    public async Task<IActionResult> Registrar(SolicitudNovedadVehiculo solicitud, CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, await servicio.RegistrarAsync(solicitud, ct));
+
+    /// <summary>PENDIENTE / EN_PROCESO / RESUELTA (con respuesta).</summary>
+    [HttpPut("{id:guid}/estado")]
+    [RequierePermiso(Permisos.VehiculosGestionar)]
+    public Task<NovedadVehiculoDto> CambiarEstado(Guid id, SolicitudEstadoNovedad solicitud, CancellationToken ct) =>
+        servicio.CambiarEstadoAsync(id, solicitud, ct);
+
+    /// <summary>Vehículos de las asignaciones vigentes o próximas del empleado del token.</summary>
+    [HttpGet("mis-vehiculos")]
+    [RequierePermiso(Permisos.NovedadesReportar)]
+    public Task<IReadOnlyList<Opcion>> MisVehiculos(CancellationToken ct) => servicio.MisVehiculosAsync(ct);
+
+    /// <summary>Las de sus vehículos (y las que reportó), abiertas primero.</summary>
+    [HttpGet("mias")]
+    [RequierePermiso(Permisos.NovedadesReportar)]
+    public Task<IReadOnlyList<NovedadVehiculoDto>> Mias(CancellationToken ct) => servicio.MiasAsync(ct);
+
+    [HttpGet("mias/{id:guid}")]
+    [RequierePermiso(Permisos.NovedadesReportar)]
+    public Task<NovedadVehiculoDto> ObtenerMia(Guid id, CancellationToken ct) => servicio.ObtenerMiaAsync(id, ct);
+
+    [HttpPost("mias")]
+    [RequierePermiso(Permisos.NovedadesReportar)]
+    [ProducesResponseType<NovedadVehiculoDto>(StatusCodes.Status201Created)]
+    public async Task<IActionResult> Reportar(SolicitudNovedadVehiculo solicitud, CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, await servicio.ReportarAsync(solicitud, ct));
+}
+
 /// <summary>Conductores y monitoras con su acceso a la Ruta del día (<c>personas/empleados/empleados-http.ts</c>).</summary>
 [PermisosCrud(Permisos.EmpleadosLeer, Permisos.EmpleadosGestionar)]
 public class EmpleadosController(ServicioEmpleados servicio)

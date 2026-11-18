@@ -91,9 +91,9 @@ public class FacturasRecibosTests(BaseDatosPrueba bd)
         var json = JsonDocument.Parse(await (await c.GetAsync($"/api/v1/recibos/{recibo.Id}")).Content.ReadAsStringAsync()).RootElement;
         Assert.Equal("NEQUI", json.GetProperty("medioPago").GetString());
 
-        Assert.Equal("febrero de 2026 de la factura FAC-0001 ya está pagado (recibo REC-0001).",
+        Assert.Equal("febrero de 2026 de la factura FAC-0001 ya está pagado.",
             await FallaAsync(c, "recibos", DatosFinanzas.Recibo(factura.Id, "2026-02"), HttpStatusCode.Conflict));
-        Assert.Equal("diciembre de 2026 no está dentro del periodo de la factura FAC-0001.",
+        Assert.Equal("diciembre de 2026 no se cobra en la factura FAC-0001.",
             await FallaAsync(c, "recibos", DatosFinanzas.Recibo(factura.Id, "2026-12"), HttpStatusCode.UnprocessableEntity));
         var futura = await c.PostAsJsonAsync("/api/v1/recibos", DatosFinanzas.Recibo(factura.Id, "2026-03", fechaPago: DatosOperacion.Hoy.AddDays(2).ToString("yyyy-MM-dd")), ClienteApi.Json);
         Assert.Equal("La fecha de pago no puede ser futura.", await futura.MensajeErrorAsync(HttpStatusCode.BadRequest));

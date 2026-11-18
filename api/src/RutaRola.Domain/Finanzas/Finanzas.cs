@@ -33,6 +33,15 @@ public class Factura : EntidadEmpresa
     public EstadoFactura Estado { get; set; } = EstadoFactura.Vigente;
     public string? UrlPdf { get; set; }
     public string? Observaciones { get; set; }
+    /// <summary>Cotización aprobada de la que salió (null = creada a mano).</summary>
+    public Guid? IdCotizacion { get; set; }
+    public Cotizacion? Cotizacion { get; set; }
+    /// <summary>
+    /// Retiro: primer mes que YA NO se cobra (el estudiante o el acudiente se retiró). Los meses desde aquí hasta
+    /// <see cref="PeriodoFin"/> no generan cuota. Null = sin retiro.
+    /// </summary>
+    public DateOnly? PeriodoRetiro { get; set; }
+    public string? MotivoRetiro { get; set; }
     public List<FacturaDetalle> Detalle { get; set; } = [];
 }
 
@@ -59,7 +68,7 @@ public class Pago : EntidadEmpresa
     /// <summary>Nullable en BD (pagos sueltos a futuro); obligatorio en <c>/recibos</c>.</summary>
     public Guid? IdFactura { get; set; }
     public Factura? Factura { get; set; }
-    /// <summary>Mes que paga (primer día del mes).</summary>
+    /// <summary>Primer mes que paga (primer día del mes); los meses y valores aplicados están en <see cref="Detalle"/>.</summary>
     public DateOnly? Periodo { get; set; }
     public decimal Valor { get; set; }
     public DateOnly FechaPago { get; set; }
@@ -71,6 +80,19 @@ public class Pago : EntidadEmpresa
     public string NombreAcudiente { get; set; } = "";
     public string NombreEstudiante { get; set; } = "";
     public string? Observaciones { get; set; }
+    /// <summary>Cuánto de este recibo se aplicó a cada mes de la factura (un recibo puede pagar o abonar varios).</summary>
+    public List<PagoDetalle> Detalle { get; set; } = [];
+}
+
+/// <summary>Valor de un recibo aplicado a un mes de la factura (pago completo o abono).</summary>
+public class PagoDetalle
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid IdPago { get; set; }
+    public Pago Pago { get; set; } = null!;
+    /// <summary>Primer día del mes.</summary>
+    public DateOnly Periodo { get; set; }
+    public decimal Valor { get; set; }
 }
 
 public class Cotizacion : EntidadEmpresa
@@ -83,9 +105,16 @@ public class Cotizacion : EntidadEmpresa
     public Acudiente? Acudiente { get; set; }
     public string NombreAcudiente { get; set; } = "";
     public string? TelefonoAcudiente { get; set; }
-    public decimal ValorPorEstudiante { get; set; }
+    /// <summary>Meses del servicio cotizado (primer día de cada mes).</summary>
+    public DateOnly PeriodoInicio { get; set; }
+    public DateOnly PeriodoFin { get; set; }
+    /// <summary>Suma de los valores mensuales de los estudiantes.</summary>
+    public decimal ValorMensual { get; set; }
+    /// <summary><see cref="ValorMensual"/> × meses del servicio.</summary>
     public decimal ValorTotal { get; set; }
     public EstadoCotizacion Estado { get; set; } = EstadoCotizacion.Pendiente;
+    /// <summary>Cuándo se convirtió en facturas (null = aún no).</summary>
+    public DateTime? FechaFacturacion { get; set; }
     public string? Observaciones { get; set; }
     public List<CotizacionEstudiante> Estudiantes { get; set; } = [];
 }
@@ -98,17 +127,34 @@ public class CotizacionEstudiante
     public Guid? IdEstudiante { get; set; }
     public Estudiante? Estudiante { get; set; }
     public string Nombre { get; set; } = "";
+    /// <summary>Colegio registrado (null = solo el nombre escrito, cliente nuevo).</summary>
+    public Guid? IdColegio { get; set; }
+    public Colegio? Colegio { get; set; }
+    public string NombreColegio { get; set; } = "";
+    /// <summary>Valor mensual cotizado para este estudiante.</summary>
+    public decimal Valor { get; set; }
     public int Orden { get; set; }
 }
 
+/// <summary>
+/// Gasto de un vehículo (tanqueada, mantenimiento, repuesto, llantas, peajes…): historial y tablero en
+/// Operación › Vehículos. <see cref="Cantidad"/> = galones en combustible (unidades en lo demás).
+/// </summary>
 public class Gasto : EntidadEmpresa
 {
     public Guid? IdVehiculo { get; set; }
     public Vehiculo? Vehiculo { get; set; }
-    public string Categoria { get; set; } = "";
+    public TipoGasto Tipo { get; set; }
     public string? Descripcion { get; set; }
     public decimal Valor { get; set; }
     public DateOnly FechaGasto { get; set; }
+    public string? Proveedor { get; set; }
+    /// <summary>Número de factura o comprobante.</summary>
+    public string? Referencia { get; set; }
+    public int? Kilometraje { get; set; }
+    public decimal? Cantidad { get; set; }
+    public Guid? IdArchivo { get; set; }
+    public Archivo? Archivo { get; set; }
     public Guid? CreadoPor { get; set; }
     public Usuario? Creador { get; set; }
 }

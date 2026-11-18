@@ -243,6 +243,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_creacion");
 
+                    b.Property<DateTime?>("FechaFacturacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_facturacion");
+
                     b.Property<Guid?>("IdAcudiente")
                         .HasColumnType("uuid")
                         .HasColumnName("id_acudiente");
@@ -267,14 +271,22 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("text")
                         .HasColumnName("observaciones");
 
+                    b.Property<DateOnly>("PeriodoFin")
+                        .HasColumnType("date")
+                        .HasColumnName("periodo_fin");
+
+                    b.Property<DateOnly>("PeriodoInicio")
+                        .HasColumnType("date")
+                        .HasColumnName("periodo_inicio");
+
                     b.Property<string>("TelefonoAcudiente")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("telefono_acudiente");
 
-                    b.Property<decimal>("ValorPorEstudiante")
+                    b.Property<decimal>("ValorMensual")
                         .HasColumnType("numeric(14,2)")
-                        .HasColumnName("valor_por_estudiante");
+                        .HasColumnName("valor_mensual");
 
                     b.Property<decimal>("ValorTotal")
                         .HasColumnType("numeric(14,2)")
@@ -299,6 +311,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("uuid")
                         .HasColumnName("id_cotizacion_estudiante");
 
+                    b.Property<Guid?>("IdColegio")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_colegio");
+
                     b.Property<Guid>("IdCotizacion")
                         .HasColumnType("uuid")
                         .HasColumnName("id_cotizacion");
@@ -313,12 +329,25 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("character varying(200)")
                         .HasColumnName("nombre");
 
+                    b.Property<string>("NombreColegio")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("nombre_colegio");
+
                     b.Property<int>("Orden")
                         .HasColumnType("integer")
                         .HasColumnName("orden");
 
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("valor");
+
                     b.HasKey("Id")
                         .HasName("pk_cotizaciones_estudiantes");
+
+                    b.HasIndex("IdColegio")
+                        .HasDatabaseName("ix_cotizaciones_estudiantes_id_colegio");
 
                     b.HasIndex("IdCotizacion")
                         .HasDatabaseName("ix_cotizaciones_estudiantes_id_cotizacion");
@@ -427,6 +456,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("uuid")
                         .HasColumnName("id_acudiente");
 
+                    b.Property<Guid?>("IdCotizacion")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_cotizacion");
+
                     b.Property<Guid>("IdEmpresa")
                         .HasColumnType("uuid")
                         .HasColumnName("id_empresa");
@@ -434,6 +467,11 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Property<Guid>("IdEstudiante")
                         .HasColumnType("uuid")
                         .HasColumnName("id_estudiante");
+
+                    b.Property<string>("MotivoRetiro")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("motivo_retiro");
 
                     b.Property<string>("NombreAcudiente")
                         .IsRequired()
@@ -465,6 +503,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("date")
                         .HasColumnName("periodo_inicio");
 
+                    b.Property<DateOnly?>("PeriodoRetiro")
+                        .HasColumnType("date")
+                        .HasColumnName("periodo_retiro");
+
                     b.Property<string>("UrlPdf")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -483,6 +525,9 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
 
                     b.HasIndex("IdAcudiente")
                         .HasDatabaseName("ix_facturas_id_acudiente");
+
+                    b.HasIndex("IdCotizacion")
+                        .HasDatabaseName("ix_facturas_id_cotizacion");
 
                     b.HasIndex("IdEstudiante")
                         .HasDatabaseName("ix_facturas_id_estudiante");
@@ -541,18 +586,17 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("uuid")
                         .HasColumnName("id_gasto");
 
-                    b.Property<string>("Categoria")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("categoria");
+                    b.Property<decimal?>("Cantidad")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("cantidad");
 
                     b.Property<Guid?>("CreadoPor")
                         .HasColumnType("uuid")
                         .HasColumnName("creado_por");
 
                     b.Property<string>("Descripcion")
-                        .HasColumnType("text")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
                         .HasColumnName("descripcion");
 
                     b.Property<DateTime?>("FechaActualizacion")
@@ -567,6 +611,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("date")
                         .HasColumnName("fecha_gasto");
 
+                    b.Property<Guid?>("IdArchivo")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_archivo");
+
                     b.Property<Guid>("IdEmpresa")
                         .HasColumnType("uuid")
                         .HasColumnName("id_empresa");
@@ -574,6 +622,26 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Property<Guid?>("IdVehiculo")
                         .HasColumnType("uuid")
                         .HasColumnName("id_vehiculo");
+
+                    b.Property<int?>("Kilometraje")
+                        .HasColumnType("integer")
+                        .HasColumnName("kilometraje");
+
+                    b.Property<string>("Proveedor")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("proveedor");
+
+                    b.Property<string>("Referencia")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("referencia");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("tipo");
 
                     b.Property<decimal>("Valor")
                         .HasColumnType("numeric(14,2)")
@@ -585,11 +653,14 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.HasIndex("CreadoPor")
                         .HasDatabaseName("ix_gastos_creado_por");
 
-                    b.HasIndex("IdVehiculo")
-                        .HasDatabaseName("ix_gastos_id_vehiculo");
+                    b.HasIndex("IdArchivo")
+                        .HasDatabaseName("ix_gastos_id_archivo");
 
                     b.HasIndex("IdEmpresa", "FechaGasto")
                         .HasDatabaseName("ix_gastos_id_empresa_fecha_gasto");
+
+                    b.HasIndex("IdVehiculo", "FechaGasto")
+                        .HasDatabaseName("ix_gastos_id_vehiculo_fecha_gasto");
 
                     b.ToTable("gastos", (string)null);
                 });
@@ -692,12 +763,35 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .IsUnique()
                         .HasDatabaseName("ix_pagos_id_empresa_numero");
 
-                    b.HasIndex("IdFactura", "Periodo")
-                        .IsUnique()
-                        .HasDatabaseName("ix_pagos_vigente_por_periodo")
-                        .HasFilter("estado = 'VIGENTE' AND id_factura IS NOT NULL");
-
                     b.ToTable("pagos", (string)null);
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Finanzas.PagoDetalle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_pago_detalle");
+
+                    b.Property<Guid>("IdPago")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_pago");
+
+                    b.Property<DateOnly>("Periodo")
+                        .HasColumnType("date")
+                        .HasColumnName("periodo");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("valor");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pagos_detalle");
+
+                    b.HasIndex("IdPago", "Periodo")
+                        .IsUnique()
+                        .HasDatabaseName("ix_pagos_detalle_id_pago_periodo");
+
+                    b.ToTable("pagos_detalle", (string)null);
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Finanzas.PlantillaMensaje", b =>
@@ -855,6 +949,14 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("date")
                         .HasColumnName("fecha_inicio");
 
+                    b.Property<TimeOnly?>("HoraFin")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("hora_fin");
+
+                    b.Property<TimeOnly?>("HoraInicio")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("hora_inicio");
+
                     b.Property<Guid>("IdConductor")
                         .HasColumnType("uuid")
                         .HasColumnName("id_conductor");
@@ -891,16 +993,11 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.HasIndex("IdMonitora")
                         .HasDatabaseName("ix_asignaciones_ruta_id_monitora");
 
-                    b.HasIndex("IdRuta")
-                        .HasDatabaseName("ix_asignaciones_ruta_id_ruta");
-
                     b.HasIndex("IdVehiculo")
                         .HasDatabaseName("ix_asignaciones_ruta_id_vehiculo");
 
-                    b.HasIndex(new[] { "IdRuta" }, "activa")
-                        .IsUnique()
-                        .HasDatabaseName("ix_asignaciones_ruta_activa")
-                        .HasFilter("activo");
+                    b.HasIndex("IdRuta", "FechaInicio")
+                        .HasDatabaseName("ix_asignaciones_ruta_id_ruta_fecha_inicio");
 
                     b.ToTable("asignaciones_ruta", (string)null);
                 });
@@ -1075,12 +1172,20 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("uuid")
                         .HasColumnName("id_colegio");
 
+                    b.Property<string>("Jornada")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Única")
+                        .HasColumnName("jornada");
+
                     b.HasKey("Id")
                         .HasName("pk_colegios_cursos");
 
-                    b.HasIndex("IdColegio", "Grado")
+                    b.HasIndex("IdColegio", "Grado", "Jornada")
                         .IsUnique()
-                        .HasDatabaseName("ix_colegios_cursos_id_colegio_grado");
+                        .HasDatabaseName("ix_colegios_cursos_id_colegio_grado_jornada");
 
                     b.ToTable("colegios_cursos", (string)null);
                 });
@@ -1290,6 +1395,102 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasDatabaseName("ix_historial_documentos_vehiculo_id_vehiculo_tipo_documento_fe");
 
                     b.ToTable("historial_documentos_vehiculo", (string)null);
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Operacion.NovedadVehiculo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_novedad");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("descripcion");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("estado");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_actualizacion");
+
+                    b.Property<DateTime?>("FechaAtencion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_atencion");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<string>("Gravedad")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("gravedad");
+
+                    b.Property<Guid?>("IdArchivo")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_archivo");
+
+                    b.Property<Guid?>("IdEmpleado")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_empleado");
+
+                    b.Property<Guid>("IdEmpresa")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_empresa");
+
+                    b.Property<Guid>("IdVehiculo")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_vehiculo");
+
+                    b.Property<int?>("Kilometraje")
+                        .HasColumnType("integer")
+                        .HasColumnName("kilometraje");
+
+                    b.Property<string>("NombreAtiende")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("nombre_atiende");
+
+                    b.Property<string>("NombreReporta")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("nombre_reporta");
+
+                    b.Property<string>("Respuesta")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("respuesta");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("tipo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_novedades_vehiculo");
+
+                    b.HasIndex("IdArchivo")
+                        .HasDatabaseName("ix_novedades_vehiculo_id_archivo");
+
+                    b.HasIndex("IdEmpleado")
+                        .HasDatabaseName("ix_novedades_vehiculo_id_empleado");
+
+                    b.HasIndex("IdEmpresa", "Estado")
+                        .HasDatabaseName("ix_novedades_vehiculo_id_empresa_estado");
+
+                    b.HasIndex("IdVehiculo", "Estado")
+                        .HasDatabaseName("ix_novedades_vehiculo_id_vehiculo_estado");
+
+                    b.ToTable("novedades_vehiculo", (string)null);
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Operacion.ParadaViaje", b =>
@@ -3404,6 +3605,12 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
 
             modelBuilder.Entity("RutaRola.Domain.Finanzas.CotizacionEstudiante", b =>
                 {
+                    b.HasOne("RutaRola.Domain.Operacion.Colegio", "Colegio")
+                        .WithMany()
+                        .HasForeignKey("IdColegio")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_cotizaciones_estudiantes_colegios_id_colegio");
+
                     b.HasOne("RutaRola.Domain.Finanzas.Cotizacion", "Cotizacion")
                         .WithMany("Estudiantes")
                         .HasForeignKey("IdCotizacion")
@@ -3416,6 +3623,8 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasForeignKey("IdEstudiante")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_cotizaciones_estudiantes_estudiantes_id_estudiante");
+
+                    b.Navigation("Colegio");
 
                     b.Navigation("Cotizacion");
 
@@ -3451,6 +3660,12 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .IsRequired()
                         .HasConstraintName("fk_facturas_acudientes_id_acudiente");
 
+                    b.HasOne("RutaRola.Domain.Finanzas.Cotizacion", "Cotizacion")
+                        .WithMany()
+                        .HasForeignKey("IdCotizacion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_facturas_cotizaciones_id_cotizacion");
+
                     b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
                         .WithMany()
                         .HasForeignKey("IdEmpresa")
@@ -3466,6 +3681,8 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasConstraintName("fk_facturas_estudiantes_id_estudiante");
 
                     b.Navigation("Acudiente");
+
+                    b.Navigation("Cotizacion");
 
                     b.Navigation("Estudiante");
                 });
@@ -3490,6 +3707,12 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_gastos_usuarios_creado_por");
 
+                    b.HasOne("RutaRola.Domain.Comunicacion.Archivo", "Archivo")
+                        .WithMany()
+                        .HasForeignKey("IdArchivo")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_gastos_archivos_id_archivo");
+
                     b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
                         .WithMany()
                         .HasForeignKey("IdEmpresa")
@@ -3502,6 +3725,8 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasForeignKey("IdVehiculo")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_gastos_vehiculos_id_vehiculo");
+
+                    b.Navigation("Archivo");
 
                     b.Navigation("Creador");
 
@@ -3533,6 +3758,18 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.Navigation("Estudiante");
 
                     b.Navigation("Factura");
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Finanzas.PagoDetalle", b =>
+                {
+                    b.HasOne("RutaRola.Domain.Finanzas.Pago", "Pago")
+                        .WithMany("Detalle")
+                        .HasForeignKey("IdPago")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pagos_detalle_pagos_id_pago");
+
+                    b.Navigation("Pago");
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Finanzas.PlantillaMensaje", b =>
@@ -3766,6 +4003,41 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasConstraintName("fk_historial_documentos_vehiculo_vehiculos_id_vehiculo");
 
                     b.Navigation("Archivo");
+
+                    b.Navigation("Vehiculo");
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Operacion.NovedadVehiculo", b =>
+                {
+                    b.HasOne("RutaRola.Domain.Comunicacion.Archivo", "Archivo")
+                        .WithMany()
+                        .HasForeignKey("IdArchivo")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_novedades_vehiculo_archivos_id_archivo");
+
+                    b.HasOne("RutaRola.Domain.Personas.Empleado", "Empleado")
+                        .WithMany()
+                        .HasForeignKey("IdEmpleado")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_novedades_vehiculo_empleados_id_empleado");
+
+                    b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("IdEmpresa")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_novedades_vehiculo_empresas_id_empresa");
+
+                    b.HasOne("RutaRola.Domain.Operacion.Vehiculo", "Vehiculo")
+                        .WithMany()
+                        .HasForeignKey("IdVehiculo")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_novedades_vehiculo_vehiculos_id_vehiculo");
+
+                    b.Navigation("Archivo");
+
+                    b.Navigation("Empleado");
 
                     b.Navigation("Vehiculo");
                 });
@@ -4227,6 +4499,11 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Finanzas.Factura", b =>
+                {
+                    b.Navigation("Detalle");
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Finanzas.Pago", b =>
                 {
                     b.Navigation("Detalle");
                 });

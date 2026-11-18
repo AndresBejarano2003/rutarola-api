@@ -52,6 +52,7 @@ public static class Permisos
     public const string RecorridosOperar = "recorridos.operar";
     public const string GpsReportar = "gps.reportar";
     public const string GpsConsultar = "gps.consultar";
+    public const string NovedadesReportar = "novedades.reportar";
 
     public const string FacturasLeer = "facturas.leer";
     public const string FacturasGestionar = "facturas.gestionar";
@@ -103,6 +104,7 @@ public static class Permisos
         [RecorridosOperar] = "Iniciar y registrar los recorridos asignados (ruta del día)",
         [GpsReportar] = "Enviar posiciones GPS del recorrido asignado",
         [GpsConsultar] = "Ver la ubicación de los recorridos",
+        [NovedadesReportar] = "Reportar novedades (averías, daños) del vehículo asignado",
         [FacturasLeer] = "Ver facturas",
         [FacturasGestionar] = "Crear, editar y anular facturas",
         [PagosLeer] = "Ver recibos de pago",
@@ -129,14 +131,14 @@ public static class Permisos
     public static IEnumerable<string> Todos => Descripciones.Keys;
 
     private static readonly string[] Operativos =
-        [RecorridosOperar, GpsReportar, NotificacionesPropias];
+        [RecorridosOperar, GpsReportar, NotificacionesPropias, NovedadesReportar];
 
     public static readonly IReadOnlyDictionary<string, IReadOnlyCollection<string>> PorRol =
         new Dictionary<string, IReadOnlyCollection<string>>
         {
             [Roles.SuperAdmin] = [EmpresasGestionar, UsuariosLeer, UsuariosGestionar, AuditoriaLeer, NotificacionesPropias, SoporteGestionar, PromocionesGestionar],
             [Roles.AdminEmpresa] = Descripciones.Keys
-                .Where(p => p is not EmpresasGestionar and not RecorridosOperar and not GpsReportar and not PortalConsultar and not SoporteGestionar and not PromocionesGestionar)
+                .Where(p => p is not EmpresasGestionar and not RecorridosOperar and not GpsReportar and not PortalConsultar and not SoporteGestionar and not PromocionesGestionar and not NovedadesReportar)
                 .ToArray(),
             [Roles.Conductor] = Operativos,
             [Roles.Monitora] = Operativos,

@@ -54,12 +54,14 @@ public class ServicioTablero(IBaseDatos db, ServicioReportes reportes, Parametro
         var limiteAgenda = hoy.AddDays(DiasAgenda);
 
         var facturas = await db.Facturas.AsNoTracking().Where(f => f.Estado == EstadoFactura.Vigente).ToListAsync(ct);
-        var recibos = await db.Pagos.AsNoTracking().Where(p => p.Estado == EstadoPago.Vigente && p.IdFactura != null).ToListAsync(ct);
+        var recibos = await db.Pagos.AsNoTracking().Include(p => p.Detalle).Where(p => p.Estado == EstadoPago.Vigente && p.IdFactura != null).ToListAsync(ct);
         var cuotas = await reportes.CuotasPendientesAsync(null, ct);
         var estudiantes = await db.Estudiantes.AsNoTracking().Where(e => e.Activo).Select(e => new { e.Id, e.IdColegio, e.FechaCreacion }).ToListAsync(ct);
         var colegios = await db.Colegios.AsNoTracking().ToDictionaryAsync(c => c.Id, c => c.RazonSocial, ct);
         var rutas = await db.Rutas.AsNoTracking().Include(r => r.Estudiantes).Where(r => r.Activo).ToListAsync(ct);
-        var asignaciones = await db.AsignacionesRuta.AsNoTracking().Where(a => a.Activo).ToListAsync(ct);
+        // Las que cubren hoy (puede haber varias por ruta en fechas u horarios distintos).
+        var asignaciones = await db.AsignacionesRuta.AsNoTracking()
+            .Where(a => a.Activo && a.FechaInicio <= hoy && (a.FechaFin == null || a.FechaFin >= hoy)).ToListAsync(ct);
         var vehiculos = await db.Vehiculos.AsNoTracking().Include(v => v.Documentos).Where(v => v.Activo).ToListAsync(ct);
         var capacidades = await db.Vehiculos.AsNoTracking().ToDictionaryAsync(v => v.Id, v => v.Capacidad, ct);
         var conductores = await db.Empleados.AsNoTracking().Where(e => e.Activo && e.TipoEmpleado == TipoEmpleado.Conductor).ToListAsync(ct);
@@ -68,8 +70,11 @@ public class ServicioTablero(IBaseDatos db, ServicioReportes reportes, Parametro
         var desdeEnvios = DateTime.SpecifyKind(hoy.AddDays(-DiasAgenda).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc).AddHours(5);
         var enviosFallidos = await db.EnviosProgramacion.AsNoTracking().CountAsync(e => e.Estado == EstadoEnvio.Fallido && e.Fecha >= desdeEnvios, ct);
 
-        decimal Esperado(DateOnly p) => facturas.Where(f => f.PeriodoInicio <= p && p <= f.PeriodoFin).Sum(f => f.ValorMensual);
-        List<Domain.Finanzas.Pago> RecaudadoDe(DateOnly p) => recibos.Where(r => r.Periodo == p).ToList();
+        // Esperado: meses que se cobran (sin retiros). Recaudado: lo que los recibos aplicaron a ese mes (un recibo de varios
+        // meses o un abono cuenta en cada mes por su parte).
+        decimal Esperado(DateOnly p) => facturas.Where(f => ReglasCuotas.MesesCobrables(f).Contains(p)).Sum(f => f.ValorMensual);
+        List<(Domain.Finanzas.Pago Recibo, decimal Valor)> RecaudadoDe(DateOnly p) =>
+            recibos.SelectMany(r => r.Detalle.Where(d => d.Periodo == p).Select(d => (r, d.Valor))).ToList();
 
         // Cartera
         var vencidas = cuotas.Where(c => c.DiasMora > 0).ToList();
@@ -82,7 +87,7 @@ public class ServicioTablero(IBaseDatos db, ServicioReportes reportes, Parametro
         var ocupacion = rutas
             .Select(r =>
             {
-                var asignacion = asignaciones.FirstOrDefault(a => a.IdRuta == r.Id);
+                var asignacion = ReglasAsignacion.Vigente(asignaciones, r.Id, hoy, Fechas.HoraColombia(reloj));
                 return new OcupacionRutaDto(ServicioRutas.Etiquetar(r), r.Estudiantes.Count,
                     asignacion is null ? null : capacidades.TryGetValue(asignacion.IdVehiculo, out var c) ? c : null);
             })
@@ -101,8 +106,10 @@ public class ServicioTablero(IBaseDatos db, ServicioReportes reportes, Parametro
 
         // Contratos y programación
         var siguiente = periodo.AddMonths(1);
-        var contratosPorTerminar = facturas.Where(f => f.PeriodoFin == periodo || f.PeriodoFin == siguiente).ToList();
-        var sinProgramacion = facturas.Count(f => f.PeriodoFin >= periodo && !conProgramacion.Contains(f.Id));
+        // Fin del contrato = último mes que se cobra (un retiro lo adelanta).
+        DateOnly? Fin(Domain.Finanzas.Factura f) => ReglasCuotas.UltimoMesCobrable(f.PeriodoInicio, f.PeriodoFin, f.PeriodoRetiro);
+        var contratosPorTerminar = facturas.Where(f => Fin(f) == periodo || Fin(f) == siguiente).ToList();
+        var sinProgramacion = facturas.Count(f => Fin(f) >= periodo && !conProgramacion.Contains(f.Id));
 
         var pendientes = new List<PendienteTableroDto>
         {
@@ -154,10 +161,11 @@ public class ServicioTablero(IBaseDatos db, ServicioReportes reportes, Parametro
         }
         foreach (var f in contratosPorTerminar)
         {
-            var fecha = Periodos.Dia(f.PeriodoFin, 31);
+            var fin = Fin(f)!.Value;
+            var fecha = Periodos.Dia(fin, 31);
             if (EnAgenda(fecha))
             {
-                agenda.Add(new(fecha, "CONTRATO", $"Termina contrato {f.NumeroFactura}", $"{f.NombreEstudiante} · {Periodos.Nombre(f.PeriodoFin)}", "/finanzas/facturas"));
+                agenda.Add(new(fecha, "CONTRATO", $"Termina contrato {f.NumeroFactura}", $"{f.NombreEstudiante} · {Periodos.Nombre(fin)}", "/finanzas/facturas"));
             }
         }
 
@@ -165,7 +173,8 @@ public class ServicioTablero(IBaseDatos db, ServicioReportes reportes, Parametro
         var delMes = RecaudadoDe(periodo);
         return new TableroDto(
             Periodos.Texto(periodo),
-            new RecaudoDto(delMes.Sum(r => r.Valor), Esperado(periodo), delMes.Count, RecaudadoDe(periodo.AddMonths(-1)).Sum(r => r.Valor)),
+            new RecaudoDto(delMes.Sum(r => r.Valor), Esperado(periodo), delMes.Select(r => r.Recibo.Id).Distinct().Count(),
+                RecaudadoDe(periodo.AddMonths(-1)).Sum(r => r.Valor)),
             new CarteraDto(vencidas.Sum(c => c.Valor), vencidas.Count, acudientesEnMora, porVencer.Sum(c => c.Valor)),
             new EstudiantesTableroDto(estudiantes.Count, sinRuta,
                 estudiantes.Count(e => Periodos.De(DateOnly.FromDateTime(e.FechaCreacion.Add(Fechas.DesfaseColombia))) == periodo), porColegio.Count),

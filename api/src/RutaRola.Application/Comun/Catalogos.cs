@@ -10,6 +10,12 @@ public static class Catalogos
 
     public static readonly string[] Jornadas = ["Mañana", "Tarde", "Única"];
 
+    /// <summary>Jornada de los cursos que llegan sin ella (clientes anteriores a los cursos por jornada).</summary>
+    public const string JornadaPorDefecto = "Única";
+
+    /// <summary>Orden de <see cref="Jornadas"/> (cursos de un colegio).</summary>
+    public static int OrdenJornadaCurso(string jornada) => Array.IndexOf(Jornadas, jornada) is var i and >= 0 ? i : Jornadas.Length;
+
     /// <summary>Orden en que se muestran las rutas del día.</summary>
     public static readonly string[] OrdenJornadas = ["Mañana", "Única", "Tarde", "Noche"];
 

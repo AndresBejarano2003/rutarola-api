@@ -64,11 +64,13 @@ public static class Consecutivos
     /// Siguiente número tras el mayor existente. Dos creaciones simultáneas chocan con el índice único
     /// (empresa, número) y la segunda recibe 409 (se reintenta).
     /// </summary>
-    public static async Task<string> SiguienteAsync(IQueryable<string> numeros, string prefijo, CancellationToken ct)
+    public static async Task<string> SiguienteAsync(IQueryable<string> numeros, string prefijo, CancellationToken ct, int digitos = 4)
     {
         var inicio = prefijo + "-";
         var existentes = await numeros.Where(n => n.StartsWith(inicio)).ToListAsync(ct);
-        var mayor = existentes.Select(n => int.TryParse(n[inicio.Length..], out var v) ? v : 0).DefaultIfEmpty(0).Max();
-        return $"{inicio}{mayor + 1:0000}";
+        var mayor = existentes
+            .Select(n => int.TryParse(n[inicio.Length..], System.Globalization.NumberStyles.None, null, out var v) ? v : 0)
+            .DefaultIfEmpty(0).Max();
+        return inicio + (mayor + 1).ToString(new string('0', digitos));
     }
 }

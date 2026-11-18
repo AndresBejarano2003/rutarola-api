@@ -227,30 +227,44 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
                     NumeroReferencia = medio == MetodoPago.Efectivo ? null : (48_210_000 + consecutivo * 137).ToString(Periodos.Colombia.NumberFormat),
                     NumeroFactura = f.NumeroFactura, NombreAcudiente = f.NombreAcudiente, NombreEstudiante = f.NombreEstudiante,
                     FechaCreacion = Creado(hoy, mes, fecha.Day, 10),
+                    Detalle = [new PagoDetalle { Periodo = new DateOnly(anio, mes, 1), Valor = f.ValorMensual }],
                 });
             }
         }
 
-        Cotizacion Cotizacion(int numero, DateOnly fecha, string? acudiente, string nombre, string telefono, (int? Estudiante, string Nombre)[] estudiantes,
+        Cotizacion Cotizacion(int numero, DateOnly fecha, string? acudiente, string nombre, string telefono, (int? Estudiante, string Nombre, string Colegio)[] estudiantes,
             decimal valor, EstadoCotizacion estado)
         {
             var a = acudiente is null ? null : c.Acudientes[acudiente];
+            // Servicio de febrero a noviembre; cada estudiante con su valor (el segundo hermano con 20 000 menos).
+            var inicio = new DateOnly(anio, 2, 1);
+            var fin = new DateOnly(anio, 11, 1);
+            var lineas = estudiantes.Select((e, i) =>
+            {
+                var estudiante = e.Estudiante is { } n ? c.Estudiantes[n - 1] : null;
+                var colegio = estudiante is null ? null : c.Colegios.Values.FirstOrDefault(x => x.Id == estudiante.IdColegio);
+                return new CotizacionEstudiante
+                {
+                    IdEstudiante = estudiante?.Id, Nombre = estudiante?.NombreCompleto ?? e.Nombre, IdColegio = colegio?.Id,
+                    NombreColegio = colegio?.RazonSocial ?? e.Colegio, Valor = valor - i * 20_000, Orden = i + 1,
+                };
+            }).ToList();
+            var mensual = lineas.Sum(l => l.Valor);
             return new()
             {
                 IdEmpresa = idEmpresa, Numero = $"COT-{numero:0000}", Fecha = fecha, IdAcudiente = a?.Id, NombreAcudiente = a?.NombreCompleto ?? nombre,
-                TelefonoAcudiente = a?.Telefono ?? telefono, ValorPorEstudiante = valor, ValorTotal = valor * estudiantes.Length, Estado = estado,
+                TelefonoAcudiente = a?.Telefono ?? telefono, PeriodoInicio = inicio, PeriodoFin = fin, ValorMensual = mensual,
+                ValorTotal = mensual * Periodos.Entre(inicio, fin).Count(), Estado = estado,
                 FechaCreacion = Creado(hoy, fecha.Month, fecha.Day, 9), FechaActualizacion = Creado(hoy, fecha.Month, fecha.Day, 9),
-                Estudiantes = estudiantes.Select((e, i) => e.Estudiante is { } n
-                    ? new CotizacionEstudiante { IdEstudiante = c.Estudiantes[n - 1].Id, Nombre = c.Estudiantes[n - 1].NombreCompleto, Orden = i + 1 }
-                    : new CotizacionEstudiante { Nombre = e.Nombre, Orden = i + 1 }).ToList(),
+                Estudiantes = lineas,
             };
         }
         db.Cotizaciones.AddRange(
-            Cotizacion(1, new DateOnly(anio, 1, 15), "acu-1", "", "", [(1, ""), (2, "")], 400_000, EstadoCotizacion.Aprobada),
+            Cotizacion(1, new DateOnly(anio, 1, 15), "acu-1", "", "", [(1, "", ""), (2, "", "")], 400_000, EstadoCotizacion.Aprobada),
             Cotizacion(2, new DateOnly(anio, 9, 22), null, "Camila Torres Ramírez", "3209988776",
-                [(null, "Miguel Ángel Torres"), (null, "Lucía Torres")], 380_000, EstadoCotizacion.Pendiente),
-            Cotizacion(3, new DateOnly(anio, 10, 3), "acu-6", "", "", [(11, "")], 360_000, EstadoCotizacion.Rechazada),
-            Cotizacion(4, new DateOnly(anio, 10, 28), null, "Julián Peña Cabrera", "3014455667", [(null, "Sofía Peña")], 420_000,
+                [(null, "Miguel Ángel Torres", "Colegio San José"), (null, "Lucía Torres", "Liceo Los Andes")], 380_000, EstadoCotizacion.Pendiente),
+            Cotizacion(3, new DateOnly(anio, 10, 3), "acu-6", "", "", [(11, "", "")], 360_000, EstadoCotizacion.Rechazada),
+            Cotizacion(4, new DateOnly(anio, 10, 28), null, "Julián Peña Cabrera", "3014455667", [(null, "Sofía Peña", "Colegio San José")], 420_000,
                 EstadoCotizacion.Pendiente));
 
         const string mensajeBase =
@@ -326,9 +340,9 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
         return usuario.Id;
     }
 
-    private static List<ColegioCurso> Cursos(string entrada, string salida, string desde = "Jardín", string hasta = "11°") =>
+    private static List<ColegioCurso> Cursos(string jornada, string entrada, string salida, string desde = "Jardín", string hasta = "11°") =>
         Catalogos.Grados[Catalogos.OrdenGrado(desde)..(Catalogos.OrdenGrado(hasta) + 1)]
-            .Select(g => new ColegioCurso { Grado = g, HoraEntrada = TimeOnly.Parse(entrada), HoraSalida = TimeOnly.Parse(salida) })
+            .Select(g => new ColegioCurso { Grado = g, Jornada = jornada, HoraEntrada = TimeOnly.Parse(entrada), HoraSalida = TimeOnly.Parse(salida) })
             .ToList();
 
     private static Dictionary<string, Colegio> Colegios(Guid idEmpresa)
@@ -338,13 +352,16 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
 
         return new()
         {
-            ["col-1"] = Colegio("891180123-4", "Colegio San Cayetano", "Carrera 5 # 12-40, Neiva", "6088712345", Cursos("06:30", "13:00")),
+            ["col-1"] = Colegio("891180123-4", "Colegio San Cayetano", "Carrera 5 # 12-40, Neiva", "6088712345",
+                [.. Cursos("Mañana", "06:30", "13:00"), .. Cursos("Tarde", "12:30", "18:00", desde: "1°")]),
             ["col-2"] = Colegio("891180234-5", "Colegio Matre Paula", "Calle 21 # 8-15, Neiva", "6088723456",
-                [.. Cursos("06:45", "12:45", hasta: "5°"), .. Cursos("12:30", "18:00", desde: "6°")]),
-            ["col-3"] = Colegio("891180345-6", "Colegio La Gaitana", "Avenida La Toma # 3-20, Neiva", "6088734567", Cursos("07:00", "14:00")),
+                [.. Cursos("Mañana", "06:45", "12:45", hasta: "5°"), .. Cursos("Tarde", "12:30", "18:00", desde: "6°")]),
+            ["col-3"] = Colegio("891180345-6", "Colegio La Gaitana", "Avenida La Toma # 3-20, Neiva", "6088734567",
+                Cursos("Única", "07:00", "14:00")),
             ["col-4"] = Colegio("891180456-7", "Colegio Enrique Olaya Herrera", "Calle 7 # 30-11, Neiva", "6088745678",
-                Cursos("06:30", "12:30", hasta: "5°")),
-            ["col-5"] = Colegio("891180567-8", "Colegio San José", "Carrera 16 # 18-02, Neiva", "6088756789", Cursos("06:20", "13:20")),
+                Cursos("Mañana", "06:30", "12:30", hasta: "5°")),
+            ["col-5"] = Colegio("891180567-8", "Colegio San José", "Carrera 16 # 18-02, Neiva", "6088756789",
+                Cursos("Mañana", "06:20", "13:20")),
         };
     }
 

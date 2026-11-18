@@ -6,16 +6,32 @@ using RutaRola.Domain.Finanzas;
 
 namespace RutaRola.Application.Finanzas;
 
-/// <summary>Pago de una mensualidad (<c>Recibo</c> del frontend, tabla <c>pagos</c>).</summary>
+/// <summary>Valor del recibo aplicado a un mes (<c>YYYY-MM</c>).</summary>
+public record ReciboMesDto(string Periodo, decimal Valor);
+
+/// <summary>
+/// Recibo de pago (<c>Recibo</c> del frontend, tabla <c>pagos</c>). Puede pagar o abonar varios meses: <c>meses</c> dice
+/// cuánto se aplicó a cada uno y <c>periodo</c> es el primero. <c>resumen</c>: "Cancela enero y febrero de 2026; abona …".
+/// </summary>
 public record ReciboDto(
     Guid Id, string Numero, Guid FacturaId, string NumeroFactura, string NombreAcudiente, string NombreEstudiante, string Periodo,
     DateOnly FechaPago, decimal Valor, MetodoPago MedioPago, string Referencia, string Estado, string Observaciones,
-    DateTime FechaCreacion, DateTime? FechaActualizacion);
+    DateTime FechaCreacion, DateTime? FechaActualizacion, IReadOnlyList<ReciboMesDto> Meses);
 
-/// <summary><c>numero</c> y los datos de la factura los pone el servidor.</summary>
+/// <summary>
+/// <c>aplicacion</c>: MESES (paga o abona los <c>periodos</c> elegidos, en orden) o SALDO (abona al saldo de la factura,
+/// los meses más antiguos primero). Compatibilidad: sin <c>aplicacion</c> ni <c>periodos</c>, <c>periodo</c> = un mes.
+/// <c>numero</c> y los datos de la factura los pone el servidor.
+/// </summary>
 public record SolicitudRecibo(
     Guid? FacturaId, string? Periodo, DateOnly? FechaPago, decimal? Valor, MetodoPago? MedioPago, string? Referencia, string? Estado,
-    string? Observaciones);
+    string? Observaciones, AplicacionRecibo? Aplicacion = null, IReadOnlyList<string>? Periodos = null)
+{
+    public AplicacionRecibo AplicacionEfectiva => Aplicacion ?? AplicacionRecibo.Meses;
+
+    public IReadOnlyList<string> PeriodosEfectivos =>
+        Periodos is { Count: > 0 } lista ? lista : !string.IsNullOrWhiteSpace(Periodo) ? [Periodo] : [];
+}
 
 /// <summary><c>desde</c>/<c>hasta</c>: fecha de pago.</summary>
 public record FiltrosRecibo(
@@ -26,7 +42,11 @@ public class ValidadorSolicitudRecibo : AbstractValidator<SolicitudRecibo>
     public ValidadorSolicitudRecibo(TimeProvider reloj)
     {
         RuleFor(x => x.FacturaId).NotEmpty().WithMessage("Selecciona la factura.");
-        RuleFor(x => x.Periodo).PeriodoValido("mes que se paga");
+        RuleFor(x => x.PeriodosEfectivos).NotEmpty().When(x => x.AplicacionEfectiva == AplicacionRecibo.Meses)
+            .WithMessage("Elige al menos un mes a pagar.")
+            .Must(p => p.Count <= 60).WithMessage("Un recibo admite máximo 60 meses.");
+        RuleForEach(x => x.PeriodosEfectivos).Must(p => Periodos.EsValido(p)).When(x => x.AplicacionEfectiva == AplicacionRecibo.Meses)
+            .WithMessage("Indica los meses como AAAA-MM.");
         RuleFor(x => x.FechaPago).NotNull().WithMessage("Ingresa la fecha de pago.")
             .Must(f => f is null || f <= Fechas.Hoy(reloj)).WithMessage("La fecha de pago no puede ser futura.");
         RuleFor(x => x.Valor).NotNull().WithMessage("Ingresa el valor pagado.")
@@ -40,8 +60,10 @@ public class ValidadorSolicitudRecibo : AbstractValidator<SolicitudRecibo>
 }
 
 /// <summary>
-/// Recibos: número consecutivo del servidor; la factura debe estar vigente y el mes dentro de su
-/// periodo; un solo recibo válido por factura y mes (409). Anular = estado INACTIVO.
+/// Recibos: número consecutivo del servidor; la factura debe estar vigente. El valor se reparte en los meses elegidos o en
+/// el saldo de la factura (<see cref="ReglasCuotas.Distribuir"/>): completa los más antiguos y el resto queda como abono, así
+/// un pago parcial deja el mes pendiente con su saldo. No se paga más que el saldo (422). Anular = estado INACTIVO (sus
+/// valores dejan de contar).
 /// </summary>
 public class ServicioRecibos(IBaseDatos db) : ServicioCrud<Pago, ReciboDto, SolicitudRecibo, FiltrosRecibo>(db)
 {
@@ -85,6 +107,8 @@ public class ServicioRecibos(IBaseDatos db) : ServicioCrud<Pago, ReciboDto, Soli
     protected override IOrderedQueryable<Pago> Ordenar(IQueryable<Pago> consulta) =>
         consulta.OrderByDescending(x => x.FechaPago).ThenByDescending(x => x.Numero.Length).ThenByDescending(x => x.Numero).ThenBy(x => x.Id);
 
+    protected override IQueryable<Pago> Incluir(IQueryable<Pago> consulta) => consulta.Include(x => x.Detalle);
+
     protected override string Etiqueta(Pago r) => $"{r.Numero} · {r.NombreEstudiante} · {Periodos.Nombre(r.Periodo ?? r.FechaPago)}";
 
     public static EstadoPago Estado(string? estado) => EstadoRegistro.EsActivo(estado) ? EstadoPago.Vigente : EstadoPago.Anulado;
@@ -92,7 +116,8 @@ public class ServicioRecibos(IBaseDatos db) : ServicioCrud<Pago, ReciboDto, Soli
     public static ReciboDto Mapear(Pago r) => new(
         r.Id, r.Numero, r.IdFactura ?? Guid.Empty, r.NumeroFactura ?? "", r.NombreAcudiente, r.NombreEstudiante, Periodos.Texto(r.Periodo),
         r.FechaPago, r.Valor, r.MetodoPago, r.NumeroReferencia ?? "", EstadoRegistro.Texto(r.Estado == EstadoPago.Vigente),
-        r.Observaciones ?? "", r.FechaCreacion, r.FechaActualizacion);
+        r.Observaciones ?? "", r.FechaCreacion, r.FechaActualizacion,
+        r.Detalle.OrderBy(d => d.Periodo).Select(d => new ReciboMesDto(Periodos.Texto(d.Periodo), d.Valor)).ToList());
 
     protected override Task<IReadOnlyList<ReciboDto>> MapearAsync(IReadOnlyList<Pago> registros, bool detalle, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<ReciboDto>>(registros.Select(Mapear).ToList());
@@ -100,28 +125,24 @@ public class ServicioRecibos(IBaseDatos db) : ServicioCrud<Pago, ReciboDto, Soli
     protected override async Task AplicarAsync(Pago r, SolicitudRecibo s, bool nuevo, CancellationToken ct)
     {
         var factura = await Db.Facturas.FirstOrDefaultAsync(f => f.Id == s.FacturaId, ct) ?? throw ErrorNegocio.NoEncontrado("La factura");
-        var periodo = Periodos.Leer(s.Periodo!);
         var estado = Estado(s.Estado);
+        var valor = Math.Round(s.Valor!.Value, 2);
         if (estado == EstadoPago.Vigente && factura.Estado != EstadoFactura.Vigente)
         {
             throw new ErrorNegocio($"La factura {factura.NumeroFactura} está anulada.", CodigoError.Validacion);
         }
-        if (periodo < factura.PeriodoInicio || periodo > factura.PeriodoFin)
+
+        // Anulado sin cambios de factura ni valor: conserva cómo se había aplicado.
+        var conservar = estado == EstadoPago.Anulado && !nuevo && r.IdFactura == factura.Id && r.Valor == valor && r.Detalle.Count > 0;
+        if (!conservar)
         {
-            throw new ErrorNegocio(
-                $"{Periodos.Nombre(periodo, true)} no está dentro del periodo de la factura {factura.NumeroFactura}.", CodigoError.Validacion);
-        }
-        if (estado == EstadoPago.Vigente)
-        {
-            var idActual = nuevo ? (Guid?)null : r.Id;
-            var repetido = await Db.Pagos.AsNoTracking()
-                .Where(x => x.Id != idActual && x.Estado == EstadoPago.Vigente && x.IdFactura == factura.Id && x.Periodo == periodo)
-                .Select(x => x.Numero).FirstOrDefaultAsync(ct);
-            if (repetido is not null)
-            {
-                throw new ErrorNegocio(
-                    $"{Periodos.Nombre(periodo, true)} de la factura {factura.NumeroFactura} ya está pagado (recibo {repetido}).", CodigoError.Duplicado);
-            }
+            var pagos = await ReglasCuotas.PagosAsync(Db, [factura.Id], ct, nuevo ? null : r.Id);
+            var cuotas = ReglasCuotas.Cuotas(factura, pagos.GetValueOrDefault(factura.Id) ?? []);
+            var meses = s.AplicacionEfectiva == AplicacionRecibo.Meses ? s.PeriodosEfectivos.Select(Periodos.Leer).ToList() : null;
+            var lineas = ReglasCuotas.Distribuir(cuotas, valor, s.AplicacionEfectiva, meses, factura.NumeroFactura);
+            r.Detalle.Clear();
+            r.Detalle.AddRange(lineas.Select(l => new PagoDetalle { Periodo = l.Periodo, Valor = l.Valor }));
+            r.Periodo = lineas[0].Periodo;
         }
 
         if (nuevo)
@@ -137,9 +158,8 @@ public class ServicioRecibos(IBaseDatos db) : ServicioCrud<Pago, ReciboDto, Soli
         }
         r.IdFactura = factura.Id;
         r.IdEstudiante = factura.IdEstudiante;
-        r.Periodo = periodo;
         r.FechaPago = s.FechaPago!.Value;
-        r.Valor = Math.Round(s.Valor!.Value, 2);
+        r.Valor = valor;
         r.MetodoPago = s.MedioPago!.Value;
         r.NumeroReferencia = Texto.Opcional(s.Referencia);
         r.Estado = estado;

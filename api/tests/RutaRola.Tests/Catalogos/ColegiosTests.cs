@@ -48,7 +48,7 @@ public class ColegiosTests(BaseDatosPrueba bd)
 
         var respuesta = await admin.Cliente.PostAsJsonAsync("/api/v1/colegios", solicitud, ClienteApi.Json);
 
-        Assert.Equal("En 5° la hora de salida debe ser posterior a la de entrada.", await respuesta.MensajeErrorAsync(HttpStatusCode.BadRequest));
+        Assert.Equal("En 5° (Única) la hora de salida debe ser posterior a la de entrada.", await respuesta.MensajeErrorAsync(HttpStatusCode.BadRequest));
     }
 
     [Fact]
@@ -69,6 +69,42 @@ public class ColegiosTests(BaseDatosPrueba bd)
         Assert.Equal(["Jardín", "11°"], editado.Cursos.Select(c => c.Grado));
         Assert.Equal(new TimeOnly(8, 0), editado.Cursos[0].HoraEntrada);
         Assert.NotNull(editado.FechaActualizacion);
+    }
+
+    [Fact]
+    public async Task Un_grado_puede_estar_en_varias_jornadas_y_el_estudiante_toma_el_de_su_jornada()
+    {
+        var admin = await bd.AdminNuevoAsync();
+        var colegio = await admin.Cliente.CrearAsync<ColegioDto>("colegios", DatosCatalogos.Colegio(cursos:
+        [
+            new { grado = "3°", jornada = "Tarde", horaEntrada = "12:30", horaSalida = "18:00", estado = "ACTIVO" },
+            new { grado = "3°", jornada = "Mañana", horaEntrada = "06:30", horaSalida = "12:00", estado = "ACTIVO" },
+            new { grado = "4°", horaEntrada = "07:00", horaSalida = "13:00", estado = "ACTIVO" },
+        ]));
+
+        // Ordenados por jornada y grado; sin jornada = Única.
+        Assert.Equal(["3° Mañana", "3° Tarde", "4° Única"], colegio.Cursos.Select(c => $"{c.Grado} {c.Jornada}"));
+
+        var repetido = DatosCatalogos.Colegio(nit: "800111222-3", cursos:
+        [
+            new { grado = "3°", jornada = "Tarde", horaEntrada = "12:30", horaSalida = "18:00", estado = "ACTIVO" },
+            new { grado = "3°", jornada = "Tarde", horaEntrada = "13:00", horaSalida = "18:00", estado = "ACTIVO" },
+        ]);
+        var respuesta = await admin.Cliente.PostAsJsonAsync("/api/v1/colegios", repetido, ClienteApi.Json);
+        Assert.Equal("Cada grado puede aparecer una sola vez por jornada en los cursos.",
+            await respuesta.MensajeErrorAsync(HttpStatusCode.BadRequest));
+
+        // El estudiante de 4° en la Mañana no tiene curso (4° solo es Única).
+        var acudiente = await admin.Cliente.CrearAcudienteAsync();
+        var sinCurso = DatosCatalogos.Estudiante(acudiente.Id, colegio.Id, grado: "4°");
+        var rechazado = await admin.Cliente.PostAsJsonAsync("/api/v1/estudiantes", sinCurso, ClienteApi.Json);
+        Assert.Equal($"El colegio {colegio.RazonSocial} no tiene activo el curso 4° en la jornada Mañana.",
+            await rechazado.MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
+
+        var enLaTarde = DatosCatalogos.Estudiante(acudiente.Id, colegio.Id, grado: "3°");
+        enLaTarde["jornada"] = "Tarde";
+        var creado = await admin.Cliente.PostAsJsonAsync("/api/v1/estudiantes", enLaTarde, ClienteApi.Json);
+        Assert.Equal(HttpStatusCode.Created, creado.StatusCode);
     }
 
     [Fact]

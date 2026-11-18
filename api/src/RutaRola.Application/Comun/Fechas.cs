@@ -7,6 +7,9 @@ public static class Fechas
 
     public static DateOnly Hoy(TimeProvider reloj) => DateOnly.FromDateTime(reloj.GetUtcNow().ToOffset(DesfaseColombia).DateTime);
 
+    /// <summary>Hora actual en Colombia.</summary>
+    public static TimeOnly HoraColombia(TimeProvider reloj) => TimeOnly.FromDateTime(reloj.GetUtcNow().ToOffset(DesfaseColombia).DateTime);
+
     private static readonly string[] Meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic"];
 
     /// <summary><c>5 nov 2026</c>, como <c>fechaCorta</c> del frontend.</summary>

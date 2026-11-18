@@ -82,7 +82,7 @@ public class ServicioCronograma(IBaseDatos db, ParametrosEmpresa parametros, Tim
             .OrderBy(r => r.Jornada, StringComparer.Ordinal).ThenBy(r => r.Codigo, StringComparer.Ordinal)
             .Select(r =>
             {
-                var asignacion = datos.Asignaciones.FirstOrDefault(a => a.IdRuta == r.Id && Cubre(a, d));
+                var asignacion = ReglasAsignacion.Vigente(datos.Asignaciones, r.Id, d);
                 var estudiantes = r.Estudiantes.Where(e => e.Activo).Select(e => e.IdEstudiante).ToHashSet();
                 var trayectos = new[] { Trayecto.Recogida, Trayecto.Entrega }.Select(t =>
                 {
@@ -124,7 +124,7 @@ public class ServicioCronograma(IBaseDatos db, ParametrosEmpresa parametros, Tim
 
     private static string Hora(DateTime? utc) => utc is { } u ? u.Add(Fechas.DesfaseColombia).ToString("HH:mm") : "";
 
-    private static bool Cubre(Domain.Operacion.AsignacionRuta a, DateOnly d) => a.FechaInicio <= d && (a.FechaFin is not { } fin || fin >= d);
+    private static bool Cubre(Domain.Operacion.AsignacionRuta a, DateOnly d) => ReglasAsignacion.Cubre(a, d);
 
     private static IEnumerable<Domain.Operacion.Ruta> RutasDelDia(Datos datos, DateOnly d) =>
         !EsHabil(d) ? [] : datos.Rutas.Where(r => datos.Asignaciones.Any(a => a.IdRuta == r.Id && Cubre(a, d)));
@@ -133,7 +133,7 @@ public class ServicioCronograma(IBaseDatos db, ParametrosEmpresa parametros, Tim
         List<Domain.Operacion.Ruta> Rutas, List<Domain.Operacion.AsignacionRuta> Asignaciones, List<Domain.Operacion.ViajeRuta> Viajes,
         List<Domain.Operacion.AvisoAusencia> Avisos, List<Domain.Operacion.Vehiculo> Vehiculos, List<Domain.Personas.Empleado> Conductores,
         Dictionary<Guid, string> Empleados, Dictionary<Guid, string> Colegios, Dictionary<Guid, string> Estudiantes,
-        Dictionary<Guid, string> Acudientes, List<Domain.Finanzas.Factura> Facturas, HashSet<(Guid, DateOnly?)> Pagados,
+        Dictionary<Guid, string> Acudientes, List<Domain.Finanzas.Factura> Facturas, Dictionary<Guid, List<PagoMes>> Pagados,
         Dictionary<Guid, int> DiaLimite, int DiaLimitePredeterminado, DateOnly Hoy);
 
     private async Task<Datos> LeerAsync(DateOnly desde, DateOnly hasta, CancellationToken ct)
@@ -157,10 +157,7 @@ public class ServicioCronograma(IBaseDatos db, ParametrosEmpresa parametros, Tim
         var facturas = await db.Facturas.AsNoTracking()
             .Where(x => x.Estado == EstadoFactura.Vigente && x.PeriodoInicio <= mesHasta && x.PeriodoFin >= mesDesde).ToListAsync(ct);
         var ids = facturas.Select(x => x.Id).ToList();
-        var pagados = (await db.Pagos.AsNoTracking()
-                .Where(p => p.Estado == EstadoPago.Vigente && p.IdFactura != null && ids.Contains(p.IdFactura.Value))
-                .Select(p => new { p.IdFactura, p.Periodo }).ToListAsync(ct))
-            .Select(p => (p.IdFactura!.Value, p.Periodo)).ToHashSet();
+        var pagados = await ReglasCuotas.PagosAsync(db, ids, ct);
         var diaLimite = await db.ProgramacionesCobro.AsNoTracking().Where(p => ids.Contains(p.IdFactura))
             .ToDictionaryAsync(p => p.IdFactura, p => p.DiaLimitePago, ct);
         return new Datos(
@@ -196,23 +193,27 @@ public class ServicioCronograma(IBaseDatos db, ParametrosEmpresa parametros, Tim
         {
             eventos.Add(new("LICENCIA", nivelVence, "Vence licencia de conducción", c.NombreCompleto, "/operacion/conductores"));
         }
-        // Fecha límite de pago de cada mensualidad (las pagadas no cuentan como pendientes).
+        // Fecha límite de pago de cada mensualidad (sin los meses desde el retiro; las pagadas no cuentan como pendientes y
+        // un abono deja pendiente solo el saldo).
+        var mes = Periodos.De(d);
         var cuotas = datos.Facturas
-            .Where(fa => Periodos.De(d) >= fa.PeriodoInicio && Periodos.De(d) <= fa.PeriodoFin)
-            .Select(fa => (Factura: fa, Limite: Cobro.FechaLimite(Periodos.De(d), datos.DiaLimite.TryGetValue(fa.Id, out var dia) ? dia : null,
+            .Select(fa => (Factura: fa, Cuota: ReglasCuotas.Cuotas(fa, datos.Pagados.GetValueOrDefault(fa.Id) ?? []).FirstOrDefault(c => c.Periodo == mes)))
+            .Where(x => x.Cuota is not null)
+            .Select(x => (x.Factura, Cuota: x.Cuota!, Limite: Cobro.FechaLimite(mes, datos.DiaLimite.TryGetValue(x.Factura.Id, out var dia) ? dia : null,
                 datos.DiaLimitePredeterminado)))
             .Where(x => x.Limite == d).ToList();
         if (cuotas.Count > 0)
         {
-            var pendientes = cuotas.Where(x => !datos.Pagados.Contains((x.Factura.Id, (DateOnly?)Periodos.De(d)))).ToList();
+            var pendientes = cuotas.Where(x => !x.Cuota.Pagada).ToList();
             eventos.Add(new("PAGO", pendientes.Count == 0 ? NivelNotificacion.Informativa : pasado ? NivelNotificacion.Critica : NivelNotificacion.Advertencia,
                 "Fecha límite de pago",
-                $"{Plural(cuotas.Count, "cuota", "cuotas")} · {Plural(pendientes.Count, "pendiente", "pendientes")} · {Cobro.Pesos(pendientes.Sum(x => x.Factura.ValorMensual))}",
+                $"{Plural(cuotas.Count, "cuota", "cuotas")} · {Plural(pendientes.Count, "pendiente", "pendientes")} · {Cobro.Pesos(pendientes.Sum(x => x.Cuota.Saldo))}",
                 "/finanzas/reportes-financieros/facturas-pendientes"));
         }
-        foreach (var fa in datos.Facturas.Where(fa => Periodos.Dia(fa.PeriodoFin, 31) == d))
+        foreach (var fa in datos.Facturas)
         {
-            eventos.Add(new("CONTRATO", NivelNotificacion.Informativa, $"Termina contrato {fa.NumeroFactura}", $"{fa.NombreEstudiante} · {Periodos.Nombre(fa.PeriodoFin)}",
+            if (ReglasCuotas.UltimoMesCobrable(fa.PeriodoInicio, fa.PeriodoFin, fa.PeriodoRetiro) is not { } ultimo || Periodos.Dia(ultimo, 31) != d) continue;
+            eventos.Add(new("CONTRATO", NivelNotificacion.Informativa, $"Termina contrato {fa.NumeroFactura}", $"{fa.NombreEstudiante} · {Periodos.Nombre(ultimo)}",
                 "/finanzas/facturas"));
         }
         foreach (var a in datos.Asignaciones.Where(a => a.FechaFin == d))

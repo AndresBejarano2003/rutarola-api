@@ -26,6 +26,12 @@ public enum EstadoParada { Pendiente, ABordo, Entregado, Ausente }
 /// </summary>
 public enum MotivoAusencia { NoAsiste, PorSuCuenta }
 public enum TipoEvento { Inicio, CambioParada, Reorden, Novedad, Finalizacion, Cancelacion }
+/// <summary>Lo que reporta el conductor o la monitora sobre el vehículo (avería, daño, llantas…).</summary>
+public enum TipoNovedadVehiculo { Averia, Dano, Llantas, Mantenimiento, Limpieza, Documentos, Otro }
+/// <summary>ALTA = afecta la operación o la seguridad (el vehículo no debería salir).</summary>
+public enum GravedadNovedad { Baja, Media, Alta }
+/// <summary>PENDIENTE (recién reportada) → EN_PROCESO (en taller o en revisión) → RESUELTA (con la respuesta).</summary>
+public enum EstadoNovedadVehiculo { Pendiente, EnProceso, Resuelta }
 
 // Finanzas
 public enum EstadoFactura { Vigente, Anulada }
@@ -35,6 +41,8 @@ public enum EstadoCotizacion { Pendiente, Aprobada, Rechazada }
 public enum CanalEnvio { Whatsapp, Email }
 public enum EstadoPlantilla { EnUso, Activo, Inactivo }
 public enum EstadoEnvio { Enviado, Fallido }
+/// <summary>Gastos del vehículo (historial y tablero de Operación › Vehículos).</summary>
+public enum TipoGasto { Combustible, Mantenimiento, Repuesto, Llantas, Lavado, Peaje, Parqueadero, Seguro, Impuesto, Multa, Otro }
 
 // Comunicación
 public enum CategoriaNotificacion { Pagos, Facturacion, Cotizaciones, Vencimientos, Operacion, Personas, Envios, Sistema }

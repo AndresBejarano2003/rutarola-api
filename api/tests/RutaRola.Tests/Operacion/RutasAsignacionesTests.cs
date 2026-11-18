@@ -32,43 +32,54 @@ public class RutasAsignacionesTests(BaseDatosPrueba bd)
         Assert.Empty((await (await c.GetAsync($"/api/v1/rutas?estudianteId={e2.Id}")).LeerAsync<ListaPaginada<RutaDto>>()).Items);
         Assert.Single((await (await c.GetAsync("/api/v1/rutas?texto=granjas&jornada=Mañana")).LeerAsync<ListaPaginada<RutaDto>>()).Items);
         var opciones = await (await c.GetAsync("/api/v1/rutas/opciones")).LeerAsync<List<Opcion>>();
-        Assert.Equal("r-01 · Norte", Assert.Single(opciones).Nombre);
+        Assert.Equal("R-01 · Norte", Assert.Single(opciones).Nombre);
 
         // El estudiante en ruta no se puede eliminar.
         var motivo = await (await c.GetAsync($"/api/v1/estudiantes/{e1.Id}/motivo-no-eliminar")).LeerAsync<RespuestaMotivo>();
-        Assert.Equal("No se puede eliminar: está en la ruta r-01 · Norte. Quítalo de la ruta o cámbialo a Inactivo.", motivo.Motivo);
+        Assert.Equal("No se puede eliminar: está en la ruta R-01 · Norte. Quítalo de la ruta o cámbialo a Inactivo.", motivo.Motivo);
     }
 
     [Fact]
-    public async Task Valida_codigo_unico_colegio_de_los_estudiantes_y_choque_de_jornada()
+    public async Task El_codigo_es_un_consecutivo_del_servidor_y_valida_colegio_jornada_y_choques()
     {
         var admin = await bd.AdminNuevoAsync();
         var c = admin.Cliente;
         var (colegio, acudiente, estudiante) = await c.CrearEstudianteAsync();
-        await c.CrearAsync<RutaDto>("rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id], "R-01"));
+        // El código que envíe el cliente se ignora: el servidor asigna R-01, R-02…
+        var primera = await c.CrearAsync<RutaDto>("rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id], "X-99"));
+        Assert.Equal("R-01", primera.Codigo);
+        var segunda = await c.CrearAsync<RutaDto>("rutas", DatosOperacion.Ruta(colegio.Id, [], "R-01"));
+        Assert.Equal("R-02", segunda.Codigo);
+        // Editar no cambia el código.
+        var editada = await (await c.PutAsJsonAsync($"/api/v1/rutas/{segunda.Id}", DatosOperacion.Ruta(colegio.Id, [], "Z-1"), ClienteApi.Json))
+            .LeerAsync<RutaDto>();
+        Assert.Equal("R-02", editada.Codigo);
 
-        var duplicada = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(colegio.Id, [], "r-01"), ClienteApi.Json);
-        Assert.Equal("Ya existe una ruta con el código r-01.", await duplicada.MensajeErrorAsync(HttpStatusCode.Conflict));
-
-        var choque = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id], "R-02"), ClienteApi.Json);
+        var choque = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id]), ClienteApi.Json);
         Assert.Equal("Uno o más estudiantes ya están en la ruta R-01 · Norte (jornada Mañana). Quítalos de esa ruta primero.",
             await choque.MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
-        // Otra jornada o la ruta inactiva sí se permiten.
-        await c.CrearAsync<RutaDto>("rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id], "R-03", jornada: "Tarde"));
-        await c.CrearAsync<RutaDto>("rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id], "R-04", estado: "INACTIVO"));
+        // La ruta inactiva sí se permite.
+        await c.CrearAsync<RutaDto>("rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id], estado: "INACTIVO"));
+
+        // Un estudiante de la Mañana no va en una ruta de la Tarde.
+        var otraJornada = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id], jornada: "Tarde"), ClienteApi.Json);
+        Assert.Equal($"La ruta es de la jornada Tarde y estos estudiantes son de otra: {estudiante.PrimerNombre} {estudiante.PrimerApellido} (Mañana).",
+            await otraJornada.MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
+        var deLaTarde = await c.GetAsync($"/api/v1/estudiantes/opciones?colegioId={colegio.Id}&jornada=Tarde");
+        Assert.Empty(await deLaTarde.LeerAsync<List<Opcion>>());
 
         var otroColegio = await c.CrearColegioAsync();
-        var mal = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(otroColegio.Id, [estudiante.Id], "R-05", jornada: "Única"), ClienteApi.Json);
+        var mal = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(otroColegio.Id, [estudiante.Id], jornada: "Mañana"), ClienteApi.Json);
         Assert.Equal("Todos los estudiantes de la ruta deben ser del Colegio San Cayetano.", await mal.MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
 
-        var inexistente = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(colegio.Id, [Guid.NewGuid()], "R-06"), ClienteApi.Json);
+        var inexistente = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(colegio.Id, [Guid.NewGuid()]), ClienteApi.Json);
         Assert.Equal("Uno o más estudiantes no existen o fueron eliminados.", await inexistente.MensajeErrorAsync(HttpStatusCode.NotFound));
 
-        var invalida = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(colegio.Id, [], "R 07", jornada: "Madrugada"), ClienteApi.Json);
+        var invalida = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(colegio.Id, [], jornada: "Madrugada"), ClienteApi.Json);
         Assert.Equal(HttpStatusCode.BadRequest, invalida.StatusCode);
         var errores = JsonDocument.Parse(await invalida.Content.ReadAsStringAsync()).RootElement.GetProperty("errors");
-        Assert.True(errores.TryGetProperty("codigo", out _));
         Assert.True(errores.TryGetProperty("jornada", out _));
+        _ = acudiente;
     }
 
     [Fact]
@@ -143,23 +154,81 @@ public class RutasAsignacionesTests(BaseDatosPrueba bd)
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/v1/asignaciones",
             DatosOperacion.Asignacion(ruta.Id, vehiculo.Id, conductor.Id, null, "2026-05-10", "2026-05-01"), ClienteApi.Json)).StatusCode);
 
-        // Cruces: una activa por ruta; nadie en dos rutas de la misma jornada.
+        // Cruces: la ruta no tiene dos asignaciones que se crucen; nadie en dos asignaciones que se crucen.
         await c.CrearAsync<AsignacionDto>("asignaciones", DatosOperacion.Asignacion(ruta.Id, vehiculo.Id, conductor.Id, monitora.Id));
-        Assert.Equal("La ruta R-01 · Norte ya tiene una asignación activa. Inactívala primero.",
+        var desde = DatosOperacion.Hoy.AddDays(-30).ToString("yyyy-MM-dd");
+        Assert.Equal($"La ruta R-01 · Norte ya tiene una asignación activa desde el {desde} que se cruza. Cambia las fechas o el horario, o inactívala primero.",
             await Falla(DatosOperacion.Asignacion(ruta.Id, vehiculo.Id, conductor.Id, null), HttpStatusCode.Conflict));
         var (colegio2, _, e3) = await c.CrearEstudianteAsync();
         var ruta2 = await c.CrearAsync<RutaDto>("rutas", DatosOperacion.Ruta(colegio2.Id, [e3.Id], "R-02"));
         var otroConductor = await c.CrearAsync<EmpleadoDto>("empleados", DatosCatalogos.Empleado(ClienteApi.Unico("o")));
         var otroVehiculo = await c.CrearAsync<VehiculoDto>("vehiculos", DatosCatalogos.Vehiculo("OTR456", "4"));
-        Assert.Equal("El vehículo ya cubre la ruta R-01 · Norte en la jornada Mañana.",
+        Assert.Equal($"El vehículo ABC123 ya cubre la ruta R-01 · Norte desde el {desde}.",
             await Falla(DatosOperacion.Asignacion(ruta2.Id, vehiculo.Id, otroConductor.Id, null), HttpStatusCode.Conflict));
-        Assert.Equal("José Luis Cárdenas ya está asignado a la ruta R-01 · Norte en la jornada Mañana.",
+        Assert.Equal($"José Luis Cárdenas ya está asignado a la ruta R-01 · Norte desde el {desde}.",
             await Falla(DatosOperacion.Asignacion(ruta2.Id, otroVehiculo.Id, conductor.Id, null), HttpStatusCode.Conflict));
-        Assert.Equal("José Luis Cárdenas ya está asignada a la ruta R-01 · Norte en la jornada Mañana.",
+        Assert.Equal($"José Luis Cárdenas ya está asignada a la ruta R-01 · Norte desde el {desde}.",
             await Falla(DatosOperacion.Asignacion(ruta2.Id, otroVehiculo.Id, otroConductor.Id, monitora.Id), HttpStatusCode.Conflict));
         // Inactiva no choca.
         await c.CrearAsync<AsignacionDto>("asignaciones",
             DatosOperacion.Asignacion(ruta2.Id, vehiculo.Id, conductor.Id, null, estado: "INACTIVO"));
+    }
+
+    [Fact]
+    public async Task Una_ruta_tiene_varias_asignaciones_en_semanas_u_horarios_distintos_sin_cruces()
+    {
+        var admin = await bd.AdminNuevoAsync();
+        var c = admin.Cliente;
+        var (colegio, _, estudiante) = await c.CrearEstudianteAsync();
+        var ruta = await c.CrearAsync<RutaDto>("rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id]));
+        var vehiculo1 = await c.CrearAsync<VehiculoDto>("vehiculos", DatosCatalogos.Vehiculo(DatosOperacion.Placa(), "11"));
+        var vehiculo2 = await c.CrearAsync<VehiculoDto>("vehiculos", DatosCatalogos.Vehiculo(DatosOperacion.Placa(), "12"));
+        var conductor1 = await c.CrearAsync<EmpleadoDto>("empleados", DatosCatalogos.Empleado(ClienteApi.Unico("a")));
+        var conductor2 = await c.CrearAsync<EmpleadoDto>("empleados", DatosCatalogos.Empleado(ClienteApi.Unico("b")));
+        var lunes = DatosOperacion.Hoy.AddDays(1);
+        string Dia(int n) => lunes.AddDays(n).ToString("yyyy-MM-dd");
+
+        async Task<HttpResponseMessage> Crear(Dictionary<string, object?> s) => await c.PostAsJsonAsync("/api/v1/asignaciones", s, ClienteApi.Json);
+
+        // Semana 1: vehículo 1 + conductor 1; semana 2: vehículo 2 + conductor 2.
+        var semana1 = await (await Crear(DatosOperacion.Asignacion(ruta.Id, vehiculo1.Id, conductor1.Id, null, Dia(0), Dia(6))))
+            .LeerAsync<AsignacionDto>(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, (await Crear(DatosOperacion.Asignacion(ruta.Id, vehiculo2.Id, conductor2.Id, null, Dia(7), Dia(13)))).StatusCode);
+        // Se cruza con la semana 2 (sin horario = toda la jornada).
+        Assert.Equal(HttpStatusCode.Conflict, (await Crear(DatosOperacion.Asignacion(ruta.Id, vehiculo1.Id, conductor1.Id, null, Dia(13), Dia(20)))).StatusCode);
+
+        // El mismo rango de fechas con horas distintas sí se puede, siempre que la ruta tenga horario en ambas.
+        var conHorario = DatosOperacion.Asignacion(ruta.Id, vehiculo1.Id, conductor1.Id, null, Dia(0), Dia(6), horaInicio: "05:30", horaFin: "08:00");
+        var editada = await (await c.PutAsJsonAsync($"/api/v1/asignaciones/{semana1.Id}", conHorario, ClienteApi.Json)).LeerAsync<AsignacionDto>();
+        Assert.Equal(new TimeOnly(5, 30), editada.HoraInicio);
+        var tarde = await Crear(DatosOperacion.Asignacion(ruta.Id, vehiculo2.Id, conductor2.Id, null, Dia(0), Dia(6), horaInicio: "12:00", horaFin: "14:30"));
+        Assert.Equal(HttpStatusCode.Created, tarde.StatusCode);
+        var json = JsonDocument.Parse(await tarde.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal("12:00", json.GetProperty("horaInicio").GetString());
+
+        // Horas que se cruzan con la de la mañana: 409 con el periodo de la otra.
+        var cruce = await Crear(DatosOperacion.Asignacion(ruta.Id, vehiculo2.Id, conductor2.Id, null, Dia(2), Dia(3), horaInicio: "07:00", horaFin: "09:00"));
+        Assert.Equal($"La ruta {ruta.Codigo} · Norte ya tiene una asignación activa del {Dia(0)} al {Dia(6)}, 05:30–08:00 que se cruza. Cambia las fechas o el horario, o inactívala primero.",
+            await cruce.MensajeErrorAsync(HttpStatusCode.Conflict));
+
+        // El conductor de la mañana no puede estar en otra ruta a la misma hora, pero sí en otro horario.
+        var (colegio2, _, e2) = await c.CrearEstudianteAsync();
+        var ruta2 = await c.CrearAsync<RutaDto>("rutas", DatosOperacion.Ruta(colegio2.Id, [e2.Id]));
+        var vehiculo3 = await c.CrearAsync<VehiculoDto>("vehiculos", DatosCatalogos.Vehiculo(DatosOperacion.Placa(), "13"));
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await Crear(DatosOperacion.Asignacion(ruta2.Id, vehiculo3.Id, conductor1.Id, null, Dia(1), Dia(1), horaInicio: "07:30", horaFin: "09:00"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created,
+            (await Crear(DatosOperacion.Asignacion(ruta2.Id, vehiculo3.Id, conductor1.Id, null, Dia(1), Dia(1), horaInicio: "08:00", horaFin: "09:00"))).StatusCode);
+
+        // Horario a medias o al revés: 400.
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Crear(DatosOperacion.Asignacion(ruta.Id, vehiculo1.Id, conductor1.Id, null, Dia(30), Dia(31), horaInicio: "07:00"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Crear(DatosOperacion.Asignacion(ruta.Id, vehiculo1.Id, conductor1.Id, null, Dia(30), Dia(31), horaInicio: "09:00", horaFin: "07:00"))).StatusCode);
+
+        // Filtro por fecha: las dos del primer lunes.
+        var delDia = await (await c.GetAsync($"/api/v1/asignaciones?rutaId={ruta.Id}&fecha={Dia(0)}")).LeerAsync<ListaPaginada<AsignacionDto>>();
+        Assert.Equal(2, delDia.Total);
     }
 
     [Fact]

@@ -7,7 +7,17 @@ namespace RutaRola.Api.Controllers;
 
 /// <summary>Contratos mensuales (<c>finanzas/facturas/facturas-http.ts</c>).</summary>
 [PermisosCrud(Permisos.FacturasLeer, Permisos.FacturasGestionar)]
-public class FacturasController(ServicioFacturas servicio) : ControladorCrud<FacturaDto, SolicitudFactura, FiltrosFactura>(servicio);
+public class FacturasController(ServicioFacturas servicio) : ControladorCrud<FacturaDto, SolicitudFactura, FiltrosFactura>(servicio)
+{
+    /// <summary>Cuotas de la factura (valor, pagado, saldo y fecha límite por mes). <c>sinRecibo</c>: sin contar ese recibo (al editarlo).</summary>
+    [HttpGet("{id:guid}/cuotas")]
+    public Task<IReadOnlyList<CuotaFacturaDto>> Cuotas(Guid id, [FromQuery] Guid? sinRecibo, CancellationToken ct) =>
+        servicio.CuotasAsync(id, sinRecibo, ct);
+
+    /// <summary>Retiro: desde <c>periodoRetiro</c> ya no se cobra (<c>""</c> lo quita).</summary>
+    [HttpPut("{id:guid}/retiro")]
+    public Task<FacturaDto> Retiro(Guid id, SolicitudRetiro solicitud, CancellationToken ct) => servicio.RetiroAsync(id, solicitud, ct);
+}
 
 /// <summary>Pagos de las mensualidades (<c>finanzas/recibos/recibos-http.ts</c>).</summary>
 [PermisosCrud(Permisos.PagosLeer, Permisos.PagosGestionar)]
@@ -16,7 +26,14 @@ public class RecibosController(ServicioRecibos servicio) : ControladorCrud<Recib
 /// <summary>Cotizaciones (<c>finanzas/cotizaciones/cotizaciones-http.ts</c>).</summary>
 [PermisosCrud(Permisos.CotizacionesLeer, Permisos.CotizacionesGestionar)]
 public class CotizacionesController(ServicioCotizaciones servicio)
-    : ControladorCrud<CotizacionDto, SolicitudCotizacion, FiltrosCotizacion>(servicio);
+    : ControladorCrud<CotizacionDto, SolicitudCotizacion, FiltrosCotizacion>(servicio)
+{
+    /// <summary>Aprueba y crea una factura por estudiante (necesita <c>facturas.gestionar</c> además de cotizaciones).</summary>
+    [HttpPost("{id:guid}/facturar")]
+    [RequierePermiso(Permisos.FacturasGestionar)]
+    public Task<ResultadoFacturacion> Facturar(Guid id, SolicitudFacturarCotizacion solicitud, CancellationToken ct) =>
+        servicio.FacturarAsync(id, solicitud, ct);
+}
 
 /// <summary>Recordatorios automáticos de cobro (<c>finanzas/programacion/programaciones-http.ts</c>).</summary>
 [PermisosCrud(Permisos.ProgramacionesLeer, Permisos.ProgramacionesGestionar)]

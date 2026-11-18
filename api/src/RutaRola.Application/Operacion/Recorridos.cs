@@ -38,7 +38,7 @@ public record CompaneroDto(string Nombre, string Telefono, TipoEmpleado Rol, str
 public record RutaAsignadaDto(
     Guid AsignacionId, Guid RutaId, string Ruta, string Jornada, string Sector, string Colegio, string DireccionColegio,
     string Vehiculo, TipoEmpleado Rol, CompaneroDto? Companero, int Estudiantes, IReadOnlyList<ResumenRecorridoDto> Recorridos,
-    int AvisosAusencia = 0);
+    int AvisosAusencia = 0, string Horario = "");
 
 public record SolicitudIniciarRecorrido(Guid? AsignacionId, Trayecto? Trayecto);
 
@@ -152,9 +152,12 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
                     otro is null ? null : new CompaneroDto(otro.NombreCompleto, otro.Telefono, otro.TipoEmpleado, otro.Foto ?? ""),
                     a.Ruta.Estudiantes.Count,
                     recorridos.Where(v => v.IdAsignacion == a.Id).OrderBy(v => v.Trayecto).Select(Resumir).ToList(),
-                    a.Ruta.Estudiantes.Count(e => conAviso.Contains(e.IdEstudiante)));
+                    a.Ruta.Estudiantes.Count(e => conAviso.Contains(e.IdEstudiante)),
+                    ReglasAsignacion.Horario(a.HoraInicio, a.HoraFin));
             })
-            .OrderBy(r => Catalogos.OrdenJornada(r.Jornada)).ThenBy(r => r.Ruta, StringComparer.Create(new("es-CO"), false))
+            // Turnos con horario en orden de hora; luego por jornada y ruta.
+            .OrderBy(r => r.Horario.Length == 0 ? "99" : r.Horario, StringComparer.Ordinal)
+            .ThenBy(r => Catalogos.OrdenJornada(r.Jornada)).ThenBy(r => r.Ruta, StringComparer.Create(new("es-CO"), false))
             .ToList();
     }
 

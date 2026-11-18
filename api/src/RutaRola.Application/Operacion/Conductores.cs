@@ -41,8 +41,11 @@ public class ServicioConductores(IBaseDatos db, TimeProvider reloj, ParametrosEm
         var conductores = await consulta.OrdenarPorApellido().ToListAsync(ct);
 
         var ids = conductores.Select(c => c.Id).ToList();
+        var hoy = Fechas.Hoy(reloj);
+        // La asignación que cubre hoy (o la próxima, si aún no empieza); varias por ruta en fechas u horarios distintos.
         var asignaciones = await db.AsignacionesRuta.AsNoTracking()
-            .Where(a => a.Activo && ids.Contains(a.IdConductor))
+            .Where(a => a.Activo && ids.Contains(a.IdConductor) && (a.FechaFin == null || a.FechaFin >= hoy))
+            .OrderBy(a => a.FechaInicio > hoy).ThenBy(a => a.FechaInicio).ThenBy(a => a.HoraInicio)
             .Select(a => new
             {
                 a.Id, a.IdConductor, Ruta = a.Ruta.Codigo + " · " + a.Ruta.Nombre, a.Ruta.Jornada,
@@ -51,7 +54,6 @@ public class ServicioConductores(IBaseDatos db, TimeProvider reloj, ParametrosEm
             })
             .ToListAsync(ct);
 
-        var hoy = Fechas.Hoy(reloj);
         var diasAlerta = await parametros.DiasAlertaVencimientoAsync(ct);
         var todos = conductores.Select(e =>
         {

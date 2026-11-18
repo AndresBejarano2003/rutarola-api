@@ -18,7 +18,8 @@ public record SolicitudEstudiante(
 
 /// <summary><c>acudienteId</c> encuentra a los estudiantes de ese acudiente (principal o no).</summary>
 public record FiltrosEstudiante(
-    string? Texto = null, Guid? AcudienteId = null, Guid? ColegioId = null, string? Grado = null, string? Estado = null);
+    string? Texto = null, Guid? AcudienteId = null, Guid? ColegioId = null, string? Grado = null, string? Estado = null,
+    string? Jornada = null);
 
 public class ValidadorSolicitudEstudiante : AbstractValidator<SolicitudEstudiante>
 {
@@ -44,7 +45,7 @@ public class ValidadorSolicitudEstudiante : AbstractValidator<SolicitudEstudiant
 /// deben ser de la misma empresa (404 si no); el grado debe ser un curso activo del colegio; no se
 /// elimina si está en una ruta o tiene facturas.
 /// </summary>
-public class ServicioEstudiantes(IBaseDatos db, Suscripciones.ServicioSuscripcion suscripcion) : ServicioCrud<Estudiante, EstudianteDto, SolicitudEstudiante, FiltrosEstudiante>(db)
+public class ServicioEstudiantes(IBaseDatos db, Suscripciones.ServicioSuscripcion suscripcion, TimeProvider reloj) : ServicioCrud<Estudiante, EstudianteDto, SolicitudEstudiante, FiltrosEstudiante>(db)
 {
     protected override string Entidad => "El estudiante";
     protected override DbSet<Estudiante> Conjunto => Db.Estudiantes;
@@ -63,6 +64,10 @@ public class ServicioEstudiantes(IBaseDatos db, Suscripciones.ServicioSuscripcio
         if (Texto.Opcional(f.Grado) is { } grado)
         {
             consulta = consulta.Where(e => e.Grado == grado);
+        }
+        if (Texto.Opcional(f.Jornada) is { } jornada)
+        {
+            consulta = consulta.Where(e => e.Jornada == jornada);
         }
         if (Texto.Opcional(f.Estado) is { } estado)
         {
@@ -98,10 +103,13 @@ public class ServicioEstudiantes(IBaseDatos db, Suscripciones.ServicioSuscripcio
             throw ErrorNegocio.NoEncontrado("El acudiente");
         }
         var grado = s.Grado!.Trim();
-        var cambioCurso = nuevo || e.IdColegio != colegio.Id || e.Grado != grado;
-        if (cambioCurso && !colegio.Cursos.Any(c => c.Grado == grado && c.Activo))
+        var jornada = s.Jornada!.Trim();
+        // El curso es grado + jornada: se revisa al crear o al cambiar colegio, grado o jornada.
+        var cambioCurso = nuevo || e.IdColegio != colegio.Id || e.Grado != grado || e.Jornada != jornada;
+        if (cambioCurso && !colegio.Cursos.Any(c => c.Grado == grado && c.Jornada == jornada && c.Activo))
         {
-            throw new ErrorNegocio($"El colegio {colegio.RazonSocial} no tiene activo el curso {grado}.", CodigoError.Validacion);
+            throw new ErrorNegocio(
+                $"El colegio {colegio.RazonSocial} no tiene activo el curso {grado} en la jornada {jornada}.", CodigoError.Validacion);
         }
 
         e.Aplicar(s);
@@ -109,11 +117,16 @@ public class ServicioEstudiantes(IBaseDatos db, Suscripciones.ServicioSuscripcio
         e.Direccion = s.Direccion!.Trim();
         e.IdColegio = colegio.Id;
         e.Grado = grado;
-        e.Jornada = s.Jornada!.Trim();
+        e.Jornada = jornada;
         // Activar uno más no puede superar el límite del plan (los ya activos se conservan).
         if (EstadoRegistro.EsActivo(s.Estado) && (nuevo || !e.Activo))
         {
             await suscripcion.ValidarEstudianteAsync(nuevo ? null : e.Id, ct);
+        }
+        // Retiro: al inactivarlo, sus facturas vigentes dejan de cobrar los meses que faltan.
+        if (!nuevo && e.Activo && !EstadoRegistro.EsActivo(s.Estado))
+        {
+            await Finanzas.ServicioFacturas.RetirarAsync(Db, e.Id, null, Fechas.Hoy(reloj), "Retiro del estudiante (quedó inactivo).", ct);
         }
         e.Activo = EstadoRegistro.EsActivo(s.Estado);
         e.Observaciones = Texto.Opcional(s.Observaciones);

@@ -29,19 +29,21 @@ public class ReportesTableroTests(BaseDatosPrueba bd)
         var c = admin.Cliente;
         await c.CrearAsync<ReciboDto>("recibos", DatosFinanzas.Recibo(factura.Id, DatosFinanzas.Periodo(-3), 400000, "EFECTIVO"));
 
+        // 400 000 de 420 000: el mes queda pendiente con saldo de 20 000 (abono).
         var pendientes = await (await c.GetAsync("/api/v1/reportes/facturas-pendientes")).LeerAsync<List<CuotaPendienteDto>>();
-        Assert.Equal([DatosFinanzas.Periodo(-2), DatosFinanzas.Periodo()], pendientes.Select(p => p.Periodo));
-        Assert.True(pendientes[0].DiasMora > 0);
-        Assert.True(pendientes[1].DiasMora <= 0);
+        Assert.Equal([DatosFinanzas.Periodo(-3), DatosFinanzas.Periodo(-2), DatosFinanzas.Periodo()], pendientes.Select(p => p.Periodo));
+        Assert.Equal((20000m, 420000m, 400000m), (pendientes[0].Valor, pendientes[0].ValorMes, pendientes[0].Abonado));
+        Assert.True(pendientes[1].DiasMora > 0);
+        Assert.True(pendientes[2].DiasMora <= 0);
         var limite = DatosOperacion.Hoy.AddMonths(-2);
-        Assert.Equal(new DateOnly(limite.Year, limite.Month, DateTime.DaysInMonth(limite.Year, limite.Month)), pendientes[0].FechaLimite);
-        Assert.Single(await (await c.GetAsync("/api/v1/reportes/facturas-pendientes?situacion=VENCIDAS&texto=juan")).LeerAsync<List<CuotaPendienteDto>>());
+        Assert.Equal(new DateOnly(limite.Year, limite.Month, DateTime.DaysInMonth(limite.Year, limite.Month)), pendientes[1].FechaLimite);
+        Assert.Equal(2, (await (await c.GetAsync("/api/v1/reportes/facturas-pendientes?situacion=VENCIDAS&texto=juan")).LeerAsync<List<CuotaPendienteDto>>()).Count);
         Assert.Single(await (await c.GetAsync("/api/v1/reportes/facturas-pendientes?situacion=POR_VENCER")).LeerAsync<List<CuotaPendienteDto>>());
 
         var moroso = Assert.Single(await (await c.GetAsync("/api/v1/reportes/morosos")).LeerAsync<List<MorosoDto>>());
-        Assert.Equal(("María Pérez López", "3001234567", 1, 420000m), (moroso.NombreAcudiente, moroso.Telefono, moroso.Cuotas, moroso.ValorAdeudado));
+        Assert.Equal(("María Pérez López", "3001234567", 2, 440000m), (moroso.NombreAcudiente, moroso.Telefono, moroso.Cuotas, moroso.ValorAdeudado));
         Assert.Equal([factura.Numero], moroso.Facturas);
-        Assert.Empty(await (await c.GetAsync("/api/v1/reportes/morosos?diasMinimos=90")).LeerAsync<List<MorosoDto>>());
+        Assert.Empty(await (await c.GetAsync("/api/v1/reportes/morosos?diasMinimos=200")).LeerAsync<List<MorosoDto>>());
 
         var mes = DatosFinanzas.Periodo();
         var ingresos = await (await c.GetAsync($"/api/v1/reportes/ingresos?desde={mes}&hasta={mes}")).LeerAsync<ReporteIngresosDto>();
@@ -62,7 +64,8 @@ public class ReportesTableroTests(BaseDatosPrueba bd)
         var t = await (await c.GetAsync("/api/v1/tablero")).LeerAsync<TableroDto>();
         Assert.Equal(DatosFinanzas.Periodo(), t.Periodo);
         Assert.Equal(new RecaudoDto(410000, 420000, 1, 420000), t.Recaudo);
-        Assert.Equal(new CarteraDto(840000, 2, 1, 0), t.Cartera);
+        // 410 000 de 420 000 este mes: quedan 10 000 por vencer.
+        Assert.Equal(new CarteraDto(840000, 2, 1, 10000), t.Cartera);
         Assert.Equal(new EstudiantesTableroDto(1, 1, 1, 1), t.Estudiantes);
         Assert.Equal(new OperacionTableroDto(0, 0, 0, 0, null), t.Operacion);
         Assert.Equal(["mora", "sin-ruta"], t.Pendientes.Select(p => p.Id));

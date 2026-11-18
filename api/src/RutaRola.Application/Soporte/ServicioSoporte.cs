@@ -139,7 +139,11 @@ public class ServicioSoporte(IBaseDatos db, IContextoUsuario contexto, AvisosSop
             var comentario = Texto.Opcional(s.Comentario);
             if (comentario is null && ReglasTicket.RequiereComentario(t.Estado, hacia))
             {
-                throw new ErrorNegocio("Explica el motivo del cambio: la empresa lo verá en el historial.", CodigoError.Validacion);
+                throw new ErrorNegocio(
+                    hacia == EstadoTicket.Cerrado
+                        ? "Justifica por qué terminas el ticket: la empresa lo verá en el historial."
+                        : "Explica el motivo del cambio: la empresa lo verá en el historial.",
+                    CodigoError.Validacion);
             }
             Cambiar(t, hacia, comentario, plataforma: true, nombre);
             return new Aviso(true, hacia switch
@@ -148,6 +152,7 @@ public class ServicioSoporte(IBaseDatos db, IContextoUsuario contexto, AvisosSop
                 EstadoTicket.ValidacionCliente => "Valida la solución, por favor",
                 EstadoTicket.Resuelto => "Tu solicitud fue resuelta",
                 EstadoTicket.Rechazado => "Tu solicitud no procede",
+                EstadoTicket.Cerrado => "Tu solicitud se cerró",
                 _ => $"Tu solicitud pasó a: {ReglasTicket.Nombre(hacia)}",
             }, comentario ?? "");
         }, ct);

@@ -68,10 +68,12 @@ public class RutaRolaDbContext(
     // Finanzas
     public DbSet<Factura> Facturas => Set<Factura>();
     public DbSet<FacturaDetalle> FacturasDetalle => Set<FacturaDetalle>();
+    public DbSet<PagoDetalle> PagosDetalle => Set<PagoDetalle>();
     public DbSet<Pago> Pagos => Set<Pago>();
     public DbSet<Cotizacion> Cotizaciones => Set<Cotizacion>();
     public DbSet<CotizacionEstudiante> CotizacionesEstudiantes => Set<CotizacionEstudiante>();
     public DbSet<Gasto> Gastos => Set<Gasto>();
+    public DbSet<NovedadVehiculo> NovedadesVehiculo => Set<NovedadVehiculo>();
     public DbSet<ProgramacionCobro> ProgramacionesCobro => Set<ProgramacionCobro>();
     public DbSet<PlantillaMensaje> PlantillasMensaje => Set<PlantillaMensaje>();
     public DbSet<PlantillaMensajeArchivo> PlantillasMensajeArchivos => Set<PlantillaMensajeArchivo>();
@@ -151,6 +153,7 @@ public class RutaRolaDbContext(
         modelBuilder.Entity<Evento>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Viaje.Ruta.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<GpsVehiculo>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Vehiculo.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<FacturaDetalle>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Factura.IdEmpresa == IdEmpresaActual);
+        modelBuilder.Entity<PagoDetalle>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Pago.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<CotizacionEstudiante>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Cotizacion.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<PlantillaMensaje>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Programacion.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<PlantillaMensajeArchivo>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Plantilla.Programacion.IdEmpresa == IdEmpresaActual);

@@ -17,6 +17,9 @@ internal class FacturaConfig : IEntityTypeConfiguration<Factura>
         b.Property(x => x.ValorTotal).HasColumnType(Dinero);
         b.Property(x => x.Concepto).HasMaxLength(200);
         b.Property(x => x.UrlPdf).HasMaxLength(500);
+        b.Property(x => x.MotivoRetiro).HasMaxLength(300);
+        b.HasOne(x => x.Cotizacion).WithMany().HasForeignKey(x => x.IdCotizacion);
+        b.HasIndex(x => x.IdCotizacion);
         b.HasOne(x => x.Acudiente).WithMany().HasForeignKey(x => x.IdAcudiente);
         b.HasOne(x => x.Estudiante).WithMany().HasForeignKey(x => x.IdEstudiante);
         b.HasIndex(x => new { x.IdEmpresa, x.NumeroFactura }).IsUnique();
@@ -51,11 +54,21 @@ internal class PagoConfig : IEntityTypeConfiguration<Pago>
         b.HasOne(x => x.Estudiante).WithMany().HasForeignKey(x => x.IdEstudiante);
         b.HasOne(x => x.Factura).WithMany().HasForeignKey(x => x.IdFactura);
         b.HasIndex(x => new { x.IdEmpresa, x.Numero }).IsUnique();
-        // Un solo recibo vigente por factura y mes.
-        b.HasIndex(x => new { x.IdFactura, x.Periodo }).IsUnique()
-            .HasFilter("estado = 'VIGENTE' AND id_factura IS NOT NULL").HasDatabaseName("ix_pagos_vigente_por_periodo");
         b.HasIndex(x => x.IdFactura);
         b.HasIndex(x => new { x.IdEmpresa, x.FechaPago });
+    }
+}
+
+internal class PagoDetalleConfig : IEntityTypeConfiguration<PagoDetalle>
+{
+    public void Configure(EntityTypeBuilder<PagoDetalle> b)
+    {
+        b.ToTable("pagos_detalle");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Id).HasColumnName("id_pago_detalle").ValueGeneratedNever();
+        b.Property(x => x.Valor).HasColumnType(Dinero);
+        b.HasOne(x => x.Pago).WithMany(p => p.Detalle).HasForeignKey(x => x.IdPago).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(x => new { x.IdPago, x.Periodo }).IsUnique();
     }
 }
 
@@ -67,7 +80,7 @@ internal class CotizacionConfig : IEntityTypeConfiguration<Cotizacion>
         b.Property(x => x.Numero).HasMaxLength(20);
         b.Property(x => x.NombreAcudiente).HasMaxLength(200);
         b.Property(x => x.TelefonoAcudiente).HasMaxLength(20);
-        b.Property(x => x.ValorPorEstudiante).HasColumnType(Dinero);
+        b.Property(x => x.ValorMensual).HasColumnType(Dinero);
         b.Property(x => x.ValorTotal).HasColumnType(Dinero);
         b.HasOne(x => x.Acudiente).WithMany().HasForeignKey(x => x.IdAcudiente);
         b.HasIndex(x => new { x.IdEmpresa, x.Numero }).IsUnique();
@@ -82,6 +95,9 @@ internal class CotizacionEstudianteConfig : IEntityTypeConfiguration<CotizacionE
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id_cotizacion_estudiante").ValueGeneratedNever();
         b.Property(x => x.Nombre).HasMaxLength(200);
+        b.Property(x => x.NombreColegio).HasMaxLength(200);
+        b.Property(x => x.Valor).HasColumnType(Dinero);
+        b.HasOne(x => x.Colegio).WithMany().HasForeignKey(x => x.IdColegio);
         b.HasOne(x => x.Cotizacion).WithMany(c => c.Estudiantes).HasForeignKey(x => x.IdCotizacion).OnDelete(DeleteBehavior.Cascade);
         b.HasOne(x => x.Estudiante).WithMany().HasForeignKey(x => x.IdEstudiante);
     }
@@ -92,11 +108,17 @@ internal class GastoConfig : IEntityTypeConfiguration<Gasto>
     public void Configure(EntityTypeBuilder<Gasto> b)
     {
         b.Tabla("gastos", "id_gasto");
-        b.Property(x => x.Categoria).HasMaxLength(50);
+        b.Property(x => x.Tipo).HasMaxLength(30);
+        b.Property(x => x.Descripcion).HasMaxLength(300);
         b.Property(x => x.Valor).HasColumnType(Dinero);
+        b.Property(x => x.Proveedor).HasMaxLength(120);
+        b.Property(x => x.Referencia).HasMaxLength(50);
+        b.Property(x => x.Cantidad).HasColumnType("numeric(10,2)");
         b.HasOne(x => x.Vehiculo).WithMany().HasForeignKey(x => x.IdVehiculo);
         b.HasOne(x => x.Creador).WithMany().HasForeignKey(x => x.CreadoPor);
+        b.HasOne(x => x.Archivo).WithMany().HasForeignKey(x => x.IdArchivo);
         b.HasIndex(x => new { x.IdEmpresa, x.FechaGasto });
+        b.HasIndex(x => new { x.IdVehiculo, x.FechaGasto });
     }
 }
 

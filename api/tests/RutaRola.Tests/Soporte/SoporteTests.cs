@@ -115,6 +115,34 @@ public class SoporteTests(BaseDatosPrueba bd)
     }
 
     [Fact]
+    public async Task La_plataforma_deja_seguimiento_sin_cambiar_estado_y_termina_el_ticket_con_justificacion()
+    {
+        var admin = await bd.AdminNuevoAsync();
+        var super = await bd.SuperAdminAsync();
+        var creado = await (await admin.Cliente.PostAsJsonAsync(Empresa, Ticket(), ClienteApi.Json)).LeerAsync<TicketDto>(HttpStatusCode.Created);
+        await EstadoAsync(super, creado.Id, "EN_REVISION");
+        var esperando = await EstadoAsync(super, creado.Id, "ESPERANDO_CLIENTE", "Envíanos una captura, por favor.");
+        Assert.Contains(EstadoTicket.Cerrado, esperando.SiguientesEstados);
+
+        // Seguimiento: comenta y el ticket se queda donde estaba.
+        var seguimiento = await (await super.PostAsJsonAsync($"{Plataforma}/{creado.Id}/comentarios",
+            new { texto = "Seguimos atentos a tu captura.", interno = false }, ClienteApi.Json)).LeerAsync<TicketDto>();
+        Assert.Equal(EstadoTicket.EsperandoCliente, seguimiento.Estado);
+        Assert.Contains(seguimiento.Eventos, e => e.Texto == "Seguimos atentos a tu captura." && !e.Interno);
+
+        // Terminar sin resolver exige justificación.
+        var sinMotivo = await super.PostAsJsonAsync($"{Plataforma}/{creado.Id}/estado", new { estado = "CERRADO" }, ClienteApi.Json);
+        Assert.Equal("Justifica por qué terminas el ticket: la empresa lo verá en el historial.",
+            await sinMotivo.MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
+        var terminado = await EstadoAsync(super, creado.Id, "CERRADO", "Se cierra por falta de respuesta de la empresa durante 15 días.");
+        Assert.Equal(EstadoTicket.Cerrado, terminado.Estado);
+        Assert.NotNull(terminado.FechaCierre);
+        var vista = await (await admin.Cliente.GetAsync($"{Empresa}/{creado.Id}")).LeerAsync<TicketDto>();
+        Assert.Contains(vista.Eventos, e => e.EstadoNuevo == EstadoTicket.Cerrado && e.Texto.Contains("falta de respuesta"));
+        Assert.False(vista.Acciones.Comentar);
+    }
+
+    [Fact]
     public async Task Asigna_responsable_y_prioridad_y_agenda_y_registra_reuniones()
     {
         var admin = await bd.AdminNuevoAsync();

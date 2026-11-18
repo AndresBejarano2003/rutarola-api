@@ -16,10 +16,13 @@ public record ReporteIngresosDto(
     decimal Total, int Cantidad, decimal Promedio, IReadOnlyList<IngresoMesDto> PorMes, IReadOnlyList<IngresoMedioDto> PorMedio,
     IReadOnlyList<ReciboDto> Recibos);
 
-/// <summary>Mensualidad de una factura vigente sin recibo válido. <c>diasMora</c> &gt; 0 = vencida.</summary>
+/// <summary>
+/// Mensualidad de una factura vigente con saldo. <c>valor</c> = lo que falta pagar (saldo); <c>valorMes</c> = la cuota
+/// completa y <c>abonado</c> lo ya pagado con abonos. <c>diasMora</c> &gt; 0 = vencida.
+/// </summary>
 public record CuotaPendienteDto(
     Guid FacturaId, string NumeroFactura, Guid AcudienteId, string NombreAcudiente, string NombreEstudiante, string Periodo, decimal Valor,
-    DateOnly FechaLimite, int DiasMora);
+    DateOnly FechaLimite, int DiasMora, decimal ValorMes = 0, decimal Abonado = 0);
 
 /// <summary><c>situacion</c>: VENCIDAS (en mora) | POR_VENCER (dentro del plazo).</summary>
 public record FiltrosPendientes(string? Texto = null, Guid? AcudienteId = null, string? Situacion = null);
@@ -56,7 +59,7 @@ public class ServicioReportes(IBaseDatos db, ParametrosEmpresa parametros, TimeP
             var finMes = h.AddMonths(1);
             consulta = consulta.Where(p => p.FechaPago < finMes);
         }
-        var recibos = await consulta.OrderByDescending(p => p.FechaPago).ThenByDescending(p => p.Numero.Length).ThenByDescending(p => p.Numero)
+        var recibos = await consulta.Include(p => p.Detalle).OrderByDescending(p => p.FechaPago).ThenByDescending(p => p.Numero.Length).ThenByDescending(p => p.Numero)
             .ToListAsync(ct);
 
         var total = recibos.Sum(r => r.Valor);
@@ -113,8 +116,8 @@ public class ServicioReportes(IBaseDatos db, ParametrosEmpresa parametros, TimeP
     }
 
     /// <summary>
-    /// Mensualidades vencidas o del mes en curso sin recibo válido de las facturas vigentes (de un acudiente
-    /// si se indica), de la fecha límite más cercana a la más lejana.
+    /// Mensualidades vencidas o del mes en curso con saldo de las facturas vigentes (de un acudiente si se indica), sin los
+    /// meses desde el retiro, de la fecha límite más cercana a la más lejana. Un abono parcial deja el saldo pendiente.
     /// </summary>
     public async Task<IReadOnlyList<CuotaPendienteDto>> CuotasPendientesAsync(Guid? idAcudiente, CancellationToken ct = default)
     {
@@ -124,23 +127,20 @@ public class ServicioReportes(IBaseDatos db, ParametrosEmpresa parametros, TimeP
             .Where(x => x.Estado == EstadoFactura.Vigente && x.PeriodoInicio <= mesActual && (idAcudiente == null || x.IdAcudiente == idAcudiente))
             .ToListAsync(ct);
         var ids = facturas.Select(x => x.Id).ToList();
-        var pagados = (await db.Pagos.AsNoTracking()
-                .Where(p => p.Estado == EstadoPago.Vigente && p.IdFactura != null && ids.Contains(p.IdFactura.Value))
-                .Select(p => new { p.IdFactura, p.Periodo }).ToListAsync(ct))
-            .Select(p => (p.IdFactura!.Value, p.Periodo)).ToHashSet();
+        var pagos = await ReglasCuotas.PagosAsync(db, ids, ct);
         var diaLimite = await db.ProgramacionesCobro.AsNoTracking().Where(p => ids.Contains(p.IdFactura))
             .ToDictionaryAsync(p => p.IdFactura, p => p.DiaLimitePago, ct);
         var predeterminado = await parametros.DiaLimitePagoAsync(ct);
 
         return facturas
-            .SelectMany(fa => Periodos.Entre(fa.PeriodoInicio, fa.PeriodoFin < mesActual ? fa.PeriodoFin : mesActual)
-                .Where(p => !pagados.Contains((fa.Id, p)))
-                .Select(p =>
+            .SelectMany(fa => ReglasCuotas.Cuotas(fa, pagos.GetValueOrDefault(fa.Id) ?? [])
+                .Where(c => c.Periodo <= mesActual && !c.Pagada)
+                .Select(c =>
                 {
-                    var limite = Cobro.FechaLimite(p, diaLimite.TryGetValue(fa.Id, out var dia) ? dia : null, predeterminado);
+                    var limite = Cobro.FechaLimite(c.Periodo, diaLimite.TryGetValue(fa.Id, out var dia) ? dia : null, predeterminado);
                     return new CuotaPendienteDto(
-                        fa.Id, fa.NumeroFactura, fa.IdAcudiente, fa.NombreAcudiente, fa.NombreEstudiante, Periodos.Texto(p), fa.ValorMensual,
-                        limite, hoy.DayNumber - limite.DayNumber);
+                        fa.Id, fa.NumeroFactura, fa.IdAcudiente, fa.NombreAcudiente, fa.NombreEstudiante, Periodos.Texto(c.Periodo), c.Saldo,
+                        limite, hoy.DayNumber - limite.DayNumber, c.Valor, c.Pagado);
                 }))
             .OrderBy(c => c.FechaLimite).ThenBy(c => c.NumeroFactura, StringComparer.Ordinal)
             .ToList();

@@ -222,7 +222,7 @@ public class PersonasTests(BaseDatosPrueba bd)
         var acudiente = await admin.Cliente.CrearAcudienteAsync();
 
         var inactivo = await admin.Cliente.PostAsJsonAsync("/api/v1/estudiantes", DatosCatalogos.Estudiante(acudiente.Id, colegio.Id, grado: "7°"), ClienteApi.Json);
-        Assert.Equal("El colegio Colegio San Cayetano no tiene activo el curso 7°.", await inactivo.MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
+        Assert.Equal("El colegio Colegio San Cayetano no tiene activo el curso 7° en la jornada Mañana.", await inactivo.MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
 
         var inexistente = await admin.Cliente.PostAsJsonAsync("/api/v1/estudiantes", DatosCatalogos.Estudiante(acudiente.Id, Guid.NewGuid()), ClienteApi.Json);
         Assert.Equal(HttpStatusCode.NotFound, inexistente.StatusCode);

@@ -198,13 +198,25 @@ public class ServicioVehiculos(IBaseDatos db, Suscripciones.ServicioSuscripcion 
         {
             await Adjuntos.EliminarAsync(Db, id, ct);
         }
+        // Las novedades se van con el vehículo (con su foto o PDF de soporte).
+        var novedades = await Db.NovedadesVehiculo.Where(n => n.IdVehiculo == registro.Id).ToListAsync(ct);
+        foreach (var n in novedades)
+        {
+            await Adjuntos.EliminarAsync(Db, n.IdArchivo, ct);
+        }
+        Db.NovedadesVehiculo.RemoveRange(novedades);
     }
 
     public override async Task<string?> MotivoNoEliminarAsync(Guid id, CancellationToken ct = default)
     {
         var total = await Db.AsignacionesRuta.CountAsync(a => a.IdVehiculo == id, ct);
-        return total > 0
-            ? $"No se puede eliminar: el vehículo tiene {total} asignación(es) de ruta. Cámbialo a Inactivo para conservar el historial."
+        if (total > 0)
+        {
+            return $"No se puede eliminar: el vehículo tiene {total} asignación(es) de ruta. Cámbialo a Inactivo para conservar el historial.";
+        }
+        var gastos = await Db.Gastos.CountAsync(g => g.IdVehiculo == id, ct);
+        return gastos > 0
+            ? $"No se puede eliminar: el vehículo tiene {gastos} gasto(s) registrado(s). Cámbialo a Inactivo para conservar el historial."
             : null;
     }
 }

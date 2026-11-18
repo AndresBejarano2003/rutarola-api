@@ -36,7 +36,7 @@ public class ValidadorSolicitudAcudiente : AbstractValidator<SolicitudAcudiente>
 /// Acudientes. Documento único por empresa; su acceso al portal es un usuario con rol Acudiente;
 /// no se elimina si tiene estudiantes a cargo o facturas.
 /// </summary>
-public class ServicioAcudientes(IBaseDatos db, ServicioAcceso acceso)
+public class ServicioAcudientes(IBaseDatos db, ServicioAcceso acceso, TimeProvider reloj)
     : ServicioCrud<Acudiente, AcudienteDto, SolicitudAcudiente, FiltrosAcudiente>(db)
 {
     protected override string Entidad => "El acudiente";
@@ -76,6 +76,11 @@ public class ServicioAcudientes(IBaseDatos db, ServicioAcceso acceso)
         a.TelefonoAlterno = Texto.Opcional(s.TelefonoAlterno);
         a.Correo = Texto.Opcional(s.Correo)?.ToLowerInvariant();
         a.Direccion = Texto.Opcional(s.Direccion);
+        // Retiro: al inactivarlo, las facturas vigentes a su nombre dejan de cobrar los meses que faltan.
+        if (!nuevo && a.Activo && !EstadoRegistro.EsActivo(s.Estado))
+        {
+            await Finanzas.ServicioFacturas.RetirarAsync(Db, null, a.Id, Fechas.Hoy(reloj), "Retiro del acudiente (quedó inactivo).", ct);
+        }
         a.Activo = EstadoRegistro.EsActivo(s.Estado);
         a.IdUsuario = await acceso.AplicarAsync(a.IdUsuario, s, Roles.Acudiente, a.NombreCompleto, ct);
     }

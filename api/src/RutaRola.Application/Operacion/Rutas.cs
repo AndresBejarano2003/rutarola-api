@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using RutaRola.Application.Comun;
+using RutaRola.Application.Finanzas;
 using RutaRola.Domain.Operacion;
 
 namespace RutaRola.Application.Operacion;
@@ -10,6 +11,7 @@ public record RutaDto(
     Guid Id, string Codigo, string Nombre, Guid ColegioId, string Jornada, string Sector, IReadOnlyList<Guid> EstudianteIds,
     string Estado, string Observaciones, DateTime FechaCreacion, DateTime? FechaActualizacion);
 
+/// <summary><c>codigo</c> lo genera el servidor al crear (<c>R-01</c>, <c>R-02</c>…) y no cambia: el que llegue se ignora.</summary>
 public record SolicitudRuta(
     string? Codigo, string? Nombre, Guid? ColegioId, string? Jornada, string? Sector, IReadOnlyList<Guid>? EstudianteIds,
     string? Estado, string? Observaciones);
@@ -21,8 +23,6 @@ public class ValidadorSolicitudRuta : AbstractValidator<SolicitudRuta>
 {
     public ValidadorSolicitudRuta()
     {
-        RuleFor(x => x.Codigo).NotEmpty().WithMessage("Ingresa el código de la ruta.")
-            .Matches("^[A-Za-z0-9-]{2,10}$").WithMessage("El código admite de 2 a 10 letras, números o guiones (ej. R-01).");
         RuleFor(x => x.Nombre).NotEmpty().WithMessage("Ingresa el nombre de la ruta.")
             .MaximumLength(60).WithMessage("El nombre admite máximo 60 caracteres.");
         RuleFor(x => x.ColegioId).NotEmpty().WithMessage("Selecciona el colegio.");
@@ -38,13 +38,18 @@ public class ValidadorSolicitudRuta : AbstractValidator<SolicitudRuta>
 }
 
 /// <summary>
-/// Rutas y sus estudiantes en orden de recogida. Código único; los estudiantes deben ser del colegio de
-/// la ruta y no pueden estar en otra ruta activa de la misma jornada; no se elimina con asignaciones.
+/// Rutas y sus estudiantes en orden de recogida. El código es un consecutivo por empresa que asigna el servidor
+/// (<see cref="PrefijoCodigo"/>); los estudiantes deben ser del colegio y de la jornada de la ruta (los que ya estaban
+/// se conservan aunque su jornada cambie) y no pueden estar en otra ruta activa de la misma jornada; no se elimina con
+/// asignaciones.
 /// </summary>
 public class ServicioRutas(IBaseDatos db) : ServicioCrud<Ruta, RutaDto, SolicitudRuta, FiltrosRuta>(db)
 {
     protected override string Entidad => "La ruta";
     protected override DbSet<Ruta> Conjunto => Db.Rutas;
+
+    /// <summary>Consecutivo de las rutas: <c>R-01</c>, <c>R-02</c>… (sigue tras el mayor existente, también los anteriores).</summary>
+    public const string PrefijoCodigo = "R";
 
     /// <summary><c>R-01 · Norte</c> (<c>etiquetaRuta</c>).</summary>
     public static string Etiquetar(Ruta r) => $"{r.Codigo} · {r.Nombre}";
@@ -92,17 +97,11 @@ public class ServicioRutas(IBaseDatos db) : ServicioCrud<Ruta, RutaDto, Solicitu
 
     protected override async Task AplicarAsync(Ruta r, SolicitudRuta s, bool nuevo, CancellationToken ct)
     {
-        var codigo = s.Codigo!.Trim();
-        var codigoMayus = codigo.ToUpperInvariant();
         var idActual = nuevo ? (Guid?)null : r.Id;
-        if (await Db.Rutas.AnyAsync(x => x.Id != idActual && x.Codigo.ToUpper() == codigoMayus, ct))
-        {
-            throw new ErrorNegocio($"Ya existe una ruta con el código {codigo}.", CodigoError.Duplicado);
-        }
-
         var colegio = await Db.Colegios.FirstOrDefaultAsync(c => c.Id == s.ColegioId, ct) ?? throw ErrorNegocio.NoEncontrado("El colegio");
         var ids = s.EstudianteIds ?? [];
-        var estudiantes = await Db.Estudiantes.Where(e => ids.Contains(e.Id)).Select(e => new { e.Id, e.IdColegio }).ToListAsync(ct);
+        var estudiantes = await Db.Estudiantes.Where(e => ids.Contains(e.Id))
+            .Select(e => new { e.Id, e.IdColegio, e.Jornada, e.PrimerNombre, e.PrimerApellido }).ToListAsync(ct);
         if (estudiantes.Count != ids.Count)
         {
             throw new ErrorNegocio("Uno o más estudiantes no existen o fueron eliminados.", CodigoError.NoEncontrado);
@@ -113,6 +112,17 @@ public class ServicioRutas(IBaseDatos db) : ServicioCrud<Ruta, RutaDto, Solicitu
         }
 
         var jornada = s.Jornada!.Trim();
+        // Solo estudiantes de la jornada de la ruta (los que ya iban en ella se conservan).
+        var otraJornada = estudiantes
+            .Where(e => e.Jornada != jornada && r.Estudiantes.All(x => x.IdEstudiante != e.Id))
+            .Select(e => $"{e.PrimerNombre} {e.PrimerApellido} ({e.Jornada})").ToList();
+        if (otraJornada.Count > 0)
+        {
+            throw new ErrorNegocio(
+                $"La ruta es de la jornada {jornada} y estos estudiantes son de otra: {string.Join(", ", otraJornada)}.",
+                CodigoError.Validacion);
+        }
+
         var activa = EstadoRegistro.EsActivo(s.Estado);
         if (activa && ids.Count > 0)
         {
@@ -128,7 +138,10 @@ public class ServicioRutas(IBaseDatos db) : ServicioCrud<Ruta, RutaDto, Solicitu
             }
         }
 
-        r.Codigo = codigo;
+        if (nuevo)
+        {
+            r.Codigo = await Consecutivos.SiguienteAsync(Db.Rutas.Select(x => x.Codigo), PrefijoCodigo, ct, digitos: 2);
+        }
         r.Nombre = s.Nombre!.Trim();
         r.IdColegio = colegio.Id;
         r.Jornada = jornada;
