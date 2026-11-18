@@ -56,7 +56,7 @@ public class SuscripcionTests(BaseDatosPrueba bd)
         var s = await (await admin.Cliente.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();
         Assert.Equal((PlanSuscripcion.Profesional, EstadoSuscripcion.Prueba), (s.Plan, s.Estado));
         Assert.InRange(s.DiasRestantes!.Value, 14, 15);
-        Assert.Equal((15, false), (s.DiasPrueba, s.PendienteDecision));
+        Assert.Equal(15, s.DiasPrueba);
         Assert.Contains(FuncionPlan.GpsEnVivo, s.Funciones);
         Assert.True(s.PagosEnLinea);
         Assert.Equal((15, 400), (s.Limites.Vehiculos!.Value, s.Limites.Estudiantes!.Value));
@@ -118,7 +118,7 @@ public class SuscripcionTests(BaseDatosPrueba bd)
         await using (var db = bd.Contexto(null, modoSistema: true))
         {
             await db.Suscripciones.IgnoreQueryFilters().Where(s => s.IdEmpresa == admin.Empresa.Id)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.FechaFin, DateTime.UtcNow.AddMinutes(-1)));
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.FechaFin, DateTime.UtcNow.AddDays(-2)));
         }
 
         var gratis = await (await c.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();

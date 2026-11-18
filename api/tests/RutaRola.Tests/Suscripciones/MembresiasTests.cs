@@ -1,3 +1,7 @@
+using RutaRola.Api.Seguridad;
+using RutaRola.Application.Comunicacion;
+using Microsoft.Extensions.DependencyInjection;
+using System.Security.Claims;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
@@ -17,11 +21,30 @@ public class MembresiasTests(BaseDatosPrueba bd)
 {
     private const string UrlDias = "/api/v1/plataforma/parametros/suscripcion.dias_prueba";
 
-    private async Task VencerAsync(Guid idEmpresa)
+    /// <summary>El último día del plan fue ayer (Colombia): hoy ya pasa a Gratis.</summary>
+    private Task VencerAsync(Guid idEmpresa) => FinEnAsync(idEmpresa, -1);
+
+    /// <summary>Deja el último día del plan a <paramref name="dias"/> días de hoy (Colombia).</summary>
+    private async Task FinEnAsync(Guid idEmpresa, int dias)
     {
+        var hoy = Fechas.Hoy(TimeProvider.System);
+        var fin = DateTime.SpecifyKind(hoy.AddDays(dias).ToDateTime(new TimeOnly(12, 0)) - Fechas.DesfaseColombia, DateTimeKind.Utc);
         await using var db = bd.Contexto(null, modoSistema: true);
         await db.Suscripciones.IgnoreQueryFilters().Where(s => s.IdEmpresa == idEmpresa)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.FechaFin, DateTime.UtcNow.AddMinutes(-1)));
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.FechaFin, fin));
+    }
+
+    /// <summary>Corre el proceso del servidor de la empresa (vencimiento + notificaciones) y lista las del cliente.</summary>
+    private async Task<List<NotificacionDto>> NotificacionesAsync(Guid idEmpresa, HttpClient c)
+    {
+        await bd.EnScope(async sp =>
+        {
+            sp.GetRequiredService<ContextoUsuarioHttp>().Usar(new ClaimsPrincipal(
+                new ClaimsIdentity([new Claim(Reclamos.IdEmpresa, idEmpresa.ToString())], "ProcesoServidor")));
+            await sp.GetRequiredService<ServicioSuscripcion>().RevisarVencimientoAsync();
+            return await sp.GetRequiredService<GeneradorNotificaciones>().GenerarAsync();
+        });
+        return (await (await c.GetAsync("/api/v1/notificaciones?tamano=100")).LeerAsync<ListaPaginada<NotificacionDto>>()).Items.ToList();
     }
 
     [Fact]
@@ -57,7 +80,7 @@ public class MembresiasTests(BaseDatosPrueba bd)
     }
 
     [Fact]
-    public async Task Al_vencer_pide_decidir_y_seguir_en_Gratis_inactiva_lo_que_sobra()
+    public async Task Al_dia_siguiente_del_vencimiento_queda_en_Gratis_e_inactiva_lo_que_sobra()
     {
         var admin = await bd.AdminNuevoAsync();
         var c = admin.Cliente;
@@ -66,29 +89,28 @@ public class MembresiasTests(BaseDatosPrueba bd)
         {
             vehiculos.Add(await c.CrearAsync<VehiculoDto>("vehiculos", DatosCatalogos.Vehiculo(DatosOperacion.Placa(), $"{i}")));
         }
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await c.PostAsync("/api/v1/suscripcion/continuar-gratis", null)).StatusCode);
-
-        await VencerAsync(admin.Empresa.Id);
-        var vencida = await (await c.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();
-        Assert.Equal((PlanSuscripcion.Gratis, true, "PROFESIONAL"), (vencida.Plan, vencida.PendienteDecision, vencida.PlanVencido));
-        Assert.NotNull(vencida.FechaVencimiento);
-
-        // La plataforma la ve vencida (sin decidir) en su tabla y en el resumen.
+        // El último día sigue vigente (0 días) y la plataforma la ve por vencer.
+        await FinEnAsync(admin.Empresa.Id, 0);
+        var ultimoDia = await (await c.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();
+        Assert.Equal((PlanSuscripcion.Profesional, EstadoSuscripcion.Prueba, 0), (ultimoDia.Plan, ultimoDia.Estado, ultimoDia.DiasRestantes!.Value));
         var super = await bd.SuperAdminAsync();
         EmpresaDto Fila(ListaPaginada<EmpresaDto> l) => Assert.Single(l.Items, e => e.Id == admin.Empresa.Id);
         var lista = await (await super.GetAsync($"/api/v1/empresas?texto={admin.Empresa.Nit}")).LeerAsync<ListaPaginada<EmpresaDto>>();
-        Assert.Equal(("VENCIDA", "PROFESIONAL"), (Fila(lista).Membresia!.Situacion, Fila(lista).Membresia!.PlanVencido));
-        var vencidas = await (await super.GetAsync("/api/v1/empresas?membresia=VENCIDA&tamano=1000")).LeerAsync<ListaPaginada<EmpresaDto>>();
-        Assert.Contains(vencidas.Items, e => e.Id == admin.Empresa.Id);
-        Assert.True((await (await super.GetAsync("/api/v1/empresas/resumen-membresias")).LeerAsync<ResumenMembresiasDto>()).Vencida >= 1);
+        Assert.Equal("PRUEBA_POR_VENCER", Fila(lista).Membresia!.Situacion);
 
-        var decision = await (await c.PostAsync("/api/v1/suscripcion/continuar-gratis", null)).LeerAsync<DecisionGratisDto>();
-        Assert.False(decision.Suscripcion.PendienteDecision);
-        Assert.Equal(2, decision.Inactivados.Vehiculos.Count);
-        Assert.DoesNotContain(vehiculos[0].Placa, decision.Inactivados.Vehiculos); // se conserva el más antiguo
+        // Al día siguiente, sin pago: Gratis automático, sin decisión, y se conserva el vehículo más antiguo.
+        await VencerAsync(admin.Empresa.Id);
+        var vencida = await (await c.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();
+        Assert.Equal((PlanSuscripcion.Gratis, EstadoSuscripcion.Gratis, "PROFESIONAL"), (vencida.Plan, vencida.Estado, vencida.PlanVencido));
+        Assert.NotNull(vencida.FechaVencimiento);
+        Assert.Equal(1, vencida.Uso.Vehiculos);
         var activos = await (await c.GetAsync("/api/v1/vehiculos?estado=ACTIVO")).LeerAsync<ListaPaginada<VehiculoDto>>();
         Assert.Equal([vehiculos[0].Id], activos.Items.Select(v => v.Id));
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await c.PostAsync("/api/v1/suscripcion/continuar-gratis", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.PostAsync("/api/v1/suscripcion/continuar-gratis", null)).StatusCode);
+
+        // Para la plataforma ya está en Gratis (no hay "vencidas").
+        lista = await (await super.GetAsync($"/api/v1/empresas?texto={admin.Empresa.Nit}")).LeerAsync<ListaPaginada<EmpresaDto>>();
+        Assert.Equal(("GRATIS", "PROFESIONAL"), (Fila(lista).Membresia!.Situacion, Fila(lista).Membresia!.PlanVencido));
 
         // Para activar otro primero se inactiva el activo.
         object Con(VehiculoDto v, string estado) => new
@@ -116,7 +138,7 @@ public class MembresiasTests(BaseDatosPrueba bd)
         var super = await bd.SuperAdminAsync();
         var s = await (await super.PutAsJsonAsync($"/api/v1/empresas/{admin.Empresa.Id}/suscripcion",
             new { plan = "GRATIS", estado = "GRATIS" }, ClienteApi.Json)).LeerAsync<SuscripcionDto>();
-        Assert.Equal((1, false), (s.Uso.Vehiculos, s.PendienteDecision));
+        Assert.Equal(1, s.Uso.Vehiculos);
     }
 
     [Fact]
@@ -129,7 +151,6 @@ public class MembresiasTests(BaseDatosPrueba bd)
         Assert.Equal(HttpStatusCode.OK, (await c.GetAsync("/api/v1/recorridos/en-curso")).StatusCode);
 
         await VencerAsync(admin.Empresa.Id);
-        await (await c.PostAsync("/api/v1/suscripcion/continuar-gratis", null)).LeerAsync<DecisionGratisDto>();
         var mensaje = await (await c.GetAsync("/api/v1/reportes/morosos")).MensajeErrorAsync(HttpStatusCode.Forbidden);
         Assert.Contains("Tu plan Gratis no incluye los reportes financieros", mensaje);
         Assert.Contains("plan Esencial", mensaje);
@@ -147,7 +168,7 @@ public class MembresiasTests(BaseDatosPrueba bd)
     }
 
     [Fact]
-    public async Task Pagar_de_una_vez_registra_sin_prueba_y_con_la_pasarela_pendiente()
+    public async Task Pagar_de_una_vez_registra_sin_prueba_en_Gratis()
     {
         var usuario = ClienteApi.Unico("pag");
         var login = await (await bd.Api.CreateClient().PostAsJsonAsync("/api/v1/auth/registro", new
@@ -158,7 +179,7 @@ public class MembresiasTests(BaseDatosPrueba bd)
             pagarAhora = true,
         }, ClienteApi.Json)).LeerAsync<RespuestaLogin>(HttpStatusCode.Created);
         var s = await (await bd.Cliente(login.Tokens.AccessToken).GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();
-        Assert.Equal((PlanSuscripcion.Gratis, true, "", 0), (s.Plan, s.PendienteDecision, s.PlanVencido, s.DiasPrueba));
+        Assert.Equal((PlanSuscripcion.Gratis, true, "", 0), (s.Plan, s.PruebaUsada, s.PlanVencido, s.DiasPrueba));
         Assert.Equal(TemaApariencia.Oscuro, login.Sesion.Empresa!.Tema);
     }
 
@@ -177,11 +198,9 @@ public class MembresiasTests(BaseDatosPrueba bd)
         var c = bd.Cliente(login.Tokens.AccessToken);
 
         var s = await (await c.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();
-        Assert.Equal((PlanSuscripcion.Gratis, EstadoSuscripcion.Gratis, false, false, 0), (s.Plan, s.Estado, s.PendienteDecision, s.PruebaUsada, s.DiasPrueba));
+        Assert.Equal((PlanSuscripcion.Gratis, EstadoSuscripcion.Gratis, false, 0), (s.Plan, s.Estado, s.PruebaUsada, s.DiasPrueba));
         Assert.Null(s.FechaFin);
         Assert.Null(s.DiasRestantes);
-        // Nada que decidir: el Gratis lo eligió la empresa.
-        await (await c.PostAsync("/api/v1/suscripcion/continuar-gratis", null)).MensajeErrorAsync(HttpStatusCode.UnprocessableEntity);
         var super = await bd.SuperAdminAsync();
         var empresa = (await (await super.GetAsync($"/api/v1/empresas?texto={nit}")).LeerAsync<ListaPaginada<EmpresaDto>>())
             .Items.Single(e => e.Id == login.Sesion.Empresa!.Id);
@@ -193,11 +212,97 @@ public class MembresiasTests(BaseDatosPrueba bd)
         Assert.Equal(15, prueba.DiasRestantes);
         Assert.Contains("ya tiene un plan", await (await c.PostAsync("/api/v1/suscripcion/prueba", null)).MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
 
-        // Al vencer sin pago vuelve a Gratis (con la decisión) y no puede repetir la prueba.
+        // Al vencer sin pago vuelve a Gratis y no puede repetir la prueba.
         await VencerAsync(login.Sesion.Empresa!.Id);
         var vencida = await (await c.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>();
-        Assert.Equal((PlanSuscripcion.Gratis, true), (vencida.Plan, vencida.PendienteDecision));
-        await (await c.PostAsync("/api/v1/suscripcion/continuar-gratis", null)).LeerAsync<DecisionGratisDto>();
+        Assert.Equal((PlanSuscripcion.Gratis, "PROFESIONAL"), (vencida.Plan, vencida.PlanVencido));
         Assert.Contains("ya usó la prueba", await (await c.PostAsync("/api/v1/suscripcion/prueba", null)).MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
+    }
+
+    [Fact]
+    public async Task Avisa_a_todos_los_administradores_antes_de_vencer_y_al_pasar_a_Gratis()
+    {
+        var super = await bd.SuperAdminAsync();
+        const string UrlAviso = "/api/v1/plataforma/parametros/suscripcion.dias_aviso_vencimiento";
+        await (await super.PutAsJsonAsync(UrlAviso, new { valor = "7" }, ClienteApi.Json)).LeerAsync<ParametroPlataformaDto>();
+        try
+        {
+            var admin = await bd.AdminNuevoAsync();
+            var usuarioOtro = ClienteApi.Unico("adm");
+            await (await super.PostAsJsonAsync($"/api/v1/empresas/{admin.Empresa.Id}/administradores", new
+            {
+                nombre = "Otra Administradora", usuario = usuarioOtro, email = $"{usuarioOtro}@correo.co", telefono = "", estado = "ACTIVO", contrasena = "Clave-123",
+            }, ClienteApi.Json)).LeerAsync(HttpStatusCode.Created);
+            var otroCliente = await bd.ClienteDeAsync(usuarioOtro, "Clave-123");
+
+            // Faltan 10 días: todavía no. Faltan 7: avisa una sola vez.
+            await FinEnAsync(admin.Empresa.Id, 10);
+            Assert.DoesNotContain(await NotificacionesAsync(admin.Empresa.Id, admin.Cliente), n => n.Clave.StartsWith("membresia:"));
+            await FinEnAsync(admin.Empresa.Id, 7);
+            var porVencer = Assert.Single(await NotificacionesAsync(admin.Empresa.Id, admin.Cliente), n => n.Clave.StartsWith("membresia:"));
+            Assert.Equal((NivelNotificacion.Advertencia, "/sistema/membership"), (porVencer.Nivel, porVencer.Enlace));
+            Assert.Contains("vence en 7 días", porVencer.Titulo);
+            Assert.Contains("plan Gratis", porVencer.Mensaje);
+            Assert.Single(await NotificacionesAsync(admin.Empresa.Id, admin.Cliente), n => n.Clave.StartsWith("membresia:"));
+
+            // Último día y vencida → Gratis (también para el otro administrador).
+            await FinEnAsync(admin.Empresa.Id, 0);
+            Assert.Contains(await NotificacionesAsync(admin.Empresa.Id, admin.Cliente), n => n.Clave.EndsWith(":ultimo-dia") && n.Nivel == NivelNotificacion.Critica);
+            await VencerAsync(admin.Empresa.Id);
+            await NotificacionesAsync(admin.Empresa.Id, admin.Cliente);
+            Assert.Equal(PlanSuscripcion.Gratis, (await (await admin.Cliente.GetAsync("/api/v1/suscripcion")).LeerAsync<SuscripcionDto>()).Plan);
+            foreach (var cliente in new[] { admin.Cliente, otroCliente })
+            {
+                var lista = await (await cliente.GetAsync("/api/v1/notificaciones?tamano=100")).LeerAsync<ListaPaginada<NotificacionDto>>();
+                Assert.Contains(lista.Items, n => n.Clave.StartsWith("membresia:vencida:") && n.Titulo.Contains("ahora estás en Gratis"));
+            }
+        }
+        finally
+        {
+            await (await super.PutAsJsonAsync(UrlAviso, new { valor = "5" }, ClienteApi.Json)).LeerAsync<ParametroPlataformaDto>();
+        }
+    }
+
+    [Fact]
+    public async Task La_plataforma_fija_los_precios_y_los_pagos_manuales_cuentan_como_ingresos()
+    {
+        var super = await bd.SuperAdminAsync();
+        const string UrlPrecio = "/api/v1/plataforma/parametros/plan.esencial.precio_mensual";
+        var parametros = await (await super.GetAsync("/api/v1/plataforma/parametros")).LeerAsync<List<ParametroPlataformaDto>>();
+        Assert.Contains(parametros, p => p.Clave == "plan.esencial.precio_mensual" && p is { Tipo: "PESOS", Grupo: "PRECIOS", Valor: "89900" });
+        await (await super.PutAsJsonAsync(UrlPrecio, new { valor = "99900" }, ClienteApi.Json)).LeerAsync<ParametroPlataformaDto>();
+        try
+        {
+            var planes = await (await bd.Api.CreateClient().GetAsync("/api/v1/suscripcion/planes")).LeerAsync<List<PlanDto>>();
+            Assert.Equal((99_900, 999_000), (planes.Single(p => p.Id == PlanSuscripcion.Esencial).PrecioMensual, planes.Single(p => p.Id == PlanSuscripcion.Esencial).PrecioAnual));
+            Assert.Equal(HttpStatusCode.BadRequest, (await super.PutAsJsonAsync(UrlPrecio, new { valor = "10" }, ClienteApi.Json)).StatusCode);
+
+            // Activación manual con el valor recibido por transferencia.
+            var admin = await bd.AdminNuevoAsync();
+            var hoy = Fechas.Hoy(TimeProvider.System);
+            var antes = await (await super.GetAsync($"/api/v1/plataforma/ingresos?desde={hoy:yyyy-MM-dd}&hasta={hoy:yyyy-MM-dd}")).LeerAsync<IngresosPlataformaDto>();
+            await (await super.PutAsJsonAsync($"/api/v1/empresas/{admin.Empresa.Id}/suscripcion",
+                new { plan = "ESENCIAL", estado = "ACTIVA", periodo = "MENSUAL", fechaFin = DateTime.UtcNow.AddDays(30), valorPagado = 99_900 },
+                ClienteApi.Json)).LeerAsync<SuscripcionDto>();
+            var pagos = await (await super.GetAsync($"/api/v1/empresas/{admin.Empresa.Id}/suscripcion/pagos")).LeerAsync<List<PagoSuscripcionDto>>();
+            Assert.Equal((99_900L, EstadoPagoSuscripcion.Aprobado, "MANUAL"), (Assert.Single(pagos).Valor, pagos[0].Estado, pagos[0].MetodoPago));
+
+            var ingresos = await (await super.GetAsync($"/api/v1/plataforma/ingresos?desde={hoy:yyyy-MM-dd}&hasta={hoy:yyyy-MM-dd}")).LeerAsync<IngresosPlataformaDto>();
+            Assert.Equal((antes.Total + 99_900, antes.Pagos + 1, "DIA"), (ingresos.Total, ingresos.Pagos, ingresos.Agrupacion));
+            Assert.Equal(ingresos.Total, Assert.Single(ingresos.Serie).Total);
+            Assert.Contains(ingresos.PorMetodo, g => g.Clave == "MANUAL");
+            Assert.Contains(ingresos.Detalle, p => p.EmpresaId == admin.Empresa.Id && p.Valor == 99_900);
+            Assert.True(ingresos.RecurrenteMensual >= 99_900);
+
+            // Rangos largos se agrupan por mes; fechas al revés → 422; solo la plataforma.
+            var anual = await (await super.GetAsync($"/api/v1/plataforma/ingresos?desde={hoy.AddMonths(-11):yyyy-MM-dd}&hasta={hoy:yyyy-MM-dd}")).LeerAsync<IngresosPlataformaDto>();
+            Assert.Equal("MES", anual.Agrupacion);
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, (await super.GetAsync($"/api/v1/plataforma/ingresos?desde={hoy:yyyy-MM-dd}&hasta={hoy.AddDays(-1):yyyy-MM-dd}")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await admin.Cliente.GetAsync("/api/v1/plataforma/ingresos")).StatusCode);
+        }
+        finally
+        {
+            await (await super.PutAsJsonAsync(UrlPrecio, new { valor = "89900" }, ClienteApi.Json)).LeerAsync<ParametroPlataformaDto>();
+        }
     }
 }

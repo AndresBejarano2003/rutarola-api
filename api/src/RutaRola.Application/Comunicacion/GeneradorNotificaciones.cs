@@ -2,7 +2,9 @@ using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using RutaRola.Application.Comun;
 using RutaRola.Application.Configuracion;
+using Microsoft.Extensions.Logging;
 using RutaRola.Application.Finanzas;
+using RutaRola.Application.Suscripciones;
 using RutaRola.Domain.Comunicacion;
 using RutaRola.Domain.Enums;
 using RutaRola.Domain.Seguridad;
@@ -18,19 +20,26 @@ public record NuevaNotificacion(
 /// Crea las notificaciones de los administradores de la empresa del contexto con las reglas de
 /// <c>generar-notificaciones.ts</c>: eventos de los últimos <see cref="VentanaEventosDias"/> días (pagos,
 /// facturas, cotizaciones, vehículos, empleados, envíos) y condiciones del día (documentos y licencias por
-/// vencer o vencidos, contratos por terminar o terminados, mora). Cada hecho tiene una <c>clave</c> y se
-/// notifica una sola vez por usuario, aunque la elimine (índice único usuario + clave).
+/// vencer o vencidos, contratos por terminar o terminados, mora, y la membresía: por vencer desde los días que fija la
+/// plataforma, último día y vencida → Gratis). Cada hecho tiene una <c>clave</c> y se notifica una sola vez por usuario,
+/// aunque la elimine (índice único usuario + clave). Los de membresía también llegan por correo a cada administrador.
 /// </summary>
-public class GeneradorNotificaciones(IBaseDatos db, ServicioReportes reportes, ParametrosEmpresa parametros, TimeProvider reloj)
+public class GeneradorNotificaciones(
+    IBaseDatos db, ServicioReportes reportes, ParametrosEmpresa parametros, TimeProvider reloj, ICanalCorreo correo,
+    ILogger<GeneradorNotificaciones> logger)
 {
+    /// <summary>Prefijo de las claves de membresía (también se envían por correo).</summary>
+    public const string PrefijoMembresia = "membresia:";
+
     public const int VentanaEventosDias = 30;
 
     /// <summary>Genera y guarda las notificaciones nuevas. Devuelve cuántas creó (sumando todos los administradores).</summary>
     public async Task<int> GenerarAsync(CancellationToken ct = default)
     {
-        var destinatarios = await db.Usuarios.AsNoTracking()
+        var usuarios = await db.Usuarios.AsNoTracking()
             .Where(u => u.Activo && u.IdEmpresa == db.IdEmpresaActual && u.Rol.Nombre == Roles.AdminEmpresa)
-            .Select(u => u.Id).ToListAsync(ct);
+            .Select(u => new { u.Id, u.Email }).ToListAsync(ct);
+        var destinatarios = usuarios.Select(u => u.Id).ToList();
         if (destinatarios.Count == 0)
         {
             return 0;
@@ -45,10 +54,16 @@ public class GeneradorNotificaciones(IBaseDatos db, ServicioReportes reportes, P
 
         var ahora = reloj.GetUtcNow().UtcDateTime;
         var creadas = 0;
+        var correos = new List<(string Destino, NuevaNotificacion Notificacion)>();
         foreach (var usuario in destinatarios)
         {
             foreach (var n in nuevas.Where(n => !existentes.Contains((usuario, n.Clave))))
             {
+                if (n.Clave.StartsWith(PrefijoMembresia, StringComparison.Ordinal)
+                    && Texto.Opcional(usuarios.First(u => u.Id == usuario).Email) is { } destino)
+                {
+                    correos.Add((destino, n));
+                }
                 db.Notificaciones.Add(new Notificacion
                 {
                     IdUsuario = usuario, Clave = n.Clave, Categoria = n.Categoria, Nivel = n.Nivel, Titulo = n.Titulo, Mensaje = n.Mensaje,
@@ -61,7 +76,79 @@ public class GeneradorNotificaciones(IBaseDatos db, ServicioReportes reportes, P
         {
             await db.SaveChangesAsync(ct);
         }
+        foreach (var (destino, n) in correos)
+        {
+            await EnviarCorreoAsync(destino, n, ct);
+        }
         return creadas;
+    }
+
+    /// <summary>Correo del aviso de membresía (nunca falla la generación).</summary>
+    private async Task EnviarCorreoAsync(string destino, NuevaNotificacion n, CancellationToken ct)
+    {
+        if (!correo.Habilitado) return;
+        try
+        {
+            var resultado = await correo.EnviarAsync(destino, $"RutaRola: {n.Titulo}",
+                $"{n.Mensaje}\n\nRevisa tu plan en RutaRola › Sistema › Planes y membresías.", [], ct);
+            if (!resultado.Exito)
+            {
+                logger.LogWarning("No se pudo enviar el aviso de membresía: {Detalle}", resultado.Detalle);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Falló el envío del aviso de membresía");
+        }
+    }
+
+    /// <summary>
+    /// Avisos de la membresía (iguales a <c>avisosMembresia</c> de <c>generar-notificaciones.ts</c>): por vencer desde
+    /// <paramref name="diasAviso"/> días antes del último día, el último día, y vencida (ya en Gratis) durante
+    /// <see cref="VentanaEventosDias"/> días. El plan dura hasta el final de su último día.
+    /// </summary>
+    public static IEnumerable<NuevaNotificacion> AvisosMembresia(Domain.Suscripciones.Suscripcion? s, DateOnly hoy, int diasAviso, DateTime ahora)
+    {
+        if (s is null)
+        {
+            yield break;
+        }
+        const string Enlace = "/sistema/membership";
+        if (s.Estado != EstadoSuscripcion.Gratis && s.FechaFin is { } fin && !ServicioSuscripcion.VencidaEn(s, ahora))
+        {
+            var ultimo = ServicioSuscripcion.DiaFin(fin);
+            var dias = ultimo.DayNumber - hoy.DayNumber;
+            var prueba = s.Estado == EstadoSuscripcion.Prueba;
+            var nombre = CatalogoPlanes.De(s.Plan).Nombre;
+            var que = prueba ? $"Tu prueba gratuita del plan {nombre}" : $"Tu plan {nombre}";
+            var consecuencia = $"Si no pagas, desde el {Fechas.Corta(ultimo.AddDays(1))} quedas en el plan Gratis: se desactivan las funciones de tu plan " +
+                "y se inactivan los vehículos y estudiantes que superen sus límites (no se borra nada).";
+            var clave = $"{PrefijoMembresia}{TextoEnum.Escribir(s.Estado).ToLowerInvariant()}:{ultimo:yyyy-MM-dd}";
+            if (dias == 0)
+            {
+                yield return new($"{clave}:ultimo-dia", CategoriaNotificacion.Sistema, NivelNotificacion.Critica, $"{que} vence hoy",
+                    $"{que} termina hoy {Fechas.Corta(ultimo)}. {consecuencia}", Enlace, "Ver planes");
+            }
+            else if (dias <= diasAviso)
+            {
+                yield return new($"{clave}:por-vencer", CategoriaNotificacion.Sistema, NivelNotificacion.Advertencia,
+                    $"{que} vence en {Plural(dias, "día", "días")}",
+                    $"{que} termina el {Fechas.Corta(ultimo)}. {consecuencia}", Enlace, "Ver planes");
+            }
+        }
+        if (s.Estado == EstadoSuscripcion.Gratis && s.PlanVencido is { } vencido && s.FechaVencimiento is { } vencio)
+        {
+            var ultimo = ServicioSuscripcion.DiaFin(vencio);
+            if (hoy.DayNumber - ultimo.DayNumber <= VentanaEventosDias)
+            {
+                var nombre = CatalogoPlanes.De(vencido).Nombre;
+                yield return new($"{PrefijoMembresia}vencida:{TextoEnum.Escribir(vencido).ToLowerInvariant()}:{ultimo:yyyy-MM-dd}",
+                    CategoriaNotificacion.Sistema, NivelNotificacion.Critica, $"Tu plan {nombre} venció: ahora estás en Gratis",
+                    $"Tu plan {nombre} terminó el {Fechas.Corta(ultimo)} sin pago y desde el {Fechas.Corta(ultimo.AddDays(1))} estás en el plan Gratis. " +
+                    "Los vehículos y estudiantes que superaban sus límites quedaron inactivos (no se borró nada). Paga un plan para recuperar sus funciones.",
+                    Enlace, "Mejorar mi plan");
+            }
+        }
     }
 
     /// <summary>Los hechos notificables de hoy (sin consultar qué se notificó antes).</summary>
@@ -72,6 +159,11 @@ public class GeneradorNotificaciones(IBaseDatos db, ServicioReportes reportes, P
         var mesActual = Periodos.De(hoy);
         var diasAlerta = await parametros.DiasAlertaVencimientoAsync(ct);
         var resultado = new List<NuevaNotificacion>();
+
+        // Membresía (días de aviso: parámetro de la plataforma)
+        var suscripcion = await db.Suscripciones.AsNoTracking().FirstOrDefaultAsync(ct);
+        resultado.AddRange(AvisosMembresia(suscripcion, hoy, await ServicioParametrosPlataforma.DiasAvisoVencimientoAsync(db, ct),
+            reloj.GetUtcNow().UtcDateTime));
 
         // Pagos recibidos
         var recibos = await db.Pagos.AsNoTracking()

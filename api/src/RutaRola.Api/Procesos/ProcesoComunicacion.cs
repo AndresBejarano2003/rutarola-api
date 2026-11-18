@@ -1,3 +1,4 @@
+using RutaRola.Application.Suscripciones;
 using System.Security.Claims;
 using RutaRola.Api.Seguridad;
 using RutaRola.Application.Comun;
@@ -85,6 +86,12 @@ public sealed class ProcesoComunicacion(IServiceScopeFactory scopes, IConfigurat
             {
                 using var scope = scopes.CreateScope();
                 scope.ServiceProvider.GetRequiredService<ContextoUsuarioHttp>().Usar(Principal(empresa));
+                // Plan o prueba vencidos: al día siguiente pasan a Gratis (y se inactiva lo que sobre) aunque nadie entre.
+                if (await scope.ServiceProvider.GetRequiredService<ServicioSuscripcion>().RevisarVencimientoAsync(ct) is { } bajada)
+                {
+                    logger.LogInformation("Empresa {Empresa}: plan vencido, pasa a Gratis ({Vehiculos} vehículo(s) y {Estudiantes} estudiante(s) inactivados)",
+                        empresa, bajada.Vehiculos.Count, bajada.Estudiantes);
+                }
                 var envios = await scope.ServiceProvider.GetRequiredService<ServicioCobros>().EnviarRecordatoriosAsync(ct);
                 var notificaciones = await scope.ServiceProvider.GetRequiredService<GeneradorNotificaciones>().GenerarAsync(ct);
                 if (envios + notificaciones > 0)

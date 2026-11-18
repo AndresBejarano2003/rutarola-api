@@ -245,7 +245,7 @@ public class ServicioCodigosPromocionales(IBaseDatos db, TimeProvider reloj)
         var hoy = Hoy;
         if (hoy < c.FechaInicio) throw No($"El código {c.Codigo} es válido desde el {Fechas.Corta(c.FechaInicio)}.");
         if (hoy > c.FechaFin) throw No($"El código {c.Codigo} venció el {Fechas.Corta(c.FechaFin)}.");
-        var definicion = CatalogoPlanes.De(plan);
+        var definicion = await ServicioParametrosPlataforma.PlanAsync(db, plan, ct);
         var planes = ReglasCodigoPromocional.LeerPlanes(c.Planes);
         if (planes.Count > 0 && !planes.Contains(plan)) throw No($"El código {c.Codigo} no aplica para el plan {definicion.Nombre}.");
         if (c.Periodo is { } p && p != periodo)

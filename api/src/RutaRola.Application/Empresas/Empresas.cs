@@ -14,7 +14,7 @@ public record EmpresaDto(
     Suscripciones.MembresiaEmpresaDto? Membresia = null);
 
 /// <summary>Empresas por situación de su membresía (tarjetas de la plataforma).</summary>
-public record ResumenMembresiasDto(int Total, int Prueba, int PruebaPorVencer, int Activa, int PorVencer, int Vencida, int Gratis);
+public record ResumenMembresiasDto(int Total, int Prueba, int PruebaPorVencer, int Activa, int PorVencer, int Gratis);
 
 /// <summary>Primer administrador de la empresa (opcional al crearla).</summary>
 public record AdministradorInicial(string? Nombre, string? Usuario, string? Email, string? Contrasena);
@@ -26,7 +26,7 @@ public record SolicitudEmpresa(
 /// <summary>Lo que el administrador puede cambiar de su propia empresa (no el NIT ni el estado).</summary>
 public record SolicitudEmpresaPropia(string? Nombre, string? Direccion, string? Ciudad, string? Telefono, string? Email, string? LogoUrl);
 
-/// <summary><c>membresia</c>: PRUEBA | PRUEBA_POR_VENCER | ACTIVA | POR_VENCER | VENCIDA | GRATIS; <c>plan</c>: plan vigente.</summary>
+/// <summary><c>membresia</c>: PRUEBA | PRUEBA_POR_VENCER | ACTIVA | POR_VENCER | GRATIS; <c>plan</c>: plan vigente.</summary>
 public record TemaDto(Domain.Enums.TemaApariencia Tema);
 
 public record SolicitudTema(Domain.Enums.TemaApariencia? Tema);
@@ -102,14 +102,14 @@ public class ServicioEmpresas(IBaseDatos db, IPasswordHasher<Usuario> hasher, Ti
         }
         if (TextoEnum.Leer<Domain.Enums.PlanSuscripcion>(filtros.Plan) is { } plan)
         {
-            var ahora = Ahora;
+            // Vence al final de su último día (Colombia): lo que terminó antes de hoy cuenta como Gratis.
+            var inicioHoy = Suscripciones.ServicioSuscripcion.InicioDeHoyUtc(Ahora);
             var suscripciones = db.Suscripciones.IgnoreQueryFilters([FiltrosConsulta.Empresa]);
-            // Plan vigente: el vencido (sin bajar aún) cuenta como Gratis.
             consulta = plan == Domain.Enums.PlanSuscripcion.Gratis
                 ? consulta.Where(e => suscripciones.Any(s => s.IdEmpresa == e.Id && (s.Plan == plan
-                    || (s.Estado != Domain.Enums.EstadoSuscripcion.Gratis && (s.FechaFin == null || s.FechaFin <= ahora)))))
+                    || (s.Estado != Domain.Enums.EstadoSuscripcion.Gratis && (s.FechaFin == null || s.FechaFin < inicioHoy)))))
                 : consulta.Where(e => suscripciones.Any(s => s.IdEmpresa == e.Id && s.Plan == plan
-                    && (s.Estado == Domain.Enums.EstadoSuscripcion.Gratis || s.FechaFin > ahora)));
+                    && (s.Estado == Domain.Enums.EstadoSuscripcion.Gratis || s.FechaFin >= inicioHoy)));
         }
 
         var total = await consulta.CountAsync(ct);
@@ -128,7 +128,7 @@ public class ServicioEmpresas(IBaseDatos db, IPasswordHasher<Usuario> hasher, Ti
         var situaciones = ids.Select(id => Suscripciones.ServicioSuscripcion.Situacion(suscripciones.GetValueOrDefault(id), ahora)).ToList();
         int Contar(string s) => situaciones.Count(x => x == s);
         return new ResumenMembresiasDto(ids.Count, Contar("PRUEBA"), Contar("PRUEBA_POR_VENCER"), Contar("ACTIVA"), Contar("POR_VENCER"),
-            Contar("VENCIDA"), Contar("GRATIS"));
+            Contar("GRATIS"));
     }
 
     public async Task<EmpresaDto> ObtenerAsync(Guid id, CancellationToken ct = default)

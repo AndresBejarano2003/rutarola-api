@@ -371,29 +371,35 @@ contraseña o inactivar revoca sus sesiones.
 
 | Petición | Permiso | Respuesta |
 |---|---|---|
-| `GET /suscripcion/planes` | anónimo | Catálogo de `CatalogoPlanes` (precios COP con IVA, anual = 10 mensualidades, límites, funciones). |
+| `GET /suscripcion/planes` | anónimo | Catálogo de `CatalogoPlanes.Base` con los precios mensuales que fija la plataforma (`plan.*.precio_mensual`; COP con IVA, anual = 10 mensualidades), límites y funciones. |
 | `GET /suscripcion`, `GET /suscripcion/pagos` | `suscripcion.leer` | Plan, estado (PRUEBA/ACTIVA/GRATIS), días restantes, límites y uso; historial de pagos. |
 | `POST /suscripcion/codigo {codigo, plan, periodo}` | `suscripcion.gestionar` | `{codigo, precio, descuento, total, …}` si el código aplica; 422 con el motivo. El descuento es solo del primer mes. |
 | `POST /suscripcion/pagos {plan, periodo, codigoPromocional}` | `suscripcion.gestionar` | 201 `{referencia, url}`: pago PENDIENTE (con el descuento del código) y URL firmada del Web Checkout (integridad = SHA256(ref + centavos + moneda + secreto)). 422 sin llaves o si el código no aplica. Total $0 → pago APROBADO `CODIGO_PROMOCIONAL` aplicado de una vez y `url` vacía (también sin Wompi). |
 | `POST /suscripcion/pagos/{referencia}/verificacion {idTransaccion}` | `suscripcion.gestionar` | Consulta la transacción en Wompi y la aplica si está aprobada. |
 | `POST /pagos/wompi/eventos` | anónimo | Evento `transaction.updated`; checksum con `Wompi:SecretoEventos` (401 si no coincide). Valor y moneda deben coincidir con el pago. Idempotente. |
-| `GET/PUT /empresas/{id}/suscripcion`, `GET /empresas/{id}/suscripcion/pagos` | `empresas.gestionar` | Ajuste manual de la plataforma (plan, estado, vencimiento futuro, nota y `codigoPromocional` opcional solo en ACTIVA: registra el uso y anota el descuento). |
+| `GET/PUT /empresas/{id}/suscripcion`, `GET /empresas/{id}/suscripcion/pagos` | `empresas.gestionar` | Ajuste manual de la plataforma (plan, estado, vencimiento futuro —su último día debe ser hoy o después—, nota, y solo en ACTIVA `codigoPromocional` opcional —registra el uso y anota el descuento— y `valorPagado` opcional en pesos —crea un pago APROBADO `MAN-…` con método `MANUAL` que cuenta en los ingresos—). |
 | `GET/POST /plataforma/codigos-promocionales`, `GET/PUT/DELETE …/{id}`, `GET …/opciones`, `GET …/{id}/motivo-no-eliminar`, `GET …/{id}/usos` | `promociones.gestionar` (SuperAdmin) | Códigos promocionales. Filtros `texto`, `estado`, `vigencia` (PROGRAMADO/VIGENTE/VENCIDO). 409 código repetido o `DELETE` de un código usado o con pagos (se inactiva). |
-| `POST /auth/registro {empresa, administrador, aceptaTerminos, comienzo}` | anónimo (límite por IP) | 201 `{sesion, tokens}`: crea empresa, administrador y suscripción según `comienzo`: `GRATIS` (plan Gratis sin vencimiento ni decisión pendiente), `PRUEBA` (por defecto) o `PAGAR` (Gratis con la decisión pendiente, para pagar de una vez). Sin `comienzo` se usa el anterior `pagarAhora`. 409 NIT/usuario/correo en uso. |
-| `GET /suscripcion/condiciones` | anónimo | `{diasPrueba}` que recibe hoy una empresa nueva. |
-| `POST /suscripcion/continuar-gratis` | `suscripcion.gestionar` | Decide quedarse en Gratis: `{suscripcion, inactivados {vehiculos, estudiantes}}`. |
+| `POST /auth/registro {empresa, administrador, aceptaTerminos, comienzo}` | anónimo (límite por IP) | 201 `{sesion, tokens}`: crea empresa, administrador y suscripción según `comienzo`: `GRATIS` (plan Gratis sin vencimiento), `PRUEBA` (por defecto) o `PAGAR` (empieza en Gratis y el frontend abre el pago). Sin `comienzo` se usa el anterior `pagarAhora`. 409 NIT/usuario/correo en uso. |
+| `GET /suscripcion/condiciones` | anónimo | `{diasPrueba, planPrueba, nombrePlanPrueba, diasAvisoVencimiento}`: días de prueba que recibe hoy una empresa nueva y desde cuántos días antes del fin se avisa. |
 | `POST /suscripcion/prueba` | `suscripcion.gestionar` | Empresa en Gratis que no ha usado la prueba (se registró en Gratis): inicia los días de Profesional que fija hoy la plataforma → `SuscripcionDto`. 422 si ya la usó o tiene un plan. |
-| `GET/PUT /plataforma/parametros` | SuperAdmin | Parámetros de la plataforma (`parametros_plataforma`): `suscripcion.dias_prueba` 1–90 (15). |
-| `GET /empresas/resumen-membresias` | `empresas.gestionar` | Conteo por situación (PRUEBA, PRUEBA_POR_VENCER ≤ 3 d, ACTIVA, POR_VENCER ≤ 7 d, VENCIDA, GRATIS). `GET /empresas` filtra por `membresia` y `plan` y devuelve `membresia` (plan, situación, desde/hasta, días, último pago). |
+| `GET/PUT /plataforma/parametros` | SuperAdmin | Parámetros de la plataforma (`parametros_plataforma`, cada uno con `tipo` DIAS/PESOS y `grupo` MEMBRESIAS/PRECIOS): `suscripcion.dias_prueba` 1–90 (15), `suscripcion.dias_aviso_vencimiento` 1–60 (5), `plan.esencial.precio_mensual`, `plan.profesional.precio_mensual`, `plan.empresarial.precio_mensual` (1.000–100.000.000; por defecto los del catálogo). |
+| `GET /plataforma/ingresos?desde=&hasta=` | `empresas.gestionar` (SuperAdmin) | `IngresosPlataformaDto`: pagos APROBADOS con valor por el día (Colombia) en que se aplicaron (Wompi y `MANUAL`), total y pagos vs. el periodo anterior de igual duración, empresas, promedio, descuentos, recurrente mensual de los planes pagados vigentes hoy (anual ÷ 12) y empresas pagando, serie por DIA (≤ 62 días) o MES, por plan/periodo/método, top 10 empresas y detalle (≤ 500). Vacíos = mes actual; 422 si `hasta` < `desde` o más de 3 años. |
+| `GET /empresas/resumen-membresias` | `empresas.gestionar` | Conteo por situación (PRUEBA, PRUEBA_POR_VENCER ≤ 3 d, ACTIVA, POR_VENCER ≤ 7 d, GRATIS; no hay VENCIDA). `GET /empresas` filtra por `membresia` y `plan` y devuelve `membresia` (plan, situación, desde/hasta, días, último pago). |
 
-Tablas `suscripciones` (una por empresa; `dias_prueba`, `pendiente_decision`, `plan_vencido`, `fecha_vencimiento`,
+Tablas `suscripciones` (una por empresa; `dias_prueba`, `pendiente_decision` —heredada, ya no se usa—, `plan_vencido`, `fecha_vencimiento`,
 `fecha_ultimo_pago`) y `pagos_suscripcion` (`referencia` única). Toda empresa nueva recibe una prueba Profesional de
-`suscripcion.dias_prueba` días (15, lo fija la plataforma) y la conserva aunque el parámetro cambie después. Al vencer la
-prueba o el plan pagado pasa a GRATIS con `pendiente_decision`: el administrador paga o sigue en Gratis. Bajar a un plan
+`suscripcion.dias_prueba` días (15, lo fija la plataforma) y la conserva aunque el parámetro cambie después. El plan o la prueba
+duran hasta el final de su último día (Colombia: `DiaFin`, `VencidaEn`, `DiasRestantes`). Desde
+`suscripcion.dias_aviso_vencimiento` días antes, `GeneradorNotificaciones.AvisosMembresia` avisa a TODOS los
+administradores activos (campana + correo por `ICanalCorreo`, nunca falla la petición): `membresia:{estado}:{día}:por-vencer`
+y `…:ultimo-dia`. Al día siguiente, sin pago, `ProcesoComunicacion` (`RevisarVencimientoAsync`, también `GET /suscripcion`)
+la deja en GRATIS automáticamente con `plan_vencido`/`fecha_vencimiento`, aplica los límites de Gratis y avisa
+`membresia:vencida:{plan}:{día}`. No hay situación VENCIDA ni decisión pendiente (las filas antiguas con
+`pendiente_decision` pasan a Gratis); `POST /suscripcion/continuar-gratis` ya no existe. Bajar a un plan
 menor inactiva lo que sobre (primero conserva vehículos con asignación vigente y estudiantes en rutas activas, luego los
 más antiguos; un vehículo inactivado inactiva sus asignaciones); para activar otro hay que inactivar uno (422).
 Funciones del plan: `[RequiereFuncionPlan(f, soloEscritura)]` → 403 "Tu plan X no incluye …" (reportes, monitoreo,
-escrituras de programación; el mapa del portal exige `GPS_EN_VIVO`). Solo Wompi activa un plan
+cronograma, escrituras de programación; el mapa del portal exige `GPS_EN_VIVO`). Solo Wompi activa un plan
 (evento firmado o consulta del servidor), nunca el navegador. Pagar durante la prueba suma los días que quedan;
 renovar el mismo plan extiende; cambiar de plan empieza hoy. Límites: crear o activar vehículos y estudiantes por
 encima del plan → 422; lotes GPS sin `GPS_EN_VIVO` → 422; sin `RECORDATORIOS` el proceso no envía cobros. Una
@@ -408,6 +414,17 @@ ambos; `usos_maximos` null = sin límite; `usos_por_empresa`), `codigos_promocio
 `usos_codigo_promocional` (un uso por pago aprobado o activación manual). `pagos_suscripcion` guarda el código y
 `descuento_centavos`. Reglas en `ServicioCodigosPromocionales.EvaluarAsync`; el descuento es SOLO del primer mes
 (en el anual, una mensualidad; el valor fijo no supera un mes). Los pagos pendientes no cuentan como uso.
+
+## Cronograma de la operación
+
+| Petición | Permiso | Respuesta |
+|---|---|---|
+| `GET /cronograma?desde=&hasta=` | `rutas.leer` + plan con `CRONOGRAMA` (Profesional, Empresarial) | `CronogramaDto {desde, hasta, dias[]}`: por día `habil` (lunes a viernes), `rutas` (activas con asignación activa vigente ese día hábil, más las que tuvieron recorrido), `finalizados`, `enCurso`, `ausencias` (avisos de los acudientes) y `eventos` (DOCUMENTO, LICENCIA, PAGO —fecha límite de las cuotas de facturas vigentes, con pendientes y valor—, CONTRATO, FIN_ASIGNACION; nivel CRITICA si ya pasó). 422 sin fechas, `hasta` < `desde` o más de 400 días. |
+| `GET /cronograma/dia?fecha=` | igual | `DetalleDiaCronogramaDto`: rutas (colegio, placa, conductor, monitora, estudiantes, ausencias y RECOGIDA/ENTREGA con estado PROGRAMADO, EN_CURSO, FINALIZADO o SIN_REGISTRO), avisos de ausencia (estudiante, códigos de ruta, trayecto `""` = ambos, motivo, nota, acudiente, quién confirmó) y eventos. Sin fecha = hoy. |
+
+`ServicioCronograma` (`Application/Operacion/Cronograma.cs`) lee todo por el contexto filtrado (cada empresa ve solo lo
+suyo) y aplica las mismas reglas que `calcular-cronograma.ts`. Sin la función responde 403 "Tu plan X no incluye el
+cronograma de la operación…".
 
 ## Avisos de ausencia, documentos de vehículos, PDF y tema (migración `MembresiasAvisosYDocumentos`)
 

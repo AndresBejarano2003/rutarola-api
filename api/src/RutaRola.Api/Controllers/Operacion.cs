@@ -144,3 +144,19 @@ public class AvisosAusenciaController(ServicioAvisosAusencia servicio) : Control
     [HttpGet]
     public Task<IReadOnlyList<AvisoAusenciaDto>> Listar([FromQuery] FiltrosAvisoAusencia filtros, CancellationToken ct) => servicio.ListarAsync(filtros, ct);
 }
+
+/// <summary>
+/// Cronograma de la operación (planes con <c>CRONOGRAMA</c>): resumen por día de un rango (semana, mes o año, máximo 400 días)
+/// y el detalle de un día (rutas con sus trayectos, avisos de ausencia y agenda).
+/// </summary>
+[Route("api/v1/cronograma")]
+[RequierePermiso(Permisos.RutasLeer)]
+[RequiereFuncionPlan(Application.Suscripciones.FuncionPlan.Cronograma)]
+public class CronogramaController(ServicioCronograma servicio) : ControladorApi
+{
+    [HttpGet]
+    public Task<CronogramaDto> Obtener([FromQuery] FiltrosCronograma filtros, CancellationToken ct) => servicio.ObtenerAsync(filtros, ct);
+
+    [HttpGet("dia")]
+    public Task<DetalleDiaCronogramaDto> Dia([FromQuery] DateOnly? fecha, CancellationToken ct) => servicio.DiaAsync(fecha, ct);
+}

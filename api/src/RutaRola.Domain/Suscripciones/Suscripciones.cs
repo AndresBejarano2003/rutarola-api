@@ -4,8 +4,8 @@ using RutaRola.Domain.Enums;
 namespace RutaRola.Domain.Suscripciones;
 
 /// <summary>
-/// Plan vigente de una empresa (una fila por empresa). Al vencerse la prueba o el periodo pagado la empresa
-/// pasa al plan Gratis: conserva sus datos y solo se limita lo que crea de nuevo.
+/// Plan vigente de una empresa (una fila por empresa). Al día siguiente de vencerse la prueba o el periodo pagado la
+/// empresa pasa al plan Gratis: conserva sus datos y se inactiva lo que supere los límites.
 /// </summary>
 public class Suscripcion : EntidadEmpresa
 {
@@ -26,8 +26,8 @@ public class Suscripcion : EntidadEmpresa
     /// </summary>
     public int DiasPrueba { get; set; }
     /// <summary>
-    /// La prueba o el plan pagado venció y el administrador aún no decide si paga o sigue en Gratis: al iniciar
-    /// sesión ve la pasarela de pagos. Se apaga al pagar o al elegir Gratis.
+    /// Solo filas anteriores: la prueba o el plan vencía y se pedía decidir. Ya no existe esa decisión (al día siguiente
+    /// del vencimiento queda en Gratis); el servidor las resuelve al leerlas (Gratis + límites) y la apaga.
     /// </summary>
     public bool PendienteDecision { get; set; }
     /// <summary>Plan que venció (para mostrar "Tu plan Profesional venció el …") y cuándo.</summary>

@@ -18,18 +18,13 @@ public class SuscripcionController(ServicioSuscripcion servicio) : ControladorAp
 {
     [HttpGet("planes")]
     [AllowAnonymous]
-    public IReadOnlyList<PlanDto> Planes() => ServicioSuscripcion.Planes();
+    public Task<IReadOnlyList<PlanDto>> Planes(CancellationToken ct) => servicio.PlanesAsync(ct);
 
     /// <summary>Días de prueba que recibe hoy una empresa nueva (registro y precios públicos).</summary>
     [HttpGet("condiciones")]
     [AllowAnonymous]
     public Task<CondicionesRegistroDto> Condiciones([FromServices] ServicioParametrosPlataforma parametros, CancellationToken ct) =>
         parametros.CondicionesAsync(ct);
-
-    /// <summary>La prueba o el plan venció y el administrador no quiere pagar: sigue en Gratis e inactiva lo que sobre.</summary>
-    [HttpPost("continuar-gratis")]
-    [RequierePermiso(Permisos.SuscripcionGestionar)]
-    public Task<DecisionGratisDto> ContinuarGratis(CancellationToken ct) => servicio.ContinuarGratisAsync(ct);
 
     /// <summary>Empresa en Gratis que no ha usado la prueba: inicia los días de Profesional que fija la plataforma.</summary>
     [HttpPost("prueba")]
@@ -123,7 +118,16 @@ public class CodigosPromocionalesController(ServicioCodigosPromocionales servici
     public Task<IReadOnlyList<UsoCodigoDto>> Usos(Guid id, CancellationToken ct) => servicio.UsosAsync(id, ct);
 }
 
-/// <summary>Parámetros globales de la plataforma (SuperAdmin): días de la prueba gratuita.</summary>
+/// <summary>Ingresos de la plataforma por los planes pagados (SuperAdmin): <c>GET /plataforma/ingresos?desde=&amp;hasta=</c>.</summary>
+[Route("api/v1/plataforma/ingresos")]
+[RequierePermiso(Permisos.EmpresasGestionar)]
+public class IngresosPlataformaController(ServicioIngresosPlataforma servicio) : ControladorApi
+{
+    [HttpGet]
+    public Task<IngresosPlataformaDto> Obtener([FromQuery] FiltrosIngresos filtros, CancellationToken ct) => servicio.ObtenerAsync(filtros, ct);
+}
+
+/// <summary>Parámetros globales de la plataforma (SuperAdmin): días de prueba y de aviso, y precios de los planes.</summary>
 [Route("api/v1/plataforma/parametros")]
 [RequierePermiso(Permisos.EmpresasGestionar)]
 public class ParametrosPlataformaController(ServicioParametrosPlataforma servicio) : ControladorApi

@@ -19,24 +19,21 @@ public record PlanDto(
 
 /// <summary>
 /// Plan de la empresa. <c>periodo</c> <c>""</c> sin pago; <c>fechaFin</c> null en Gratis; <c>diasRestantes</c> de la
-/// prueba o del periodo pagado. <c>pagosEnLinea</c> = Wompi configurado. <c>pendienteDecision</c>: la prueba o el plan
-/// venció (o se registró para pagar de una vez) y el administrador debe elegir pagar o seguir en Gratis;
-/// <c>planVencido</c> (<c>""</c> si no aplica) y <c>fechaVencimiento</c> dicen qué venció y cuándo.
+/// prueba o del periodo pagado (0 = vence hoy: el plan dura hasta el final de su último día). <c>pagosEnLinea</c> = Wompi
+/// configurado. <c>planVencido</c> (<c>""</c> si no aplica) y <c>fechaVencimiento</c> dicen qué plan venció y cuándo:
+/// al día siguiente del vencimiento sin pago la empresa queda en Gratis automáticamente.
 /// </summary>
 public record SuscripcionDto(
     PlanSuscripcion Plan, string NombrePlan, EstadoSuscripcion Estado, string Periodo, DateTime FechaInicio, DateTime? FechaFin,
     int? DiasRestantes, bool PruebaUsada, LimitesDto Limites, UsoDto Uso, IReadOnlyList<string> Funciones, bool PagosEnLinea, string Nota,
-    bool PendienteDecision = false, string PlanVencido = "", DateTime? FechaVencimiento = null, int DiasPrueba = 0);
+    string PlanVencido = "", DateTime? FechaVencimiento = null, int DiasPrueba = 0);
 
 /// <summary>Al pasar a un plan con menos cupo: lo que quedó inactivo para respetar los límites.</summary>
 public record AjusteLimitesDto(IReadOnlyList<string> Vehiculos, int Estudiantes);
 
-/// <summary>Resultado de "Continuar con el plan Gratis".</summary>
-public record DecisionGratisDto(SuscripcionDto Suscripcion, AjusteLimitesDto Inactivados);
-
 /// <summary>
 /// Situación de la membresía para la tabla de la plataforma: PRUEBA, PRUEBA_POR_VENCER (≤ 3 días), ACTIVA,
-/// POR_VENCER (≤ 7 días), VENCIDA (venció y no ha pagado ni elegido Gratis) o GRATIS.
+/// POR_VENCER (≤ 7 días) o GRATIS (también la que venció sin pagar: pasa a Gratis al día siguiente).
 /// </summary>
 public record MembresiaEmpresaDto(
     PlanSuscripcion Plan, string NombrePlan, EstadoSuscripcion Estado, string Situacion, string Periodo, DateTime FechaInicio,
@@ -54,10 +51,15 @@ public record SolicitudPagoSuscripcion(PlanSuscripcion? Plan, PeriodoPago? Perio
 
 public record SolicitudVerificacionPago(string? IdTransaccion);
 
-/// <summary>Ajuste manual de la plataforma (convenio, pago por transferencia, extensión de la prueba…).</summary>
-/// <summary><c>codigoPromocional</c> (opcional, solo en ACTIVA): registra el uso y anota el descuento del primer mes.</summary>
+/// <summary>
+/// Ajuste manual de la plataforma (convenio, pago por transferencia, extensión de la prueba…).
+/// <c>codigoPromocional</c> (opcional, solo en ACTIVA): registra el uso y anota el descuento del primer mes.
+/// <c>valorPagado</c> (pesos, opcional, solo en ACTIVA): lo que la empresa pagó por fuera (transferencia); queda como pago
+/// APROBADO con método MANUAL y cuenta en los ingresos de la plataforma. 0 o vacío = sin pago (cortesía, convenio).
+/// </summary>
 public record SolicitudAjusteSuscripcion(
-    PlanSuscripcion? Plan, EstadoSuscripcion? Estado, PeriodoPago? Periodo, DateTime? FechaFin, string? Nota, string? CodigoPromocional = null);
+    PlanSuscripcion? Plan, EstadoSuscripcion? Estado, PeriodoPago? Periodo, DateTime? FechaFin, string? Nota, string? CodigoPromocional = null,
+    long? ValorPagado = null);
 
 public class ValidadorSolicitudPagoSuscripcion : AbstractValidator<SolicitudPagoSuscripcion>
 {
@@ -92,6 +94,10 @@ public class ValidadorSolicitudAjusteSuscripcion : AbstractValidator<SolicitudAj
         RuleFor(x => x.CodigoPromocional).MaximumLength(30).WithMessage("El código promocional no es válido.");
         RuleFor(x => x.Estado).Equal(EstadoSuscripcion.Activa).When(x => !string.IsNullOrWhiteSpace(x.CodigoPromocional))
             .WithMessage("El código promocional solo se aplica al activar un plan pagado.");
+        RuleFor(x => x.ValorPagado).InclusiveBetween(0, 1_000_000_000).When(x => x.ValorPagado is not null)
+            .WithMessage("El valor pagado no es válido.");
+        RuleFor(x => x.Estado).Equal(EstadoSuscripcion.Activa).When(x => x.ValorPagado > 0)
+            .WithMessage("El valor pagado solo se registra al activar un plan pagado.");
     }
 }
 
@@ -99,8 +105,9 @@ public class ValidadorSolicitudAjusteSuscripcion : AbstractValidator<SolicitudAj
 /// Plan de la empresa del token, sus límites y los pagos en línea con Wompi:
 /// <list type="bullet">
 /// <item>Sin fila (empresas anteriores a los planes) cuenta como prueba de Profesional desde hoy; se guarda al consultarla.</item>
-/// <item>Prueba o periodo vencido → GRATIS (se guarda al leerla). Los datos se conservan; solo se limita crear o
-/// activar vehículos y estudiantes por encima del plan.</item>
+/// <item>El plan o la prueba duran hasta el final del día de <c>FechaFin</c> (Colombia). Al día siguiente, sin pago, la
+/// empresa pasa a GRATIS automáticamente (al leerla o en el proceso del servidor) y se inactiva lo que supere los
+/// límites de Gratis. Los datos se conservan.</item>
 /// <item>El plan se activa únicamente con la confirmación de Wompi (evento firmado o consulta de la transacción),
 /// verificando referencia, valor y moneda. Aplicar un pago es idempotente.</item>
 /// <item>Pagar durante la prueba suma los días que quedaban; renovar el mismo plan suma al periodo vigente; cambiar
@@ -115,8 +122,9 @@ public class ServicioSuscripcion(
     private OpcionesWompi Wompi => wompi.Value;
     private DateTime Ahora => reloj.GetUtcNow().UtcDateTime;
 
-    public static IReadOnlyList<PlanDto> Planes() =>
-        CatalogoPlanes.Todos.Select(p => new PlanDto(
+    /// <summary>Los planes con los precios vigentes (los fija la plataforma en Ajustes).</summary>
+    public async Task<IReadOnlyList<PlanDto>> PlanesAsync(CancellationToken ct = default) =>
+        (await ServicioParametrosPlataforma.PlanesAsync(db, ct)).Select(p => new PlanDto(
             p.Plan, p.Nombre, p.Descripcion, p.PrecioMensual, p.PrecioAnual, p.PrecioDesde, p.Destacado,
             new LimitesDto(p.Vehiculos, p.Estudiantes), p.Funciones, p.Incluye)).ToList();
 
@@ -148,8 +156,8 @@ public class ServicioSuscripcion(
     };
 
     /// <summary>
-    /// "Pagar de una vez" al registrarse: sin prueba, en Gratis y con la pasarela pendiente (al entrar ve los planes
-    /// para pagar; si no paga, sigue en Gratis).
+    /// "Pagar de una vez" al registrarse: sin prueba y en Gratis; la pantalla lo lleva al pago del plan elegido (si no
+    /// paga, sigue en Gratis).
     /// </summary>
     public static Suscripcion SinPrueba(Guid idEmpresa, DateTime ahora) => new()
     {
@@ -158,7 +166,6 @@ public class ServicioSuscripcion(
         Estado = EstadoSuscripcion.Gratis,
         FechaInicio = ahora,
         PruebaUsada = true,
-        PendienteDecision = true,
     };
 
     /// <summary>
@@ -168,9 +175,8 @@ public class ServicioSuscripcion(
     public static string Situacion(Suscripcion? s, DateTime ahora)
     {
         if (s is null) return "PRUEBA";
-        if (s.Estado == EstadoSuscripcion.Gratis) return s.PendienteDecision ? "VENCIDA" : "GRATIS";
-        if (s.FechaFin is not { } fin || fin <= ahora) return "VENCIDA";
-        var dias = (fin - ahora).TotalDays;
+        if (s.Estado == EstadoSuscripcion.Gratis || VencidaEn(s, ahora)) return "GRATIS";
+        var dias = DiasRestantes(s.FechaFin!.Value, ahora);
         return s.Estado == EstadoSuscripcion.Prueba
             ? dias <= DiasAvisoPrueba ? "PRUEBA_POR_VENCER" : "PRUEBA"
             : dias <= DiasAvisoPlan ? "POR_VENCER" : "ACTIVA";
@@ -186,13 +192,13 @@ public class ServicioSuscripcion(
             var prueba = CatalogoPlanes.De(CatalogoPlanes.PlanPrueba);
             return new MembresiaEmpresaDto(prueba.Plan, prueba.Nombre, EstadoSuscripcion.Prueba, "PRUEBA", "", ahora, null, null, 0, "", null, null);
         }
-        var vencida = s.Estado != EstadoSuscripcion.Gratis && (s.FechaFin is null || s.FechaFin <= ahora);
+        var vencida = VencidaEn(s, ahora);
         var plan = CatalogoPlanes.De(vencida ? PlanSuscripcion.Gratis : s.Plan);
         var planVencido = vencida ? s.Plan : s.PlanVencido;
         return new MembresiaEmpresaDto(
             plan.Plan, plan.Nombre, vencida ? EstadoSuscripcion.Gratis : s.Estado, Situacion(s, ahora),
             !vencida && s.Periodo is { } p ? TextoEnum.Escribir(p) : "", s.FechaInicio, vencida ? null : s.FechaFin,
-            !vencida && s.FechaFin is { } fin ? Math.Max(0, (int)Math.Ceiling((fin - ahora).TotalDays)) : null,
+            !vencida && s.FechaFin is { } fin ? DiasRestantes(fin, ahora) : null,
             s.DiasPrueba, planVencido is { } pv ? TextoEnum.Escribir(pv) : "", vencida ? s.FechaFin : s.FechaVencimiento, s.FechaUltimoPago);
     }
 
@@ -227,7 +233,7 @@ public class ServicioSuscripcion(
     /// </summary>
     public async Task<CheckoutDto> IniciarPagoAsync(SolicitudPagoSuscripcion s, CancellationToken ct = default)
     {
-        var plan = CatalogoPlanes.De(s.Plan!.Value);
+        var plan = await ServicioParametrosPlataforma.PlanAsync(db, s.Plan!.Value, ct);
         var periodo = s.Periodo!.Value;
         var idEmpresa = contexto.IdEmpresa ?? throw new ErrorNegocio("Inicia sesión de nuevo.", CodigoError.Prohibido);
         var evaluacion = Texto.Opcional(s.CodigoPromocional) is { } texto ? await codigos.EvaluarAsync(texto, idEmpresa, plan.Plan, periodo, ct) : default;
@@ -385,6 +391,7 @@ public class ServicioSuscripcion(
         var ahora = Ahora;
         s.PendienteDecision = false;
         s.PlanVencido = null;
+        s.FechaVencimiento = null;
         s.FechaUltimoPago = ahora;
         await AjustarLimitesAsync(pago.IdEmpresa, CatalogoPlanes.De(pago.Plan), ct);
         var vigente = s.FechaFin is { } fin && fin > ahora && s.Estado != EstadoSuscripcion.Gratis;
@@ -407,20 +414,14 @@ public class ServicioSuscripcion(
     }
 
     /// <summary>
-    /// El administrador no quiere pagar (prueba o plan vencido): sigue en Gratis y se inactiva lo que supere sus límites.
-    /// 422 si no hay una decisión pendiente.
+    /// Proceso del servidor (empresa del contexto): si el plan o la prueba vencieron, la pasa a Gratis e inactiva lo que
+    /// sobre. Devuelve lo inactivado, o null si no había nada que bajar.
     /// </summary>
-    public async Task<DecisionGratisDto> ContinuarGratisAsync(CancellationToken ct = default)
+    public async Task<AjusteLimitesDto?> RevisarVencimientoAsync(CancellationToken ct = default)
     {
-        var s = await PropiaAsync(ct);
-        if (!s.PendienteDecision || s.Estado != EstadoSuscripcion.Gratis)
-        {
-            throw new ErrorNegocio("Tu plan sigue vigente: no hay nada que decidir.", CodigoError.Validacion);
-        }
-        var inactivados = await AjustarLimitesAsync(s.IdEmpresa, CatalogoPlanes.De(PlanSuscripcion.Gratis), ct);
-        s.PendienteDecision = false;
-        await db.SaveChangesAsync(ct);
-        return new DecisionGratisDto(await DtoAsync(s, ct), inactivados);
+        var idEmpresa = contexto.IdEmpresa ?? throw new ErrorNegocio("Inicia sesión de nuevo.", CodigoError.Prohibido);
+        var s = await db.Suscripciones.FirstOrDefaultAsync(ct);
+        return s is null ? null : await BajarSiVencioAsync(s, ct);
     }
 
     /// <summary>
@@ -575,28 +576,47 @@ public class ServicioSuscripcion(
         s.Estado = a.Estado!.Value;
         s.Periodo = a.Estado == EstadoSuscripcion.Activa ? a.Periodo ?? PeriodoPago.Mensual : null;
         s.FechaFin = a.Estado == EstadoSuscripcion.Gratis ? null : DateTime.SpecifyKind(a.FechaFin!.Value.ToUniversalTime(), DateTimeKind.Utc);
-        if (s.FechaFin is { } fin && fin <= Ahora)
+        if (s.FechaFin is { } fin && VencidaEn(s, Ahora))
         {
             throw new ErrorNegocio("La fecha de vencimiento debe ser futura.", CodigoError.Validacion);
         }
         s.FechaInicio = Ahora;
         s.Nota = Texto.Opcional(a.Nota);
-        // La plataforma decidió por la empresa: no se le vuelve a mostrar la pasarela.
         s.PendienteDecision = false;
         if (a.Estado == EstadoSuscripcion.Activa)
         {
             s.PlanVencido = null;
-            if (cambiaPlan || s.FechaUltimoPago is null) s.FechaUltimoPago = Ahora;
+            s.FechaVencimiento = null;
+            if (cambiaPlan || s.FechaUltimoPago is null || a.ValorPagado > 0) s.FechaUltimoPago = Ahora;
         }
         await AjustarLimitesAsync(idEmpresa, CatalogoPlanes.De(s.Plan), ct);
+        PagoSuscripcion? pagoManual = null;
+        if (a.Estado == EstadoSuscripcion.Activa && a.ValorPagado > 0)
+        {
+            // Pago recibido por fuera (transferencia): cuenta en los ingresos de la plataforma.
+            pagoManual = new PagoSuscripcion
+            {
+                IdEmpresa = idEmpresa, Referencia = $"MAN-{Guid.CreateVersion7():N}", Plan = s.Plan, Periodo = s.Periodo!.Value,
+                ValorCentavos = a.ValorPagado.Value * 100, Estado = EstadoPagoSuscripcion.Aprobado, MetodoPago = MetodoPagoManual,
+                Ambiente = "manual", IdUsuario = contexto.IdUsuario, FechaAplicacion = Ahora,
+            };
+            db.PagosSuscripcion.Add(pagoManual);
+        }
         if (Texto.Opcional(a.CodigoPromocional) is { } texto)
         {
             // Plan activado a mano con un código (p. ej. pago por transferencia): cuenta como uso y queda anotado.
             var (codigo, r) = await codigos.EvaluarAsync(texto, idEmpresa, s.Plan, s.Periodo!.Value, ct);
             db.UsosCodigoPromocional.Add(new UsoCodigoPromocional
             {
-                IdEmpresa = idEmpresa, IdCodigoPromocional = codigo.Id, Plan = s.Plan, Periodo = s.Periodo.Value, DescuentoCentavos = r.Descuento * 100,
+                IdEmpresa = idEmpresa, IdCodigoPromocional = codigo.Id, IdPagoSuscripcion = pagoManual?.Id, Plan = s.Plan, Periodo = s.Periodo.Value,
+                DescuentoCentavos = r.Descuento * 100,
             });
+            if (pagoManual is not null)
+            {
+                pagoManual.IdCodigoPromocional = codigo.Id;
+                pagoManual.CodigoPromocional = codigo.Codigo;
+                pagoManual.DescuentoCentavos = r.Descuento * 100;
+            }
             var anotacion = $"Código {codigo.Codigo}: descuento de {Pesos(r.Descuento)} en el primer mes (total {Pesos(r.Total)}).";
             var nota = s.Nota is null ? anotacion : $"{s.Nota} · {anotacion}";
             s.Nota = nota.Length > 500 ? nota[..500] : nota;
@@ -609,7 +629,26 @@ public class ServicioSuscripcion(
 
     private static string Pesos(long valor) => "$" + valor.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("es-CO"));
 
-    private bool Vencida(Suscripcion s) => s.Estado != EstadoSuscripcion.Gratis && (s.FechaFin is null || s.FechaFin <= Ahora);
+    /// <summary>Método de los pagos que registra la plataforma a mano (transferencia, efectivo…).</summary>
+    public const string MetodoPagoManual = "MANUAL";
+
+    private bool Vencida(Suscripcion s) => VencidaEn(s, Ahora);
+
+    /// <summary>Último día del plan en Colombia: dura hasta el final de ese día.</summary>
+    public static DateOnly DiaFin(DateTime fechaFin) => DateOnly.FromDateTime(fechaFin.Add(Fechas.DesfaseColombia));
+
+    private static DateOnly HoyEn(DateTime ahora) => DateOnly.FromDateTime(ahora.Add(Fechas.DesfaseColombia));
+
+    /// <summary>Venció si ya pasó el último día (Colombia): al día siguiente queda en Gratis.</summary>
+    public static bool VencidaEn(Suscripcion s, DateTime ahora) =>
+        s.Estado != EstadoSuscripcion.Gratis && (s.FechaFin is not { } fin || DiaFin(fin) < HoyEn(ahora));
+
+    /// <summary>Días que quedan hasta el último día (0 = vence hoy).</summary>
+    public static int DiasRestantes(DateTime fechaFin, DateTime ahora) => Math.Max(0, DiaFin(fechaFin).DayNumber - HoyEn(ahora).DayNumber);
+
+    /// <summary>Inicio de hoy en Colombia (UTC): una suscripción con <c>FechaFin</c> anterior ya venció (para consultas SQL).</summary>
+    public static DateTime InicioDeHoyUtc(DateTime ahora) =>
+        DateTime.SpecifyKind(HoyEn(ahora).ToDateTime(TimeOnly.MinValue) - Fechas.DesfaseColombia, DateTimeKind.Utc);
 
     /// <summary>La suscripción de la empresa del token: la crea (prueba) si no existe y la baja a Gratis si venció.</summary>
     private async Task<Suscripcion> PropiaAsync(CancellationToken ct)
@@ -643,11 +682,21 @@ public class ServicioSuscripcion(
         return s;
     }
 
-    private async Task BajarSiVencioAsync(Suscripcion s, CancellationToken ct)
+    /// <summary>
+    /// Pasa a Gratis la suscripción vencida e inactiva lo que supere los límites de Gratis. También resuelve las filas
+    /// anteriores que quedaron con <c>PendienteDecision</c> (la decisión ya no existe: quedan en Gratis).
+    /// </summary>
+    private async Task<AjusteLimitesDto?> BajarSiVencioAsync(Suscripcion s, CancellationToken ct)
     {
-        if (!Vencida(s)) return;
-        // Al entrar, el administrador ve la pasarela: paga o sigue en Gratis (ContinuarGratisAsync aplica los límites).
-        s.PendienteDecision = true;
+        if (s.Estado == EstadoSuscripcion.Gratis && s.PendienteDecision)
+        {
+            s.PendienteDecision = false;
+            var ajuste = await AjustarLimitesAsync(s.IdEmpresa, CatalogoPlanes.De(PlanSuscripcion.Gratis), ct);
+            await db.SaveChangesAsync(ct);
+            return ajuste;
+        }
+        if (!Vencida(s)) return null;
+        s.PendienteDecision = false;
         s.PlanVencido = s.Plan;
         s.FechaVencimiento = s.FechaFin;
         s.Plan = PlanSuscripcion.Gratis;
@@ -655,7 +704,9 @@ public class ServicioSuscripcion(
         s.Periodo = null;
         s.FechaInicio = Ahora;
         s.FechaFin = null;
+        var inactivados = await AjustarLimitesAsync(s.IdEmpresa, CatalogoPlanes.De(PlanSuscripcion.Gratis), ct);
         await db.SaveChangesAsync(ct);
+        return inactivados;
     }
 
     private async Task<SuscripcionDto> DtoAsync(Suscripcion s, CancellationToken ct, Guid? idEmpresa = null)
@@ -669,10 +720,10 @@ public class ServicioSuscripcion(
             estudiantes = db.Estudiantes.IgnoreQueryFilters([FiltrosConsulta.Empresa]).Where(e => e.IdEmpresa == id);
         }
         var uso = new UsoDto(await vehiculos.CountAsync(v => v.Activo, ct), await estudiantes.CountAsync(e => e.Activo, ct));
-        int? dias = s.FechaFin is { } fin ? Math.Max(0, (int)Math.Ceiling((fin - Ahora).TotalDays)) : null;
+        int? dias = s.FechaFin is { } fin ? DiasRestantes(fin, Ahora) : null;
         return new SuscripcionDto(
             s.Plan, plan.Nombre, s.Estado, s.Periodo is { } p ? TextoEnum.Escribir(p) : "", s.FechaInicio, s.FechaFin, dias, s.PruebaUsada,
             new LimitesDto(plan.Vehiculos, plan.Estudiantes), uso, plan.Funciones, Wompi.Habilitada, s.Nota ?? "",
-            s.PendienteDecision, s.PlanVencido is { } vencido ? TextoEnum.Escribir(vencido) : "", s.FechaVencimiento, s.DiasPrueba);
+            s.PlanVencido is { } vencido ? TextoEnum.Escribir(vencido) : "", s.FechaVencimiento, s.DiasPrueba);
     }
 }
