@@ -65,3 +65,6 @@ services:
         value: "true"
       - key: Gps__DiasRetencion
         value: "30"
+      # Documentación de la API en /docs (Scalar) y /openapi/v1.json; la raíz redirige a /docs.
+      - key: Documentacion__Habilitada
+        value: "true"

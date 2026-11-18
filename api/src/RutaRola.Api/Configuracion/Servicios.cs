@@ -106,10 +106,13 @@ public static class Servicios
         app.UseAuthorization();
         app.UseCambiosDatos();
 
-        if (!app.Environment.IsProduction())
+        // Documentación (OpenAPI + Scalar): siempre fuera de producción; en producción solo con
+        // Documentacion:Habilitada=true. Solo describe los endpoints: cada uno sigue exigiendo su token y permiso.
+        if (!app.Environment.IsProduction() || app.Configuration.GetValue<bool>("Documentacion:Habilitada"))
         {
             app.MapOpenApi().AllowAnonymous();
             app.MapScalarApiReferenceRutaRola();
+            app.MapGet("/", () => Results.Redirect("/docs")).ExcludeFromDescription().AllowAnonymous();
         }
 
         app.MapHealthChecks("/health", new HealthCheckOptions

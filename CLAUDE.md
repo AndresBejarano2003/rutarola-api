@@ -202,7 +202,7 @@ In local mode `AutenticacionLocal` keeps unhashed passwords in the browser (demo
 
 ## Backend (`api/`)
 
-ASP.NET Core Web API on **.NET 10**, C# with nullable enabled (null warnings are errors, `Directory.Build.props`), **PostgreSQL** via EF Core + Npgsql (Code First), FluentValidation, ProblemDetails, Serilog (console; compact JSON outside Development), OpenAPI + Scalar at `/docs` (not in Production), xUnit + Testcontainers. Full docs: `api/README.md`, which lists env vars, deploy steps and the differences from `docs/modelo-bd-rutarola.json`.
+ASP.NET Core Web API on **.NET 10**, C# with nullable enabled (null warnings are errors, `Directory.Build.props`), **PostgreSQL** via EF Core + Npgsql (Code First), FluentValidation, ProblemDetails, Serilog (console; compact JSON outside Development), OpenAPI + Scalar at `/docs` (`/openapi/v1.json`, `/` redirects to `/docs`; in Production only with `Documentacion__Habilitada=true`, which `render.yaml` sets — it only describes the endpoints, each still requires its token/permission), xUnit + Testcontainers. Full docs: `api/README.md`, which lists env vars, deploy steps and the differences from `docs/modelo-bd-rutarola.json`.
 
 ```
 api/src/RutaRola.Api/            Program.cs (+ `migrar` command), Configuracion/ (Servicios: DI, JSON, CORS, health; Observabilidad: Serilog, Scalar), Errores/ (ManejadorErrores, DetallesProblema), Seguridad/ (ContextoUsuarioHttp), Controllers/

@@ -79,6 +79,7 @@ dotnet run --project src/RutaRola.Api -- migrar
 |---|---|---|
 | `ConnectionStrings__RutaRola` | sí | Cadena de conexión de PostgreSQL: formato Npgsql (`Host=…;Port=5432;Database=…;Username=…;Password=…;SSL Mode=Require`) o la URL del proveedor (`postgresql://usuario:clave@host/base?sslmode=require`, Render/Neon), que `CadenaConexion` convierte. |
 | `ASPNETCORE_ENVIRONMENT` | — | `Production` en la imagen. Fuera de producción se publican `/openapi/v1.json` y `/docs` (Scalar). |
+| `Documentacion__Habilitada` | no | `true` publica `/docs` (Scalar), `/openapi/v1.json` y la raíz `/` → `/docs` también en producción (activo en `render.yaml`, se ve en `https://api.rutarola.com/docs`). Solo describe los endpoints: cada uno sigue pidiendo token y permiso; en Scalar se usa "Authorize" con el `accessToken` de `POST /api/v1/auth/login`. |
 | `PORT` | — | Puerto HTTP (8080 en la imagen). |
 | `Cors__Origenes` | — | Orígenes permitidos separados por comas. Por defecto `http://localhost:4200,https://rutarola.netlify.app`. |
 | `Seed__Admin__Password` | para crear el admin | Clave del admin demo. Sin ella no se crea. Nunca se sobrescribe la de un usuario existente. |

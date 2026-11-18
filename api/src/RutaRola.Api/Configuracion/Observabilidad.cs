@@ -40,10 +40,17 @@ public static class Observabilidad
         return app;
     }
 
-    /// <summary>Documentación interactiva en <c>/docs</c> (solo fuera de producción).</summary>
+    /// <summary>
+    /// Documentación interactiva en <c>/docs</c> (Scalar sobre <c>/openapi/v1.json</c>): fuera de producción, o en
+    /// producción con <c>Documentacion:Habilitada</c>. "Authorize" con el <c>accessToken</c> de <c>POST /api/v1/auth/login</c>.
+    /// </summary>
     public static WebApplication MapScalarApiReferenceRutaRola(this WebApplication app)
     {
-        app.MapScalarApiReference("/docs", o => o.WithTitle("RutaRola API")).AllowAnonymous();
+        app.MapScalarApiReference("/docs", o => o
+                .WithTitle("RutaRola API")
+                .AddPreferredSecuritySchemes("Bearer")
+                .WithDefaultHttpClient(ScalarTarget.JavaScript, ScalarClient.Fetch))
+            .AllowAnonymous();
         return app;
     }
 }
