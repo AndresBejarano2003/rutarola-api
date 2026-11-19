@@ -58,6 +58,27 @@ public class GpsTests(BaseDatosPrueba bd)
     }
 
     [Fact]
+    public async Task Descarta_saltos_imposibles_del_gps_para_que_el_mapa_no_se_teletransporte()
+    {
+        var (e, r) = await EnCursoAsync();
+        var ahora = DateTime.UtcNow;
+        // 111 m en 6 s (≈ 66 km/h) es normal; 52 km en 6 s es un salto; tras 3 min sin señal, la nueva ubicación vale.
+        var lote = await EnviarAsync(e.ClienteConductor, r.Id,
+            Punto(ahora.AddMinutes(-4), 2.9273m), Punto(ahora.AddMinutes(-4).AddSeconds(6), 2.9283m),
+            Punto(ahora.AddMinutes(-4).AddSeconds(12), 3.4000m));
+        Assert.Equal(2, lote.Recibidas);
+        Assert.Equal(1, lote.Descartadas);
+        Assert.Equal(2.9283m, lote.Ultima!.Latitud);
+
+        // Un salto en otro lote (o desde el teléfono de la monitora) también se descarta.
+        Assert.Equal(0, (await EnviarAsync(e.ClienteMonitora!, r.Id, Punto(ahora.AddMinutes(-4).AddSeconds(20), 3.4000m))).Recibidas);
+        Assert.Equal(1, (await EnviarAsync(e.ClienteConductor, r.Id, Punto(ahora.AddMinutes(-1), 2.9450m))).Recibidas);
+
+        Assert.True(ReglasGps.SaltoImposible(2.9273m, -75.2819m, ahora, 2.9373m, -75.2819m, ahora.AddSeconds(6)));
+        Assert.False(ReglasGps.SaltoImposible(2.9273m, -75.2819m, ahora, 2.9280m, -75.2819m, ahora.AddSeconds(1)));
+    }
+
+    [Fact]
     public async Task Valida_el_lote()
     {
         var (e, r) = await EnCursoAsync();
@@ -85,15 +106,15 @@ public class GpsTests(BaseDatosPrueba bd)
         var (e, r) = await EnCursoAsync();
         var t = DateTime.UtcNow.AddSeconds(-60);
 
-        Assert.Equal(1, (await EnviarAsync(e.ClienteConductor, r.Id, Punto(t, 1m))).Recibidas);
+        Assert.Equal(1, (await EnviarAsync(e.ClienteConductor, r.Id, Punto(t, 2.9270m))).Recibidas);
         // La monitora toma la misma ubicación 2 s después: sobra. 10 s después, sí cuenta.
-        var monitora = await EnviarAsync(e.ClienteMonitora!, r.Id, Punto(t.AddSeconds(2), 1.1m), Punto(t.AddSeconds(10), 2m));
+        var monitora = await EnviarAsync(e.ClienteMonitora!, r.Id, Punto(t.AddSeconds(2), 2.92705m), Punto(t.AddSeconds(10), 2.9271m));
         Assert.Equal((1, 1), (monitora.Recibidas, monitora.Descartadas));
         // El teléfono de la monitora se apaga: el conductor sigue y la ubicación se mantiene al día.
-        Assert.Equal(2, (await EnviarAsync(e.ClienteConductor, r.Id, Punto(t.AddSeconds(20), 3m), Punto(t.AddSeconds(30), 4m))).Recibidas);
+        Assert.Equal(2, (await EnviarAsync(e.ClienteConductor, r.Id, Punto(t.AddSeconds(20), 2.9272m), Punto(t.AddSeconds(30), 2.9273m))).Recibidas);
 
         var trayecto = await (await e.Admin.Cliente.GetAsync($"/api/v1/recorridos/{r.Id}/gps")).LeerAsync<List<PosicionDto>>();
-        Assert.Equal([1m, 2m, 3m, 4m], trayecto.Select(p => p.Latitud));
+        Assert.Equal([2.9270m, 2.9271m, 2.9272m, 2.9273m], trayecto.Select(p => p.Latitud));
     }
 
     [Fact]
@@ -153,10 +174,10 @@ public class GpsTests(BaseDatosPrueba bd)
         Assert.Equal(new ConteoParadasDto(2, 2, 0, 0, 0), vacio.Conteo);
 
         var ahora = DateTime.UtcNow;
-        await EnviarAsync(e.ClienteConductor, r.Id, Punto(ahora.AddSeconds(-30), 1m), Punto(ahora, 2m));
+        await EnviarAsync(e.ClienteConductor, r.Id, Punto(ahora.AddSeconds(-30), 2.9270m), Punto(ahora, 2.9271m));
         var mapa = Assert.Single(await (await e.Admin.Cliente.GetAsync("/api/v1/recorridos/en-curso")).LeerAsync<List<PosicionRecorridoDto>>());
         Assert.Equal(r.Id, mapa.RecorridoId);
-        Assert.Equal(2m, mapa.Posicion!.Latitud);
+        Assert.Equal(2.9271m, mapa.Posicion!.Latitud);
         Assert.Equal(HttpStatusCode.Forbidden, (await e.ClienteConductor.GetAsync("/api/v1/recorridos/en-curso")).StatusCode);
     }
 

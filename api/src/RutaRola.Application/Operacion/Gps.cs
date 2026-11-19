@@ -22,6 +22,35 @@ public record ResultadoLoteGps(int Recibidas, int Descartadas, PosicionDto? Ulti
 public record PosicionRecorridoDto(
     Guid RecorridoId, string Ruta, Trayecto Trayecto, string Conductor, string Vehiculo, ConteoParadasDto Conteo, PosicionDto? Posicion);
 
+/// <summary>
+/// Reglas puras de las lecturas (iguales a <c>ruta-del-dia/gps/gps.ts</c>): una lectura que implica ir a más de
+/// <see cref="VelocidadMaximaKmh"/> desde la anterior es un salto del GPS (ubicación por antena o wifi, rebote al volver
+/// a la app) y no se guarda; menos de 100 m nunca es un salto (error normal en una parada).
+/// </summary>
+public static class ReglasGps
+{
+    public const double VelocidadMaximaKmh = 150;
+    /// <summary>Solo se compara con lecturas de hasta este tiempo antes (tras más tiempo sin señal, la nueva manda).</summary>
+    public static readonly TimeSpan VentanaSalto = TimeSpan.FromMinutes(2);
+
+    public static double DistanciaMetros(decimal lat1, decimal lon1, decimal lat2, decimal lon2)
+    {
+        const double rad = Math.PI / 180;
+        var dLat = (double)(lat2 - lat1) * rad;
+        var dLon = (double)(lon2 - lon1) * rad;
+        var h = Math.Pow(Math.Sin(dLat / 2), 2) + Math.Cos((double)lat1 * rad) * Math.Cos((double)lat2 * rad) * Math.Pow(Math.Sin(dLon / 2), 2);
+        return 2 * 6_371_000 * Math.Asin(Math.Min(1, Math.Sqrt(h)));
+    }
+
+    public static bool SaltoImposible(decimal lat1, decimal lon1, DateTime fecha1, decimal lat2, decimal lon2, DateTime fecha2)
+    {
+        var metros = DistanciaMetros(lat1, lon1, lat2, lon2);
+        if (metros < 100) return false;
+        var segundos = Math.Max(1, Math.Abs((fecha2 - fecha1).TotalSeconds));
+        return metros / segundos * 3.6 > VelocidadMaximaKmh;
+    }
+}
+
 public class ValidadorLoteGps : AbstractValidator<SolicitudLoteGps>
 {
     public const int MaximoPorLote = 500;
@@ -133,19 +162,24 @@ public class ServicioGps(
         if (validas.Count > 0)
         {
             // Conductor y monitora pueden reportar a la vez (cualquiera de los dos mantiene la ubicación al día):
-            // una lectura a menos de SeparacionMinima de otra ya guardada del recorrido sobra (misma ubicación).
-            var minimo = validas.Min(p => p.Fecha!.Value) - SeparacionMinima;
+            // una lectura a menos de SeparacionMinima de otra ya guardada del recorrido sobra (misma ubicación), y una
+            // que "salta" respecto a la anterior (ReglasGps.SaltoImposible) no se guarda para que el mapa no la muestre.
+            var minimo = validas.Min(p => p.Fecha!.Value) - ReglasGps.VentanaSalto;
             var maximo = validas.Max(p => p.Fecha!.Value) + SeparacionMinima;
             var tomadas = await db.GpsVehiculos.AsNoTracking()
                 .Where(g => g.IdViaje == viaje.Id && g.FechaRegistro >= minimo && g.FechaRegistro <= maximo)
-                .Select(g => g.FechaRegistro).ToListAsync(ct);
+                .Select(g => new { Fecha = g.FechaRegistro, g.Latitud, g.Longitud }).ToListAsync(ct);
+            var puntos = tomadas.Select(t => (t.Fecha, t.Latitud, t.Longitud)).ToList();
             var aceptadas = new List<LecturaGps>();
             foreach (var p in validas.OrderBy(p => p.Fecha))
             {
                 var fecha = p.Fecha!.Value;
-                if (tomadas.Any(t => (t - fecha).Duration() < SeparacionMinima)) continue;
+                if (puntos.Any(t => (t.Fecha - fecha).Duration() < SeparacionMinima)) continue;
+                var anterior = puntos.Where(t => t.Fecha < fecha && fecha - t.Fecha <= ReglasGps.VentanaSalto)
+                    .OrderByDescending(t => t.Fecha).Cast<(DateTime Fecha, decimal Latitud, decimal Longitud)?>().FirstOrDefault();
+                if (anterior is { } a && ReglasGps.SaltoImposible(a.Latitud, a.Longitud, a.Fecha, p.Latitud!.Value, p.Longitud!.Value, fecha)) continue;
                 aceptadas.Add(p);
-                tomadas.Add(fecha);
+                puntos.Add((fecha, p.Latitud!.Value, p.Longitud!.Value));
             }
             validas = aceptadas;
         }
