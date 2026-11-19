@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Imagen del API (multi-stage). Escucha en $PORT (8080 por defecto).
-# Migraciones (paso explícito del despliegue):  docker run --rm -e ConnectionStrings__RutaRola=... <imagen> migrar
+# Al arrancar aplica las migraciones y luego levanta el API (iniciar.sh); solo migrar: docker run --rm -e ConnectionStrings__RutaRola=... <imagen> migrar
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
@@ -19,7 +19,9 @@ ENV PORT=8080 \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 COPY --from=build /app .
+COPY --chmod=755 iniciar.sh /app/iniciar.sh
+# Legado: Render arrancaba con este script (render.yaml → dockerCommand).
 COPY --chmod=755 iniciar-render.sh /app/iniciar-render.sh
 USER $APP_UID
 EXPOSE 8080
-ENTRYPOINT ["dotnet", "RutaRola.Api.dll"]
+ENTRYPOINT ["/app/iniciar.sh"]

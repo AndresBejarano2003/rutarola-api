@@ -17,7 +17,7 @@ public class OpcionesWompi
     public string SecretoIntegridad { get; set; } = "";
     public string SecretoEventos { get; set; } = "";
     /// <summary>A dónde vuelve el navegador después de pagar (frontend, sin <c>/#/</c>).</summary>
-    public string UrlRetorno { get; set; } = "https://rutarola.netlify.app";
+    public string UrlRetorno { get; set; } = "https://app.rutarola.com";
 
     public bool Habilitada => LlavePublica.Length > 0 && SecretoIntegridad.Length > 0;
     public bool Produccion => LlavePublica.StartsWith("pub_prod_", StringComparison.Ordinal);

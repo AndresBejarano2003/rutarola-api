@@ -1,7 +1,7 @@
 # RutaRola — API
 
 Backend de RutaRola: ASP.NET Core Web API (.NET 10, C#), PostgreSQL con EF Core + Npgsql (Code First),
-multiempresa. Lo consumen el frontend Angular (`RutaRolaApp/`, desplegado en https://rutarola.netlify.app)
+multiempresa. Lo consumen el frontend Angular (`RutaRolaApp/`, publicado en https://app.rutarola.com)
 y la futura app móvil.
 
 ## Estructura
@@ -81,7 +81,7 @@ dotnet run --project src/RutaRola.Api -- migrar
 | `ASPNETCORE_ENVIRONMENT` | — | `Production` en la imagen. Fuera de producción se publican `/openapi/v1.json` y `/docs` (Scalar). |
 | `Documentacion__Habilitada` | no | `true` publica `/docs` (Scalar), `/openapi/v1.json` y la raíz `/` → `/docs` también en producción (activo en `render.yaml`, se ve en `https://api.rutarola.com/docs`). Solo describe los endpoints: cada uno sigue pidiendo token y permiso; en Scalar se usa "Authorize" con el `accessToken` de `POST /api/v1/auth/login`. |
 | `PORT` | — | Puerto HTTP (8080 en la imagen). |
-| `Cors__Origenes` | — | Orígenes permitidos separados por comas. Por defecto `http://localhost:4200,https://rutarola.netlify.app`. |
+| `Cors__Origenes` | — | Orígenes permitidos separados por comas. Por defecto `http://localhost:4200,https://app.rutarola.com`. La app Android usa el mismo origen `https://app.rutarola.com` (`server.hostname` de Capacitor). |
 | `Seed__Admin__Password` | para crear el admin | Clave del admin demo. Sin ella no se crea. Nunca se sobrescribe la de un usuario existente. |
 | `Seed__Admin__Usuario`, `Seed__Admin__Email` | — | Por defecto `admin` / `admin@rutarola.com`. |
 | `Seed__SuperAdmin__Password` | — | Si se define, se crea `superadmin` (plataforma, sin empresa). |
@@ -99,9 +99,9 @@ dotnet run --project src/RutaRola.Api -- migrar
 | `Correo__Brevo__ApiKey` | con `Brevo` | Llave API de Brevo (SMTP & API › API Keys). |
 | `Correo__Smtp__Servidor`, `__Puerto`, `__Usuario`, `__Clave`, `__Ssl` | con `Smtp` | Puerto 587 y STARTTLS por defecto. |
 | `Soporte__CorreoEquipo` | — | Correo del equipo que recibe los tickets nuevos y las respuestas; vacío = todos los SuperAdmin activos. |
-| `Soporte__UrlFrontend` | — | Base de los enlaces de los correos (`https://rutarola.netlify.app`). |
+| `Soporte__UrlFrontend` | — | Base de los enlaces de los correos (`https://app.rutarola.com`). |
 | `Wompi__LlavePublica`, `Wompi__SecretoIntegridad`, `Wompi__SecretoEventos` | para cobrar en línea | Llaves de Wompi (Desarrolladores). `pub_test_…` usa el sandbox, `pub_prod_…` producción. Sin llave pública o secreto de integridad, `POST /suscripcion/pagos` responde 422. |
-| `Wompi__UrlRetorno` | — | Frontend al que vuelve el navegador después de pagar (`https://rutarola.netlify.app`). |
+| `Wompi__UrlRetorno` | — | Frontend al que vuelve el navegador después de pagar (`https://app.rutarola.com`). |
 | `Gps__DiasRetencion` | — | Días que se conservan las ubicaciones GPS (30; `0` = siempre). El proceso del servidor borra las más antiguas de todas las empresas: son posiciones de un vehículo con menores. |
 
 No se guardan secretos en el repo: en desarrollo `dotnet user-secrets` o `api/.env` (ignorado por git);
@@ -109,7 +109,14 @@ en el hosting, sus variables de entorno.
 
 ## Desplegar
 
-**Render (Blueprint `render.yaml` en la raíz del repo `rutarola-api`)**: PostgreSQL gratuito + servicio web Docker
+**Producción actual: servidor propio** (VPS de Hostinger en EE. UU., nginx delante de la API, PostgreSQL en el
+mismo servidor): API en `https://api.rutarola.com`, frontend en `https://app.rutarola.com`. Las variables de entorno
+(CORS `https://app.rutarola.com`, secretos, `Soporte__UrlFrontend`) se configuran en ese servidor, nunca en el repo.
+Coolify vuelve a desplegar solo cuando cambia `main`. La imagen arranca con `iniciar.sh`: aplica las migraciones y los
+datos base (`migrar`, idempotente) y luego levanta el API; si la migración falla, el API no arranca y Coolify mantiene
+la versión anterior. Lo de Render que sigue es **histórico** (ya no está en uso).
+
+**Render (histórico; Blueprint `render.yaml` en la raíz del repo `rutarola-api`)**: PostgreSQL gratuito + servicio web Docker
 (`api/Dockerfile`, contexto `api/`), health check `/health`, `Jwt__Clave` generada por Render y CORS para
 `https://rutarola.netlify.app`. Al crear el Blueprint, Render pide los secretos `sync: false`
 (`Seed__Admin__Password`, `Seed__SuperAdmin__Password`, `Seed__Demo__Password`). El plan gratuito no tiene
@@ -460,7 +467,7 @@ Wompi: `pagosEnLinea` = false, el frontend ofrece "Solicitar por Soporte" y la p
 Empresas › Plan (`PUT /empresas/{id}/suscripcion`).
 
 **Configurar Wompi (cuando se active):** llaves del sandbox en las variables `Wompi__*` y, en el panel de Wompi (Desarrolladores ›
-URL de eventos), `https://rutarola-api.onrender.com/api/v1/pagos/wompi/eventos`.
+URL de eventos), `https://api.rutarola.com/api/v1/pagos/wompi/eventos`.
 
 ## Diferencias con el modelo de Lucidchart (`docs/modelo-bd-rutarola.json`)
 

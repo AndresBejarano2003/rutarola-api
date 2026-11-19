@@ -18,7 +18,7 @@ public class OpcionesSoporte
     /// <summary>Buzón del equipo de soporte. Vacío = el correo de cada SuperAdmin activo.</summary>
     public string CorreoEquipo { get; set; } = "";
     /// <summary>URL pública del frontend para los enlaces de los correos (sin <c>/#/</c>).</summary>
-    public string UrlFrontend { get; set; } = "https://rutarola.netlify.app";
+    public string UrlFrontend { get; set; } = "https://app.rutarola.com";
 }
 
 /// <summary>

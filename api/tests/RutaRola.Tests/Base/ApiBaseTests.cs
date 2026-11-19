@@ -65,7 +65,7 @@ public class ApiBaseTests(BaseDatosPrueba bd)
             return respuesta.Headers.TryGetValues("Access-Control-Allow-Origin", out var v) ? v.Single() : null;
         }
 
-        Assert.Equal("https://rutarola.netlify.app", await Preflight("https://rutarola.netlify.app"));
+        Assert.Equal("https://app.rutarola.com", await Preflight("https://app.rutarola.com"));
         Assert.Equal("http://localhost:4200", await Preflight("http://localhost:4200"));
         Assert.Null(await Preflight("https://sitio-malicioso.example"));
     }
