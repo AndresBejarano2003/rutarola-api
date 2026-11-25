@@ -13,7 +13,7 @@ namespace RutaRola.Infrastructure.Persistencia.Seed;
 
 /// <summary>
 /// Datos de ejemplo de la empresa demo, iguales a los del modo local del frontend (colegios,
-/// vehículos, empleados, acudientes y estudiantes de Neiva; rutas y asignaciones; facturas, recibos,
+/// vehículos, empleados, acudientes y estudiantes de Bogotá; rutas y asignaciones; facturas, recibos,
 /// cotizaciones y programaciones de cobro) para que las pantallas no arranquen vacías al cambiar a HTTP.
 /// Solo fuera de producción, con <c>Seed:Demo:Habilitado</c> y la contraseña de los usuarios demo en
 /// <c>Seed:Demo:Password</c>. Cada sección se crea una sola vez (si la empresa no tiene colegios, rutas o
@@ -150,10 +150,10 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
         };
         var rutas = new[]
         {
-            Ruta("R-01", "Norte", "col-5", "Mañana", "Cándido, Las Granjas, Santa Inés", 1, 2),
-            Ruta("R-02", "Centro", "col-1", "Mañana", "Centro, Altico, Quebrada Seca", 3, 12),
-            Ruta("R-03", "Sur", "col-2", "Tarde", "Timanco, Los Mártires, Limonar", 4, 5),
-            Ruta("R-04", "Oriente", "col-3", "Única", "Ipanema, Calixto, Alberto Galindo", 6, 7),
+            Ruta("R-01", "Norte", "col-5", "Mañana", "Cedritos, Usaquén, Santa Bárbara", 1, 2),
+            Ruta("R-02", "Centro", "col-1", "Mañana", "La Candelaria, Teusaquillo, Chapinero", 3, 12),
+            Ruta("R-03", "Sur", "col-2", "Tarde", "Kennedy, Tunjuelito, Bosa", 4, 5),
+            Ruta("R-04", "Oriente", "col-3", "Única", "San Cristóbal, Santa Ana, La Perseverancia", 6, 7),
         };
         db.Rutas.AddRange(rutas);
         AsignacionRuta Asignacion(int ruta, int vehiculo, int conductor, int monitora) => new()
@@ -352,15 +352,15 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
 
         return new()
         {
-            ["col-1"] = Colegio("891180123-4", "Colegio San Cayetano", "Carrera 5 # 12-40, Neiva", "6088712345",
+            ["col-1"] = Colegio("891180123-4", "Colegio San Cayetano", "Carrera 7 # 72-40, Bogotá", "6017712345",
                 [.. Cursos("Mañana", "06:30", "13:00"), .. Cursos("Tarde", "12:30", "18:00", desde: "1°")]),
-            ["col-2"] = Colegio("891180234-5", "Colegio Matre Paula", "Calle 21 # 8-15, Neiva", "6088723456",
+            ["col-2"] = Colegio("891180234-5", "Colegio Matre Paula", "Calle 45 # 13-15, Bogotá", "6017723456",
                 [.. Cursos("Mañana", "06:45", "12:45", hasta: "5°"), .. Cursos("Tarde", "12:30", "18:00", desde: "6°")]),
-            ["col-3"] = Colegio("891180345-6", "Colegio La Gaitana", "Avenida La Toma # 3-20, Neiva", "6088734567",
+            ["col-3"] = Colegio("891180345-6", "Colegio Santa Fe", "Avenida Boyacá # 63-20, Bogotá", "6017734567",
                 Cursos("Única", "07:00", "14:00")),
-            ["col-4"] = Colegio("891180456-7", "Colegio Enrique Olaya Herrera", "Calle 7 # 30-11, Neiva", "6088745678",
+            ["col-4"] = Colegio("891180456-7", "Colegio Enrique Olaya Herrera", "Calle 26 Sur # 30-11, Bogotá", "6017745678",
                 Cursos("Mañana", "06:30", "12:30", hasta: "5°")),
-            ["col-5"] = Colegio("891180567-8", "Colegio San José", "Carrera 16 # 18-02, Neiva", "6088756789",
+            ["col-5"] = Colegio("891180567-8", "Colegio San José", "Carrera 19 # 134-02, Bogotá", "6017756789",
                 Cursos("Mañana", "06:20", "13:20")),
         };
     }
@@ -405,7 +405,7 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
         Empleado Empleado(string documento, string[] nombres, TipoEmpleado tipo, decimal sueldo, TipoContrato contrato, string telefono,
             (string Categoria, int Dias)? licencia, bool activo = true) => Persona(new Empleado
         {
-            TipoEmpleado = tipo, Telefono = telefono, Direccion = "Carrera 5 # 12-40, Neiva", FechaIngreso = new DateOnly(2025, 2, 1),
+            TipoEmpleado = tipo, Telefono = telefono, Direccion = "Carrera 9 # 140-12, Bogotá", FechaIngreso = new DateOnly(2025, 2, 1),
             Sueldo = sueldo, TipoContrato = contrato, Activo = activo,
             NumeroLicencia = licencia is null ? null : documento,
             CategoriaLicencia = licencia?.Categoria,
@@ -427,7 +427,7 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
         Acudiente Acudiente(string tipo, string documento, string[] nombres, string telefono, string correo, bool activo = true) =>
             Persona(new Acudiente
             {
-                Telefono = telefono, Correo = correo.Length > 0 ? correo : null, Direccion = "Calle 10 # 5-23, Neiva", Activo = activo,
+                Telefono = telefono, Correo = correo.Length > 0 ? correo : null, Direccion = "Calle 140 # 11-23, Bogotá", Activo = activo,
             }, idEmpresa, tipo, documento, nombres);
 
         return new()
@@ -449,7 +449,7 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
             string colegio, string grado, string jornada, bool activo = true) =>
             (Persona(new Estudiante
             {
-                FechaNacimiento = DateOnly.Parse(nacimiento), Direccion = "Calle 10 # 5-23, Neiva", Grado = grado, Jornada = jornada,
+                FechaNacimiento = DateOnly.Parse(nacimiento), Direccion = "Calle 140 # 11-23, Bogotá", Grado = grado, Jornada = jornada,
                 Activo = activo,
             }, idEmpresa, tipo, documento, nombres), acudiente, colegio);
 
