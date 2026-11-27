@@ -10,6 +10,11 @@ public static class CatalogoConfiguracion
     /// <summary>1 = los acudientes ven en el portal la ubicación en vivo del vehículo; 0 = solo el estado y la hora de inicio.</summary>
     public const string AcudientesVenUbicacion = "gps.acudientes_ven_ubicacion";
     /// <summary>1 = los acudientes de la empresa pueden unir su cuenta con la de otra empresa de transporte (Mi cuenta).</summary>
+    /// <summary>
+    /// 1 = (con <see cref="AcudientesVenUbicacion"/> activo) en la RECOGIDA el acudiente ve la ubicación mientras la ruta va
+    /// por su estudiante a la casa; 0 = solo desde que el estudiante sube al vehículo.
+    /// </summary>
+    public const string AcudientesVenAntesDeRecoger = "gps.acudientes_ven_antes_de_recoger";
     public const string AcudientesUnenCuentas = "portal.acudientes_unen_cuentas";
 
     public static readonly IReadOnlyList<ParametroConfiguracion> Parametros =
@@ -17,6 +22,7 @@ public static class CatalogoConfiguracion
         new(DiaLimitePago, "Día del mes en que vence la cuota cuando la factura no tiene programación (por defecto 5).", "5", 1, 31),
         new(DiasAlertaVencimiento, "Días antes del vencimiento de documentos y licencias en que se avisa (por defecto 30).", "30", 1, 120),
         new(AcudientesVenUbicacion, "Los acudientes ven en su portal la ubicación en vivo del vehículo mientras su ruta va en camino. Si se desactiva, solo ven el estado del estudiante y la hora en que inició el recorrido; el administrador sigue viendo el monitoreo completo.", "1", 0, 1),
+        new(AcudientesVenAntesDeRecoger, "Si los acudientes ven la ubicación: en la recogida también la ven mientras la ruta va por su estudiante a la casa. Si se desactiva, solo la ven desde que su estudiante sube al vehículo.", "1", 0, 1),
         new(AcudientesUnenCuentas, "Los acudientes pueden unir su cuenta de esta empresa con la de otra empresa de transporte que use RutaRola, para ver a todos sus estudiantes con un solo usuario. Cada empresa sigue viendo solo sus propios datos.", "1", 0, 1),
     ];
 

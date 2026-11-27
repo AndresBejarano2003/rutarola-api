@@ -298,15 +298,18 @@ public class ServicioGps(
 
     /// <summary>
     /// Acudientes con algún estudiante que VA EN CAMINO en el recorrido (solo ellos ven la ubicación): A_BORDO, o
-    /// PENDIENTE en la RECOGIDA (el vehículo va por él a la casa). En la ENTREGA, uno que aún no sube (p. ej. su colegio
+    /// PENDIENTE en la RECOGIDA (el vehículo va por él a la casa) si la empresa lo permite
+    /// (<c>gps.acudientes_ven_antes_de_recoger</c>, por defecto 1; con 0 solo A_BORDO). En la ENTREGA, uno que aún no sube (p. ej. su colegio
     /// todavía no inicia la entrega) no la ve; entregado o ausente, tampoco.
     /// Con <paramref name="soloAcudiente"/>, se limita a ese acudiente.
     /// </summary>
     private async Task<IReadOnlyList<Guid>> AcudientesEnCaminoAsync(Guid idRecorrido, Guid? soloAcudiente, CancellationToken ct)
     {
+        var antesDeRecoger = await parametros.AcudientesVenAntesDeRecogerAsync(ct);
         var estudiantes = db.ParadasViaje.AsNoTracking()
             .Where(p => p.IdViaje == idRecorrido
-                && (p.Estado == EstadoParada.ABordo || (p.Estado == EstadoParada.Pendiente && p.Viaje.Trayecto == Trayecto.Recogida)))
+                && (p.Estado == EstadoParada.ABordo
+                    || (antesDeRecoger && p.Estado == EstadoParada.Pendiente && p.Viaje.Trayecto == Trayecto.Recogida)))
             .Select(p => p.IdEstudiante);
         var consulta = db.EstudiantesAcudientes.AsNoTracking().Where(ea => estudiantes.Contains(ea.IdEstudiante));
         if (soloAcudiente is { } a)

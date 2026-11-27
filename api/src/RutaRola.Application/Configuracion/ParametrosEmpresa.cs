@@ -22,6 +22,10 @@ public class ParametrosEmpresa(IBaseDatos db)
     public async Task<bool> AcudientesVenUbicacionAsync(CancellationToken ct = default) =>
         await EnteroAsync(CatalogoConfiguracion.AcudientesVenUbicacion, ct) == 1;
 
+    /// <summary>¿En la recogida el acudiente ve la ubicación antes de que suba su estudiante (la ruta va por él)?</summary>
+    public async Task<bool> AcudientesVenAntesDeRecogerAsync(CancellationToken ct = default) =>
+        await EnteroAsync(CatalogoConfiguracion.AcudientesVenAntesDeRecoger, ct) == 1;
+
     private async Task<int> EnteroAsync(string clave, CancellationToken ct)
     {
         var parametro = CatalogoConfiguracion.Buscar(clave)!;

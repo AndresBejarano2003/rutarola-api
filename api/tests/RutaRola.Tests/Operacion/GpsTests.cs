@@ -272,6 +272,23 @@ public class GpsTests(BaseDatosPrueba bd)
     }
 
     [Fact]
+    public async Task Si_la_empresa_lo_desactiva_en_la_recogida_el_acudiente_solo_ve_la_ubicacion_cuando_su_estudiante_sube()
+    {
+        var (e, r) = await EnCursoAsync(estudiantes: 1);
+        (await e.Admin.Cliente.PutAsJsonAsync("/api/v1/configuracion/gps.acudientes_ven_antes_de_recoger", new { valor = "0" }, ClienteApi.Json))
+            .EnsureSuccessStatusCode();
+        await EnviarAsync(e.ClienteConductor, r.Id, Punto(DateTime.UtcNow.AddSeconds(-10)));
+        var acudiente = await bd.ClienteDeAsync(e.Acudiente.Usuario, "Clave-123");
+
+        // La ruta va por él, pero la empresa no lo comparte hasta que sube.
+        Assert.Equal(HttpStatusCode.NoContent, (await acudiente.GetAsync($"/api/v1/recorridos/{r.Id}/gps/ultima")).StatusCode);
+        var portal = JsonDocument.Parse(await (await acudiente.GetAsync("/api/v1/portal")).Content.ReadAsStringAsync()).RootElement;
+        Assert.False(portal.GetProperty("ubicacionAntesDeRecoger").GetBoolean());
+        await e.ClienteConductor.MarcarAsync(r.Id, "A_BORDO", e.Estudiantes[0].Id);
+        Assert.Equal(HttpStatusCode.OK, (await acudiente.GetAsync($"/api/v1/recorridos/{r.Id}/gps/ultima")).StatusCode);
+    }
+
+    [Fact]
     public async Task En_la_entrega_el_acudiente_ve_la_ubicacion_solo_cuando_su_estudiante_ya_va_a_bordo()
     {
         var e = await bd.EscenarioAsync(estudiantes: 1);

@@ -61,7 +61,9 @@ public record AcudientePortalDto(string Nombre, string Telefono, string Correo, 
 public record PortalAcudienteDto(
     AcudientePortalDto Acudiente, IReadOnlyList<EstudiantePortalDto> Estudiantes, IReadOnlyList<FacturaPortalDto> Facturas,
     IReadOnlyList<ReciboPortalDto> Recibos, IReadOnlyList<CotizacionPortalDto> Cotizaciones, ResumenCuentaDto Resumen,
-    bool UbicacionEnVivo);
+    bool UbicacionEnVivo,
+    // En la recogida, ve la ubicación también antes de que suba su estudiante (gps.acudientes_ven_antes_de_recoger).
+    bool UbicacionAntesDeRecoger = true);
 
 /// <summary>
 /// Portal del acudiente del token (nunca de un parámetro), igual que <c>PortalLocal</c>: solo SUS estudiantes
@@ -139,7 +141,8 @@ public class ServicioPortal(
                 c.Estado, Periodos.Texto(c.PeriodoInicio), Periodos.Texto(c.PeriodoFin), Periodos.Entre(c.PeriodoInicio, c.PeriodoFin).Count())).ToList(),
             resumen,
             // La empresa comparte la ubicación Y su plan incluye el GPS en vivo.
-            await parametros.AcudientesVenUbicacionAsync(ct) && await suscripcion.TieneFuncionAsync(Suscripciones.FuncionPlan.GpsEnVivo, ct));
+            await parametros.AcudientesVenUbicacionAsync(ct) && await suscripcion.TieneFuncionAsync(Suscripciones.FuncionPlan.GpsEnVivo, ct),
+            await parametros.AcudientesVenAntesDeRecogerAsync(ct));
     }
 
     private static string Iniciales(string nombre, string apellido) =>
