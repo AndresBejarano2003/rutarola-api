@@ -243,6 +243,35 @@ public class GpsTests(BaseDatosPrueba bd)
     }
 
     [Fact]
+    public async Task El_acudiente_deja_de_ver_la_ubicacion_cuando_sus_estudiantes_ya_fueron_entregados_aunque_el_recorrido_siga()
+    {
+        var (e, r) = await EnCursoAsync(estudiantes: 2);
+        var acudiente = await bd.ClienteDeAsync(e.Acudiente.Usuario, "Clave-123");
+        await using var hub = await HubPrueba.ConectarAsync(bd, Token(acudiente));
+        Assert.Null(await hub.InvocarAsync("Seguir", r.Id));
+        var ahora = DateTime.UtcNow;
+
+        await EnviarAsync(e.ClienteConductor, r.Id, Punto(ahora.AddSeconds(-30), 2.9271m));
+        Assert.Equal(2.9271m, (await hub.EsperarAsync("posicion")).GetProperty("latitud").GetDecimal());
+
+        // Uno de sus estudiantes ya llegó; el otro sigue por recoger: lo sigue viendo.
+        await e.ClienteConductor.MarcarAsync(r.Id, "A_BORDO", e.Estudiantes[0].Id);
+        await e.ClienteConductor.MarcarAsync(r.Id, "ENTREGADO", e.Estudiantes[0].Id);
+        await EnviarAsync(e.ClienteConductor, r.Id, Punto(ahora.AddSeconds(-20), 2.9272m));
+        Assert.Equal(2.9272m, (await hub.EsperarAsync("posicion")).GetProperty("latitud").GetDecimal());
+
+        // El otro no va hoy: el recorrido sigue EN_CURSO (p. ej. hacia otro colegio), pero ya no le incumbe.
+        await e.ClienteConductor.MarcarAsync(r.Id, "AUSENTE", e.Estudiantes[1].Id);
+        Assert.Equal(HttpStatusCode.NoContent, (await acudiente.GetAsync($"/api/v1/recorridos/{r.Id}/gps/ultima")).StatusCode);
+        await EnviarAsync(e.ClienteConductor, r.Id, Punto(ahora.AddSeconds(-10), 2.9273m));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => hub.EsperarAsync("posicion", segundos: 2));
+        var admin = await (await e.Admin.Cliente.GetAsync($"/api/v1/recorridos/{r.Id}/gps/ultima")).LeerAsync<PosicionDto>();
+        Assert.Equal(2.9273m, admin.Latitud);
+        await using var otraVez = await HubPrueba.ConectarAsync(bd, Token(acudiente));
+        Assert.Contains("va en camino", await otraVez.InvocarAsync("Seguir", r.Id));
+    }
+
+    [Fact]
     public async Task Si_la_empresa_no_comparte_la_ubicacion_el_acudiente_no_la_ve_pero_si_la_hora_de_inicio_y_el_admin_si()
     {
         var (e, r) = await EnCursoAsync();

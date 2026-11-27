@@ -82,7 +82,8 @@ public interface IAvisosRecorrido
     /// A la empresa (mapa del administrador) y, si el recorrido sigue EN_CURSO, a su personal que lo sigue y, solo
     /// si <paramref name="acudientes"/> (la empresa comparte la ubicación con ellos), a los acudientes que lo siguen.
     /// </summary>
-    Task PosicionAsync(Guid idEmpresa, PosicionDto posicion, bool enCurso, bool acudientes, CancellationToken ct = default);
+    /// <param name="acudientes">Acudientes que pueden ver esta posición: los que aún tienen un estudiante por recoger o a bordo.</param>
+    Task PosicionAsync(Guid idEmpresa, PosicionDto posicion, bool enCurso, IReadOnlyCollection<Guid> acudientes, CancellationToken ct = default);
 
     /// <summary>
     /// El recorrido cambió (inicio, paradas, orden, fin): lo vuelven a consultar quienes lo siguen, la empresa,
@@ -203,7 +204,10 @@ public class ServicioGps(
         if (validas.Count > 0 && ultima is not null && validas.Any(p => p.Fecha == ultima.Fecha) && contexto.IdEmpresa is { } empresa)
         {
             var enCurso = viaje.Estado == EstadoViaje.EnCurso;
-            await avisos.PosicionAsync(empresa, ultima, enCurso, enCurso && await parametros.AcudientesVenUbicacionAsync(ct), ct);
+            IReadOnlyCollection<Guid> acudientes = enCurso && await parametros.AcudientesVenUbicacionAsync(ct)
+                ? await AcudientesEnCaminoAsync(viaje.Id, null, ct)
+                : [];
+            await avisos.PosicionAsync(empresa, ultima, enCurso, acudientes, ct);
         }
         return new ResultadoLoteGps(validas.Count, s.Posiciones!.Count - validas.Count, ultima);
     }
@@ -281,11 +285,32 @@ public class ServicioGps(
                 var acudiente = contexto.IdAcudiente ?? Guid.Empty;
                 consulta = consulta.Where(v => v.Paradas.Any(p =>
                     db.EstudiantesAcudientes.Any(ea => ea.IdEstudiante == p.IdEstudiante && ea.IdAcudiente == acudiente)));
-                break;
+                var viajeAcudiente = await consulta.Select(v => (EstadoViaje?)v.Estado).FirstOrDefaultAsync(ct)
+                    ?? throw new ErrorNegocio(NoEncontrado, CodigoError.NoEncontrado);
+                // Solo mientras alguno de SUS estudiantes va en camino: entregado (en el colegio o en la casa) o ausente,
+                // el resto del recorrido (p. ej. el otro colegio) ya no le incumbe.
+                return viajeAcudiente == EstadoViaje.EnCurso && (await AcudientesEnCaminoAsync(idRecorrido, acudiente, ct)).Count > 0;
         }
         var estado = await consulta.Select(v => (EstadoViaje?)v.Estado).FirstOrDefaultAsync(ct)
             ?? throw new ErrorNegocio(NoEncontrado, CodigoError.NoEncontrado);
         return estado == EstadoViaje.EnCurso;
+    }
+
+    /// <summary>
+    /// Acudientes con algún estudiante del recorrido aún PENDIENTE o A_BORDO (solo ellos ven la ubicación).
+    /// Con <paramref name="soloAcudiente"/>, se limita a ese acudiente.
+    /// </summary>
+    private async Task<IReadOnlyList<Guid>> AcudientesEnCaminoAsync(Guid idRecorrido, Guid? soloAcudiente, CancellationToken ct)
+    {
+        var estudiantes = db.ParadasViaje.AsNoTracking()
+            .Where(p => p.IdViaje == idRecorrido && (p.Estado == EstadoParada.Pendiente || p.Estado == EstadoParada.ABordo))
+            .Select(p => p.IdEstudiante);
+        var consulta = db.EstudiantesAcudientes.AsNoTracking().Where(ea => estudiantes.Contains(ea.IdEstudiante));
+        if (soloAcudiente is { } a)
+        {
+            consulta = consulta.Where(ea => ea.IdAcudiente == a);
+        }
+        return await consulta.Select(ea => ea.IdAcudiente).Distinct().ToListAsync(ct);
     }
 
     private async Task<PosicionDto?> LeerUltimaAsync(Guid idRecorrido, CancellationToken ct) =>

@@ -23,6 +23,11 @@ public class RecorridosHub(ServicioGps servicio, IContextoUsuario contexto, IAut
     public static string GrupoRecorrido(Guid id) => $"recorrido:{id}";
     /// <summary>Acudientes que siguen el recorrido: reciben posiciones solo si la empresa comparte la ubicación con ellos.</summary>
     public static string GrupoRecorridoAcudientes(Guid id) => $"recorrido:{id}:acudientes";
+    /// <summary>
+    /// Conexiones de UN acudiente que sigue el recorrido: las posiciones van solo a los acudientes con algún estudiante
+    /// aún por recoger o a bordo (entregado o ausente, deja de recibirlas aunque el recorrido siga).
+    /// </summary>
+    public static string GrupoRecorridoAcudiente(Guid id, Guid acudiente) => $"recorrido:{id}:acudiente:{acudiente}";
     public static string GrupoEmpresa(Guid id) => $"empresa:{id}";
     public static string GrupoEmpleado(Guid id) => $"empleado:{id}";
     public static string GrupoAcudiente(Guid id) => $"acudiente:{id}";
@@ -61,16 +66,26 @@ public class RecorridosHub(ServicioGps servicio, IContextoUsuario contexto, IAut
         }
         if (alcance == AlcanceGps.Acudiente && !enCurso)
         {
-            throw new HubException("La ubicación del vehículo solo se ve mientras el recorrido está en curso.");
+            throw new HubException("La ubicación del vehículo solo se ve mientras tu estudiante va en camino.");
         }
-        await Groups.AddToGroupAsync(Context.ConnectionId,
-            alcance == AlcanceGps.Acudiente ? GrupoRecorridoAcudientes(recorridoId) : GrupoRecorrido(recorridoId));
+        if (alcance == AlcanceGps.Acudiente && contexto.IdAcudiente is { } acudiente)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, GrupoRecorridoAcudientes(recorridoId));
+            await Groups.AddToGroupAsync(Context.ConnectionId, GrupoRecorridoAcudiente(recorridoId, acudiente));
+            return;
+        }
+        await Groups.AddToGroupAsync(Context.ConnectionId, GrupoRecorrido(recorridoId));
     }
 
     public async Task Dejar(Guid recorridoId)
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, GrupoRecorrido(recorridoId));
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, GrupoRecorridoAcudientes(recorridoId));
+        UsarUsuarioDeLaConexion();
+        if (contexto.IdAcudiente is { } acudiente)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, GrupoRecorridoAcudiente(recorridoId, acudiente));
+        }
     }
 
     public async Task SeguirEmpresa()
@@ -96,7 +111,7 @@ public class RecorridosHub(ServicioGps servicio, IContextoUsuario contexto, IAut
 /// <summary>Envía los avisos por SignalR; un fallo se registra y no afecta la petición que lo originó.</summary>
 public class AvisosRecorridoSignalR(IHubContext<RecorridosHub> hub, ILogger<AvisosRecorridoSignalR> log) : IAvisosRecorrido
 {
-    public async Task PosicionAsync(Guid idEmpresa, PosicionDto posicion, bool enCurso, bool acudientes, CancellationToken ct = default)
+    public async Task PosicionAsync(Guid idEmpresa, PosicionDto posicion, bool enCurso, IReadOnlyCollection<Guid> acudientes, CancellationToken ct = default)
     {
         try
         {
@@ -105,9 +120,9 @@ public class AvisosRecorridoSignalR(IHubContext<RecorridosHub> hub, ILogger<Avis
             {
                 grupos.Add(RecorridosHub.GrupoRecorrido(posicion.RecorridoId));
             }
-            if (enCurso && acudientes)
+            if (enCurso)
             {
-                grupos.Add(RecorridosHub.GrupoRecorridoAcudientes(posicion.RecorridoId));
+                grupos.AddRange(acudientes.Select(a => RecorridosHub.GrupoRecorridoAcudiente(posicion.RecorridoId, a)));
             }
             await hub.Clients.Groups(grupos).SendAsync("posicion", posicion, ct);
         }
