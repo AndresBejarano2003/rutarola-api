@@ -35,6 +35,7 @@ public interface IBaseDatos
     DbSet<DocumentoVehiculo> DocumentosVehiculo { get; }
     DbSet<Ruta> Rutas { get; }
     DbSet<RutaEstudiante> RutasEstudiantes { get; }
+    DbSet<RutaColegio> RutasColegios { get; }
     DbSet<AsignacionRuta> AsignacionesRuta { get; }
     DbSet<ViajeRuta> ViajesRuta { get; }
     DbSet<ParadaViaje> ParadasViaje { get; }

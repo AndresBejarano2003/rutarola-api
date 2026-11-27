@@ -11,11 +11,11 @@ public static class DatosOperacion
     public static DateOnly Hoy => DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-5));
 
     public static Dictionary<string, object?> Ruta(Guid colegioId, IEnumerable<Guid> estudianteIds, string? codigo = null,
-        string jornada = "Mañana", string estado = "ACTIVO") => new()
+        string jornada = "Mañana", string estado = "ACTIVO", IEnumerable<Guid>? colegioIds = null) => new()
     {
         ["codigo"] = codigo ?? $"R-{Random.Shared.Next(100, 99999)}",
         ["nombre"] = "Norte",
-        ["colegioId"] = colegioId,
+        ["colegioIds"] = (colegioIds ?? [colegioId]).ToArray(),
         ["jornada"] = jornada,
         ["sector"] = "Cándido, Las Granjas",
         ["estudianteIds"] = estudianteIds.ToArray(),

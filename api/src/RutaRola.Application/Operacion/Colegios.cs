@@ -21,7 +21,8 @@ public record SolicitudColegio(
     string? Nit, string? RazonSocial, string? Direccion, string? Telefono, IReadOnlyList<SolicitudCurso>? Cursos, string? Estado);
 
 /// <summary><c>texto</c> busca en razón social y NIT.</summary>
-public record FiltrosColegio(string? Texto = null, string? Estado = null);
+/// <summary><c>jornada</c>: colegios con algún curso activo en esa jornada (al armar una ruta).</summary>
+public record FiltrosColegio(string? Texto = null, string? Estado = null, string? Jornada = null);
 
 public class ValidadorSolicitudColegio : AbstractValidator<SolicitudColegio>
 {
@@ -71,6 +72,10 @@ public class ServicioColegios(IBaseDatos db) : ServicioCrud<Colegio, ColegioDto,
         {
             var activo = EstadoRegistro.EsActivo(estado);
             consulta = consulta.Where(c => c.Activo == activo);
+        }
+        if (Texto.Opcional(f.Jornada) is { } jornada)
+        {
+            consulta = consulta.Where(c => c.Cursos.Any(x => x.Activo && x.Jornada == jornada));
         }
         return consulta;
     }
@@ -126,7 +131,7 @@ public class ServicioColegios(IBaseDatos db) : ServicioCrud<Colegio, ColegioDto,
     public override async Task<string?> MotivoNoEliminarAsync(Guid id, CancellationToken ct = default)
     {
         var estudiantes = await Db.Estudiantes.CountAsync(e => e.IdColegio == id, ct);
-        var rutas = await Db.Rutas.CountAsync(r => r.IdColegio == id, ct);
+        var rutas = await Db.Rutas.CountAsync(r => r.Colegios.Any(x => x.IdColegio == id), ct);
         var usos = new[]
         {
             estudiantes > 0 ? $"{estudiantes} estudiante(s)" : "",

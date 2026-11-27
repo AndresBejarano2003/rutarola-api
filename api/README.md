@@ -174,7 +174,7 @@ Todos con el contrato CRUD (ver Convenciones) y solo para el administrador de la
 
 | Recurso | Filtros | Reglas (mismos mensajes que el modo local) |
 |---|---|---|
-| `/colegios` | `texto` (razón social, NIT), `estado` | NIT único por empresa sin contar el dígito de verificación (409); cursos por **grado + jornada** (`colegios_cursos.jornada`; único por colegio, grado y jornada; salida posterior a la entrada); el grado del estudiante debe ser un curso activo de su colegio **en su jornada** (422); no se elimina con estudiantes o rutas. |
+| `/colegios` | `texto` (razón social, NIT), `estado`, `jornada` (colegios con algún curso activo en esa jornada; también en `/colegios/opciones`) | NIT único por empresa sin contar el dígito de verificación (409); cursos por **grado + jornada** (`colegios_cursos.jornada`; único por colegio, grado y jornada; salida posterior a la entrada); el grado del estudiante debe ser un curso activo de su colegio **en su jornada** (422); no se elimina con estudiantes o rutas. |
 | `/vehiculos` | `texto` (placa, interno, marca, línea), `tipo`, `estado` | Placa (`ABC123`, se normaliza) y número interno únicos (409); los cuatro vencimientos son filas de `documentos_vehiculo`; no se elimina con asignaciones. |
 | `/empleados` | `texto` (nombre, documento), `tipoEmpleado`, `estado` | Documento único; licencia obligatoria para conductores; contrato adjunto; credenciales; no se elimina con asignaciones. |
 | `/acudientes` | `texto`, `estado` | Documento único; credenciales del portal; no se elimina con estudiantes a cargo o facturas. |
@@ -185,7 +185,7 @@ Todos con el contrato CRUD (ver Convenciones) y solo para el administrador de la
 
 | Recurso | Filtros | Reglas |
 |---|---|---|
-| `/rutas` | `texto` (código, nombre, sector), `colegioId`, `jornada`, `estado`, `estudianteId` | **Código consecutivo del servidor** (`R-01`, `R-02`…; el del cuerpo se ignora y no se edita; índice único → 409, reintentar); `estudianteIds` en orden de recogida (`rutas_estudiantes.orden_recogida`), del colegio **y la jornada** de la ruta (422) y sin otra ruta activa de la misma jornada (422); no se elimina con asignaciones. |
+| `/rutas` | `texto` (código, nombre, sector), `colegioId` (rutas que lo incluyen), `jornada`, `estado`, `estudianteId` | **Código consecutivo del servidor** (`R-01`, `R-02`…; el del cuerpo se ignora y no se edita; índice único → 409, reintentar); **uno o varios colegios** `colegioIds` (tabla `rutas_colegios`, con `orden`; 1–20, sin repetir; `colegioId` del cuerpo se acepta por compatibilidad y la respuesta trae `colegioId` = el primero); cada colegio nuevo debe tener cursos activos en la jornada (422); `estudianteIds` en orden de recogida (`rutas_estudiantes.orden_recogida`), de los colegios **y la jornada** de la ruta (422) y sin otra ruta activa de la misma jornada (422); no se elimina con asignaciones. Si al editar cambia el orden, `ServicioRutas.DespuesDeGuardarAsync` (gancho de `ServicioCrud`) llama `ServicioRecorridos.AplicarOrdenDeRutaAsync`: reordena las paradas pendientes de los recorridos EN_CURSO de la ruta (inverso en ENTREGA), deja `ordenActualizado` con `empleadoId` `""` y "{nombre} (administrador)" y avisa por el hub. |
 | `/asignaciones` | `rutaId`, `vehiculoId`, `empleadoId` (conductor o monitora), `estado` | `fechaFin`, `monitoraId`, `horaInicio` y `horaFin` vacíos = sin fin / sin monitora / toda la jornada (columnas `hora_inicio`/`hora_fin`; las dos o ninguna, fin > inicio). Si queda activa: ruta, vehículo y personal activos; tipo de empleado correcto; capacidad; licencia y documentos sin vencer (422). **Sin cruces** (409): dos asignaciones activas de la misma ruta, o del mismo vehículo, conductor o monitora, se cruzan si se tocan en fechas Y en horario (`ReglasAsignacion.HorarioSeCruza`: con horas en ambas se comparan; si una no tiene, ocupa la jornada). La del momento es `ReglasAsignacion.Vigente` (turno en curso, el siguiente o el primero). No se elimina con recorridos. |
 
 **Recorridos** (`/recorridos`, tablas `viajes_ruta` / `paradas_viaje` / `eventos`). El empleado sale del token:
@@ -484,7 +484,8 @@ Se aplicaron para que la BD sirva exactamente lo que usa el frontend:
   - `cotizaciones` (+ `cotizaciones_estudiantes`);
   - `programaciones_cobro`, `plantillas_mensaje` (+ `plantillas_mensaje_archivos`) y `envios_programacion`.
 - `viajes_ruta` = recorrido: asignación, trayecto, monitora, snapshot, orden actualizado y `xmin` para
-  concurrencia. `paradas_viaje` lleva el snapshot del estudiante y del acudiente.
+  concurrencia. `paradas_viaje` lleva el snapshot del estudiante, del acudiente y de **su colegio** (`id_colegio`, `nombre_colegio`,
+  `direccion_colegio`, migración `RutasVariosColegios`, que también crea `rutas_colegios` copiando `rutas.id_colegio`).
 - `facturas` = contrato mensual: acudiente, periodos, valor mensual, snapshot. `facturas_detalle` tiene una
   línea por mes.
 - `pagos` = recibos: número, periodo, `id_factura`, snapshot, y uno vigente por factura + mes.

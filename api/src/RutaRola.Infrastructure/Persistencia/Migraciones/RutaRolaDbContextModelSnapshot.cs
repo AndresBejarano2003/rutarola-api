@@ -1505,6 +1505,11 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("character varying(200)")
                         .HasColumnName("direccion");
 
+                    b.Property<string>("DireccionColegio")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("direccion_colegio");
+
                     b.Property<string>("Estado")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -1530,6 +1535,10 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("hora_recogida");
 
+                    b.Property<Guid?>("IdColegio")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_colegio");
+
                     b.Property<Guid>("IdEstudiante")
                         .HasColumnType("uuid")
                         .HasColumnName("id_estudiante");
@@ -1547,6 +1556,11 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("nombre_acudiente");
+
+                    b.Property<string>("NombreColegio")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("nombre_colegio");
 
                     b.Property<string>("NombreEstudiante")
                         .IsRequired()
@@ -1604,10 +1618,6 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_creacion");
 
-                    b.Property<Guid>("IdColegio")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id_colegio");
-
                     b.Property<Guid>("IdEmpresa")
                         .HasColumnType("uuid")
                         .HasColumnName("id_empresa");
@@ -1636,14 +1646,42 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.HasKey("Id")
                         .HasName("pk_rutas");
 
-                    b.HasIndex("IdColegio")
-                        .HasDatabaseName("ix_rutas_id_colegio");
-
                     b.HasIndex("IdEmpresa", "Codigo")
                         .IsUnique()
                         .HasDatabaseName("ix_rutas_id_empresa_codigo");
 
                     b.ToTable("rutas", (string)null);
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Operacion.RutaColegio", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_ruta_colegio");
+
+                    b.Property<Guid>("IdColegio")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_colegio");
+
+                    b.Property<Guid>("IdRuta")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_ruta");
+
+                    b.Property<int>("Orden")
+                        .HasColumnType("integer")
+                        .HasColumnName("orden");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rutas_colegios");
+
+                    b.HasIndex("IdColegio")
+                        .HasDatabaseName("ix_rutas_colegios_id_colegio");
+
+                    b.HasIndex("IdRuta", "IdColegio")
+                        .IsUnique()
+                        .HasDatabaseName("ix_rutas_colegios_id_ruta_id_colegio");
+
+                    b.ToTable("rutas_colegios", (string)null);
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Operacion.RutaEstudiante", b =>
@@ -4065,21 +4103,33 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
 
             modelBuilder.Entity("RutaRola.Domain.Operacion.Ruta", b =>
                 {
-                    b.HasOne("RutaRola.Domain.Operacion.Colegio", "Colegio")
-                        .WithMany()
-                        .HasForeignKey("IdColegio")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_rutas_colegios_id_colegio");
-
                     b.HasOne("RutaRola.Domain.Seguridad.Empresa", null)
                         .WithMany()
                         .HasForeignKey("IdEmpresa")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_rutas_empresas_id_empresa");
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Operacion.RutaColegio", b =>
+                {
+                    b.HasOne("RutaRola.Domain.Operacion.Colegio", "Colegio")
+                        .WithMany()
+                        .HasForeignKey("IdColegio")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_rutas_colegios_colegios_id_colegio");
+
+                    b.HasOne("RutaRola.Domain.Operacion.Ruta", "Ruta")
+                        .WithMany("Colegios")
+                        .HasForeignKey("IdRuta")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rutas_colegios_rutas_id_ruta");
 
                     b.Navigation("Colegio");
+
+                    b.Navigation("Ruta");
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Operacion.RutaEstudiante", b =>
@@ -4527,6 +4577,8 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
 
             modelBuilder.Entity("RutaRola.Domain.Operacion.Ruta", b =>
                 {
+                    b.Navigation("Colegios");
+
                     b.Navigation("Estudiantes");
                 });
 

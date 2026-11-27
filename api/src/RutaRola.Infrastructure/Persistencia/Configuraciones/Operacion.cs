@@ -120,8 +120,21 @@ internal class RutaConfig : IEntityTypeConfiguration<Ruta>
         b.Property(x => x.Nombre).HasMaxLength(100);
         b.Property(x => x.Jornada).HasMaxLength(20);
         b.Property(x => x.Sector).HasMaxLength(100);
-        b.HasOne(x => x.Colegio).WithMany().HasForeignKey(x => x.IdColegio);
         b.HasIndex(x => new { x.IdEmpresa, x.Codigo }).IsUnique();
+    }
+}
+
+internal class RutaColegioConfig : IEntityTypeConfiguration<RutaColegio>
+{
+    public void Configure(EntityTypeBuilder<RutaColegio> b)
+    {
+        b.ToTable("rutas_colegios");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Id).HasColumnName("id_ruta_colegio").ValueGeneratedNever();
+        b.HasOne(x => x.Ruta).WithMany(r => r.Colegios).HasForeignKey(x => x.IdRuta).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Colegio).WithMany().HasForeignKey(x => x.IdColegio);
+        b.HasIndex(x => new { x.IdRuta, x.IdColegio }).IsUnique();
+        b.HasIndex(x => x.IdColegio);
     }
 }
 
@@ -195,6 +208,8 @@ internal class ParadaViajeConfig : IEntityTypeConfiguration<ParadaViaje>
         b.Property(x => x.Direccion).HasMaxLength(200);
         b.Property(x => x.NombreAcudiente).HasMaxLength(200);
         b.Property(x => x.TelefonoAcudiente).HasMaxLength(20);
+        b.Property(x => x.NombreColegio).HasMaxLength(150);
+        b.Property(x => x.DireccionColegio).HasMaxLength(200);
         b.HasOne(x => x.Viaje).WithMany(v => v.Paradas).HasForeignKey(x => x.IdViaje).OnDelete(DeleteBehavior.Cascade);
         b.HasOne(x => x.Estudiante).WithMany().HasForeignKey(x => x.IdEstudiante);
         b.HasIndex(x => new { x.IdViaje, x.IdEstudiante }).IsUnique();

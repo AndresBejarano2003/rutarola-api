@@ -60,6 +60,7 @@ public class RutaRolaDbContext(
     public DbSet<DocumentoVehiculo> DocumentosVehiculo => Set<DocumentoVehiculo>();
     public DbSet<Ruta> Rutas => Set<Ruta>();
     public DbSet<RutaEstudiante> RutasEstudiantes => Set<RutaEstudiante>();
+    public DbSet<RutaColegio> RutasColegios => Set<RutaColegio>();
     public DbSet<AsignacionRuta> AsignacionesRuta => Set<AsignacionRuta>();
     public DbSet<ViajeRuta> ViajesRuta => Set<ViajeRuta>();
     public DbSet<ParadaViaje> ParadasViaje => Set<ParadaViaje>();
@@ -148,6 +149,7 @@ public class RutaRolaDbContext(
         modelBuilder.Entity<ColegioCurso>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Colegio.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<DocumentoVehiculo>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Vehiculo.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<RutaEstudiante>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Ruta.IdEmpresa == IdEmpresaActual);
+        modelBuilder.Entity<RutaColegio>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Ruta.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<ViajeRuta>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Ruta.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<ParadaViaje>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Viaje.Ruta.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<Evento>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Viaje.Ruta.IdEmpresa == IdEmpresaActual);

@@ -58,6 +58,9 @@ public abstract class ServicioCrud<TEntidad, TDto, TSolicitud, TFiltros>(IBaseDa
     /// <summary>Limpieza antes de borrar (usuario de acceso, adjuntos…).</summary>
     protected virtual Task AntesDeEliminarAsync(TEntidad registro, CancellationToken ct) => Task.CompletedTask;
 
+    /// <summary>Tras guardar con éxito un registro creado o editado (efectos en otros módulos, avisos).</summary>
+    protected virtual Task DespuesDeGuardarAsync(TEntidad registro, bool nuevo, CancellationToken ct) => Task.CompletedTask;
+
     public async Task<ListaPaginada<TDto>> ListarAsync(TFiltros filtros, Paginacion paginacion, CancellationToken ct = default)
     {
         var consulta = Filtrar(Conjunto.AsNoTracking(), filtros);
@@ -87,6 +90,7 @@ public abstract class ServicioCrud<TEntidad, TDto, TSolicitud, TFiltros>(IBaseDa
         await AplicarAsync(registro, solicitud, true, ct);
         Conjunto.Add(registro);
         await Db.SaveChangesAsync(ct);
+        await DespuesDeGuardarAsync(registro, true, ct);
         return await ObtenerAsync(registro.Id, ct);
     }
 
@@ -95,6 +99,7 @@ public abstract class ServicioCrud<TEntidad, TDto, TSolicitud, TFiltros>(IBaseDa
         var registro = await BuscarAsync(id, ct);
         await AplicarAsync(registro, solicitud, false, ct);
         await Db.SaveChangesAsync(ct);
+        await DespuesDeGuardarAsync(registro, false, ct);
         return await ObtenerAsync(id, ct);
     }
 

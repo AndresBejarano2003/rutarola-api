@@ -220,7 +220,7 @@ public class RecorridosTests(BaseDatosPrueba bd)
         var ordenado = await (await e.ClienteMonitora!.PutAsJsonAsync($"/api/v1/recorridos/{r.Id}/orden", new { estudianteIds = new[] { samuel, valentina } }, ClienteApi.Json))
             .LeerAsync<RecorridoDto>();
         Assert.Equal([juan, samuel, valentina], ordenado.Paradas.Select(p => p.EstudianteId));
-        Assert.Equal(e.Monitora!.Id, ordenado.OrdenActualizado!.EmpleadoId);
+        Assert.Equal(e.Monitora!.Id.ToString(), ordenado.OrdenActualizado!.EmpleadoId);
         Assert.Equal("José Luis Cárdenas", ordenado.OrdenActualizado.Nombre);
 
         // El conductor ve el nuevo orden.

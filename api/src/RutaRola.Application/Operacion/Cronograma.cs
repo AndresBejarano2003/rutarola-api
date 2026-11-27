@@ -92,7 +92,7 @@ public class ServicioCronograma(IBaseDatos db, ParametrosEmpresa parametros, Tim
                     return new TrayectoCronogramaDto(t, estado, v?.Id.ToString() ?? "", Hora(v?.HoraInicio), Hora(v?.HoraFin));
                 }).ToList();
                 return new RutaCronogramaDto(
-                    r.Id, r.Codigo, r.Nombre, r.Jornada, datos.Colegios.GetValueOrDefault(r.IdColegio, ""),
+                    r.Id, r.Codigo, r.Nombre, r.Jornada, string.Join(" · ", ServicioRutas.ColegiosEnOrden(r).Select(id => datos.Colegios.GetValueOrDefault(id, ""))),
                     asignacion is null ? "" : datos.Vehiculos.FirstOrDefault(v => v.Id == asignacion.IdVehiculo)?.Placa ?? "",
                     asignacion is null ? "" : datos.Empleados.GetValueOrDefault(asignacion.IdConductor, ""),
                     asignacion?.IdMonitora is { } m ? datos.Empleados.GetValueOrDefault(m, "") : "",
@@ -138,7 +138,7 @@ public class ServicioCronograma(IBaseDatos db, ParametrosEmpresa parametros, Tim
 
     private async Task<Datos> LeerAsync(DateOnly desde, DateOnly hasta, CancellationToken ct)
     {
-        var rutas = await db.Rutas.AsNoTracking().Include(r => r.Estudiantes).Where(r => r.Activo).ToListAsync(ct);
+        var rutas = await db.Rutas.AsNoTracking().Include(r => r.Estudiantes).Include(r => r.Colegios).Where(r => r.Activo).ToListAsync(ct);
         var asignaciones = await db.AsignacionesRuta.AsNoTracking()
             .Where(a => a.Activo && a.FechaInicio <= hasta && (a.FechaFin == null || a.FechaFin >= desde)).ToListAsync(ct);
         var viajes = await db.ViajesRuta.AsNoTracking().Where(v => v.FechaViaje >= desde && v.FechaViaje <= hasta).ToListAsync(ct);

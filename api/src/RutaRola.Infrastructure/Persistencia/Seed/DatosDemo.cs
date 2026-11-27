@@ -145,7 +145,8 @@ internal class DatosDemo(RutaRolaDbContext db, IPasswordHasher<Usuario> hasher, 
     {
         Ruta Ruta(string codigo, string nombre, string colegio, string jornada, string sector, params int[] est) => new()
         {
-            IdEmpresa = idEmpresa, Codigo = codigo, Nombre = nombre, IdColegio = c.Colegios[colegio].Id, Jornada = jornada, Sector = sector,
+            IdEmpresa = idEmpresa, Codigo = codigo, Nombre = nombre, Jornada = jornada, Sector = sector,
+            Colegios = [new RutaColegio { IdColegio = c.Colegios[colegio].Id, Orden = 1 }],
             Estudiantes = est.Select((n, i) => new RutaEstudiante { IdEstudiante = c.Estudiantes[n - 1].Id, OrdenRecogida = i + 1 }).ToList(),
         };
         var rutas = new[]

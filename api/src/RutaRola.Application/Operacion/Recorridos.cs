@@ -13,19 +13,24 @@ namespace RutaRola.Application.Operacion;
 /// </summary>
 public record ParadaDto(
     Guid EstudianteId, string Estudiante, string Grado, string Direccion, string Acudiente, string TelefonoAcudiente,
-    EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega, string MotivoAusencia, AvisoParadaDto? Aviso = null);
+    EstadoParada Estado, DateTime? HoraAbordo, DateTime? HoraEntrega, string MotivoAusencia, AvisoParadaDto? Aviso = null,
+    string ColegioId = "", string Colegio = "", string DireccionColegio = "");
+
+/// <summary>Un colegio del recorrido (la ruta puede atender varios). <c>colegioId</c> <c>""</c> en recorridos anteriores.</summary>
+public record ColegioRecorridoDto(string ColegioId, string Nombre, string Direccion);
 
 /// <summary>Foto de perfil actual de un estudiante del recorrido (solo los que tienen foto).</summary>
 public record FotoEstudianteDto(Guid EstudianteId, string Foto);
 
-public record CambioOrdenDto(Guid EmpleadoId, string Nombre, DateTime Hora);
+/// <summary><c>empleadoId</c> <c>""</c> cuando el orden lo cambió el administrador desde la ruta.</summary>
+public record CambioOrdenDto(string EmpleadoId, string Nombre, DateTime Hora);
 
 /// <summary><c>Recorrido</c> del frontend (tabla <c>viajes_ruta</c>). <c>paradas</c> en el orden de visita.</summary>
 public record RecorridoDto(
     Guid Id, Guid AsignacionId, Guid RutaId, DateOnly Fecha, Trayecto Trayecto, EstadoViaje Estado, string Ruta, string Jornada,
     string Colegio, string DireccionColegio, string Vehiculo, Guid ConductorId, string Conductor, string MonitoraId, string Monitora,
     IReadOnlyList<ParadaDto> Paradas, DateTime? Inicio, DateTime? Fin, string IniciadoPor, CambioOrdenDto? OrdenActualizado,
-    string Observaciones, DateTime FechaCreacion, DateTime? FechaActualizacion);
+    string Observaciones, DateTime FechaCreacion, DateTime? FechaActualizacion, IReadOnlyList<ColegioRecorridoDto>? Colegios = null);
 
 public record ConteoParadasDto(int Total, int Pendientes, int ABordo, int Entregados, int Ausentes);
 
@@ -38,7 +43,7 @@ public record CompaneroDto(string Nombre, string Telefono, TipoEmpleado Rol, str
 public record RutaAsignadaDto(
     Guid AsignacionId, Guid RutaId, string Ruta, string Jornada, string Sector, string Colegio, string DireccionColegio,
     string Vehiculo, TipoEmpleado Rol, CompaneroDto? Companero, int Estudiantes, IReadOnlyList<ResumenRecorridoDto> Recorridos,
-    int AvisosAusencia = 0, string Horario = "");
+    int AvisosAusencia = 0, string Horario = "", IReadOnlyList<ColegioRecorridoDto>? Colegios = null);
 
 public record SolicitudIniciarRecorrido(Guid? AsignacionId, Trayecto? Trayecto);
 
@@ -129,7 +134,7 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
     {
         var empleado = IdEmpleado;
         var asignaciones = await db.AsignacionesRuta.AsNoTracking()
-            .Include(a => a.Ruta).ThenInclude(r => r.Colegio)
+            .Include(a => a.Ruta).ThenInclude(r => r.Colegios).ThenInclude(c => c.Colegio)
             .Include(a => a.Ruta).ThenInclude(r => r.Estudiantes)
             .Include(a => a.Vehiculo).Include(a => a.Conductor).Include(a => a.Monitora)
             .Where(a => a.Activo && a.Ruta.Activo && a.FechaInicio <= fecha && (a.FechaFin == null || a.FechaFin >= fecha)
@@ -146,14 +151,15 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
             {
                 var rol = a.IdConductor == empleado ? TipoEmpleado.Conductor : TipoEmpleado.Monitora;
                 var otro = rol == TipoEmpleado.Conductor ? a.Monitora : a.Conductor;
+                var colegios = ColegiosDe(a.Ruta);
                 return new RutaAsignadaDto(
-                    a.Id, a.IdRuta, ServicioRutas.Etiquetar(a.Ruta), a.Ruta.Jornada, a.Ruta.Sector ?? "", a.Ruta.Colegio.RazonSocial,
-                    a.Ruta.Colegio.Direccion, a.Vehiculo.Placa, rol,
+                    a.Id, a.IdRuta, ServicioRutas.Etiquetar(a.Ruta), a.Ruta.Jornada, a.Ruta.Sector ?? "", NombresColegios(colegios),
+                    colegios.Count == 1 ? colegios[0].Direccion : "", a.Vehiculo.Placa, rol,
                     otro is null ? null : new CompaneroDto(otro.NombreCompleto, otro.Telefono, otro.TipoEmpleado, otro.Foto ?? ""),
                     a.Ruta.Estudiantes.Count,
                     recorridos.Where(v => v.IdAsignacion == a.Id).OrderBy(v => v.Trayecto).Select(Resumir).ToList(),
                     a.Ruta.Estudiantes.Count(e => conAviso.Contains(e.IdEstudiante)),
-                    ReglasAsignacion.Horario(a.HoraInicio, a.HoraFin));
+                    ReglasAsignacion.Horario(a.HoraInicio, a.HoraFin), colegios);
             })
             // Turnos con horario en orden de hora; luego por jornada y ruta.
             .OrderBy(r => r.Horario.Length == 0 ? "99" : r.Horario, StringComparer.Ordinal)
@@ -171,7 +177,7 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
         var hoy = Fechas.Hoy(reloj);
         var trayecto = s.Trayecto!.Value;
         var asignacion = await db.AsignacionesRuta
-            .Include(a => a.Ruta).ThenInclude(r => r.Colegio)
+            .Include(a => a.Ruta).ThenInclude(r => r.Colegios).ThenInclude(c => c.Colegio)
             .Include(a => a.Ruta).ThenInclude(r => r.Estudiantes)
             .Include(a => a.Vehiculo).Include(a => a.Conductor).Include(a => a.Monitora)
             .FirstOrDefaultAsync(a => a.Id == s.AsignacionId && a.Activo && a.Ruta.Activo && a.FechaInicio <= hoy
@@ -190,8 +196,9 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
 
         var orden = asignacion.Ruta.Estudiantes.OrderBy(e => e.OrdenRecogida).Select(e => e.IdEstudiante).ToList();
         var estudiantes = await db.Estudiantes.AsNoTracking()
-            .Include(e => e.Acudientes).ThenInclude(x => x.Acudiente)
+            .Include(e => e.Acudientes).ThenInclude(x => x.Acudiente).Include(e => e.Colegio)
             .Where(e => orden.Contains(e.Id) && e.Activo).ToListAsync(ct);
+        var colegiosRuta = ColegiosDe(asignacion.Ruta);
         var enRuta = orden.Select(id => estudiantes.FirstOrDefault(e => e.Id == id)).OfType<Domain.Personas.Estudiante>().ToList();
         if (enRuta.Count == 0)
         {
@@ -227,8 +234,8 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
             IdIniciadoPor = empleado,
             NombreRuta = ruta,
             Jornada = asignacion.Ruta.Jornada,
-            NombreColegio = asignacion.Ruta.Colegio.RazonSocial,
-            DireccionColegio = asignacion.Ruta.Colegio.Direccion,
+            NombreColegio = Recortar(NombresColegios(colegiosRuta), 150),
+            DireccionColegio = colegiosRuta.Count > 0 ? colegiosRuta[0].Direccion : null,
             DescripcionVehiculo = asignacion.Vehiculo.Placa,
             NombreConductor = asignacion.Conductor.NombreCompleto,
             NombreMonitora = asignacion.Monitora?.NombreCompleto,
@@ -244,6 +251,9 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
                     Direccion = e.Direccion,
                     NombreAcudiente = acudiente?.NombreCompleto,
                     TelefonoAcudiente = acudiente?.Telefono,
+                    IdColegio = e.IdColegio,
+                    NombreColegio = e.Colegio.RazonSocial,
+                    DireccionColegio = e.Colegio.Direccion,
                     Estado = noAsisten.Contains(e.Id) ? EstadoParada.Ausente : EstadoParada.Pendiente,
                     MotivoAusencia = noAsisten.Contains(e.Id) ? Domain.Enums.MotivoAusencia.NoAsiste : null,
                 };
@@ -384,6 +394,61 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
             viaje.FechaOrdenActualizado = Ahora;
             viaje.Eventos.Add(Evento(TipoEvento.Reorden, $"{nombre} cambió el orden de visita."));
         }, ct);
+
+    /// <summary>
+    /// El administrador cambió el orden de recogida de la ruta: cada recorrido EN CURSO reordena lo que le falta por
+    /// visitar con el nuevo orden (al revés en la entrega); lo visitado queda igual. El personal y quienes lo siguen lo
+    /// ven al instante, con el aviso "… cambió el orden".
+    /// </summary>
+    public async Task AplicarOrdenDeRutaAsync(Guid idRuta, IReadOnlyList<Guid> orden, CancellationToken ct = default)
+    {
+        var viajes = await db.ViajesRuta.Include(v => v.Paradas)
+            .Where(v => v.IdRuta == idRuta && v.Estado == EstadoViaje.EnCurso).ToListAsync(ct);
+        if (viajes.Count == 0)
+        {
+            return;
+        }
+        var posicion = orden.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i);
+        var nombre = contexto.IdUsuario is { } idUsuario
+            ? await db.Usuarios.Where(u => u.Id == idUsuario).Select(u => u.Nombre).FirstOrDefaultAsync(ct)
+            : null;
+        nombre = string.IsNullOrWhiteSpace(nombre) ? "El administrador" : $"{nombre} (administrador)";
+        var cambiados = new List<ViajeRuta>();
+        foreach (var viaje in viajes)
+        {
+            var enOrden = viaje.Paradas.OrderBy(p => p.OrdenRecogida).ToList();
+            var faltan = enOrden.Where(p => PorVisitar(p, viaje.Trayecto)).ToList();
+            // Los que ya no están en la ruta conservan su lugar relativo al final.
+            int Clave(ParadaViaje p) => posicion.TryGetValue(p.IdEstudiante, out var i)
+                ? (viaje.Trayecto == Trayecto.Entrega ? orden.Count - i : i)
+                : int.MaxValue;
+            var nuevos = faltan.OrderBy(Clave).ToList();
+            if (nuevos.SequenceEqual(faltan))
+            {
+                continue;
+            }
+            var final = enOrden.Where(p => !PorVisitar(p, viaje.Trayecto)).Concat(nuevos).ToList();
+            for (var i = 0; i < final.Count; i++)
+            {
+                final[i].OrdenRecogida = i + 1;
+            }
+            viaje.IdOrdenActualizadoPor = null;
+            viaje.NombreOrdenActualizadoPor = Recortar(nombre, 200);
+            viaje.FechaOrdenActualizado = Ahora;
+            viaje.FechaActualizacion = Ahora;
+            viaje.Eventos.Add(Evento(TipoEvento.Reorden, $"{nombre} cambió el orden de recogida de la ruta."));
+            cambiados.Add(viaje);
+        }
+        if (cambiados.Count == 0)
+        {
+            return;
+        }
+        await db.SaveChangesAsync(ct);
+        foreach (var viaje in cambiados)
+        {
+            await AvisarAsync(viaje, ct);
+        }
+    }
 
     public Task<RecorridoDto> FinalizarAsync(Guid id, SolicitudFinalizarRecorrido s, CancellationToken ct = default) =>
         ModificarAsync(id, viaje =>
@@ -578,10 +643,23 @@ public class ServicioRecorridos(IBaseDatos db, IContextoUsuario contexto, IAviso
         v.NombreMonitora ?? "",
         v.Paradas.OrderBy(p => p.OrdenRecogida).Select(p => new ParadaDto(
             p.IdEstudiante, p.NombreEstudiante, p.Grado, p.Direccion, p.NombreAcudiente ?? "", p.TelefonoAcudiente ?? "",
-            p.Estado, p.HoraRecogida, p.HoraEntrega, TextoMotivo(p.MotivoAusencia), Aviso(avisos, v, p.IdEstudiante))).ToList(),
+            p.Estado, p.HoraRecogida, p.HoraEntrega, TextoMotivo(p.MotivoAusencia), Aviso(avisos, v, p.IdEstudiante),
+            p.IdColegio?.ToString() ?? "", p.NombreColegio ?? v.NombreColegio, p.DireccionColegio ?? v.DireccionColegio ?? "")).ToList(),
         v.HoraInicio, v.HoraFin, v.IdIniciadoPor?.ToString() ?? "",
-        v.IdOrdenActualizadoPor is { } quien && v.FechaOrdenActualizado is { } hora
-            ? new CambioOrdenDto(quien, v.NombreOrdenActualizadoPor ?? "", hora)
+        v.FechaOrdenActualizado is { } hora
+            ? new CambioOrdenDto(v.IdOrdenActualizadoPor?.ToString() ?? "", v.NombreOrdenActualizadoPor ?? "", hora)
             : null,
-        v.Observaciones ?? "", v.FechaCreacion, v.FechaActualizacion);
+        v.Observaciones ?? "", v.FechaCreacion, v.FechaActualizacion,
+        // Colegios en el orden en que aparecen sus estudiantes (los recorridos anteriores tienen uno solo, sin id).
+        v.Paradas.OrderBy(p => p.OrdenRecogida)
+            .Select(p => new ColegioRecorridoDto(p.IdColegio?.ToString() ?? "", p.NombreColegio ?? v.NombreColegio, p.DireccionColegio ?? v.DireccionColegio ?? ""))
+            .DistinctBy(c => c.ColegioId).ToList());
+
+    /// <summary>Colegios de la ruta en su orden.</summary>
+    private static IReadOnlyList<ColegioRecorridoDto> ColegiosDe(Ruta r) =>
+        r.Colegios.OrderBy(c => c.Orden).Select(c => new ColegioRecorridoDto(c.IdColegio.ToString(), c.Colegio.RazonSocial, c.Colegio.Direccion)).ToList();
+
+    private static string NombresColegios(IReadOnlyList<ColegioRecorridoDto> colegios) => string.Join(" · ", colegios.Select(c => c.Nombre));
+
+    private static string Recortar(string texto, int maximo) => texto.Length <= maximo ? texto : texto[..(maximo - 1)] + "…";
 }

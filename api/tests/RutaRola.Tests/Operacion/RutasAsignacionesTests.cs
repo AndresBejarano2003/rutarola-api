@@ -62,8 +62,16 @@ public class RutasAsignacionesTests(BaseDatosPrueba bd)
         await c.CrearAsync<RutaDto>("rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id], estado: "INACTIVO"));
 
         // Un estudiante de la Mañana no va en una ruta de la Tarde.
-        var otraJornada = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id], jornada: "Tarde"), ClienteApi.Json);
-        Assert.Equal($"La ruta es de la jornada Tarde y estos estudiantes son de otra: {estudiante.PrimerNombre} {estudiante.PrimerApellido} (Mañana).",
+        // Un colegio sin cursos en la jornada no se agrega a la ruta.
+        var sinCursos = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(colegio.Id, [estudiante.Id], jornada: "Tarde"), ClienteApi.Json);
+        Assert.Equal("Colegio San Cayetano no tiene cursos activos en la jornada Tarde.",
+            await sinCursos.MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
+        var conTarde = await c.CrearAsync<ColegioDto>("colegios", DatosCatalogos.Colegio(cursos: [
+            new { grado = "1°", jornada = "Mañana", horaEntrada = "06:30", horaSalida = "13:00", estado = "ACTIVO" },
+            new { grado = "1°", jornada = "Tarde", horaEntrada = "13:00", horaSalida = "18:00", estado = "ACTIVO" }]));
+        var deMañana = await c.CrearAsync<EstudianteDto>("estudiantes", DatosCatalogos.Estudiante(acudiente.Id, conTarde.Id));
+        var otraJornada = await c.PostAsJsonAsync("/api/v1/rutas", DatosOperacion.Ruta(conTarde.Id, [deMañana.Id], jornada: "Tarde"), ClienteApi.Json);
+        Assert.Equal($"La ruta es de la jornada Tarde y estos estudiantes son de otra: {deMañana.PrimerNombre} {deMañana.PrimerApellido} (Mañana).",
             await otraJornada.MensajeErrorAsync(HttpStatusCode.UnprocessableEntity));
         var deLaTarde = await c.GetAsync($"/api/v1/estudiantes/opciones?colegioId={colegio.Id}&jornada=Tarde");
         Assert.Empty(await deLaTarde.LeerAsync<List<Opcion>>());

@@ -136,13 +136,24 @@ public class Ruta : EntidadEmpresa
 {
     public string Codigo { get; set; } = "";
     public string Nombre { get; set; } = "";
-    public Guid IdColegio { get; set; }
-    public Colegio Colegio { get; set; } = null!;
     public string Jornada { get; set; } = "";
     public string? Sector { get; set; }
     public string? Observaciones { get; set; }
     public bool Activo { get; set; } = true;
+    /// <summary>Colegios que atiende la ruta (todos de su jornada), en el orden en que se agregaron.</summary>
+    public List<RutaColegio> Colegios { get; set; } = [];
     public List<RutaEstudiante> Estudiantes { get; set; } = [];
+}
+
+/// <summary>Un colegio de la ruta (una ruta puede llevar estudiantes de varios colegios de la misma jornada).</summary>
+public class RutaColegio
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid IdRuta { get; set; }
+    public Ruta Ruta { get; set; } = null!;
+    public Guid IdColegio { get; set; }
+    public Colegio Colegio { get; set; } = null!;
+    public int Orden { get; set; }
 }
 
 public class RutaEstudiante
@@ -252,6 +263,10 @@ public class ParadaViaje
     public string Direccion { get; set; } = "";
     public string? NombreAcudiente { get; set; }
     public string? TelefonoAcudiente { get; set; }
+    /// <summary>Colegio del estudiante al iniciar (la ruta puede tener varios): agrupa las llegadas y las salidas.</summary>
+    public Guid? IdColegio { get; set; }
+    public string? NombreColegio { get; set; }
+    public string? DireccionColegio { get; set; }
 }
 
 public class Evento
