@@ -23,6 +23,7 @@ public interface IBaseDatos
     DbSet<Permiso> Permisos { get; }
     DbSet<RolPermiso> RolesPermisos { get; }
     DbSet<SesionUsuario> SesionesUsuario { get; }
+    DbSet<CuentaUnida> CuentasUnidas { get; }
     DbSet<Auditoria> Auditoria { get; }
     DbSet<ConfiguracionSistema> ConfiguracionSistema { get; }
     DbSet<Empleado> Empleados { get; }

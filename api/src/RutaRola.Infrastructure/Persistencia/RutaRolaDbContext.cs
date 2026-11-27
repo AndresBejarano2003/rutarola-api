@@ -46,6 +46,7 @@ public class RutaRolaDbContext(
     public DbSet<Permiso> Permisos => Set<Permiso>();
     public DbSet<RolPermiso> RolesPermisos => Set<RolPermiso>();
     public DbSet<SesionUsuario> SesionesUsuario => Set<SesionUsuario>();
+    public DbSet<CuentaUnida> CuentasUnidas => Set<CuentaUnida>();
     public DbSet<Auditoria> Auditoria => Set<Auditoria>();
     public DbSet<ConfiguracionSistema> ConfiguracionSistema => Set<ConfiguracionSistema>();
     // Personas
@@ -144,6 +145,8 @@ public class RutaRolaDbContext(
         modelBuilder.Entity<Empresa>().HasQueryFilter(FiltroEmpresa, e => ModoSistema || e.Id == IdEmpresaActual);
         modelBuilder.Entity<Usuario>().HasQueryFilter(FiltroEmpresa, u => ModoSistema || u.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<SesionUsuario>().HasQueryFilter(FiltroEmpresa, s => ModoSistema || s.Usuario.IdEmpresa == IdEmpresaActual);
+        // Las cuentas de OTRAS empresas del grupo solo se leen en ServicioCuentasUnidas, con IgnoreQueryFilters explícito.
+        modelBuilder.Entity<CuentaUnida>().HasQueryFilter(FiltroEmpresa, c => ModoSistema || c.Usuario.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<Auditoria>().HasQueryFilter(FiltroEmpresa, a => ModoSistema || a.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<EstudianteAcudiente>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Estudiante.IdEmpresa == IdEmpresaActual);
         modelBuilder.Entity<ColegioCurso>().HasQueryFilter(FiltroEmpresa, x => ModoSistema || x.Colegio.IdEmpresa == IdEmpresaActual);

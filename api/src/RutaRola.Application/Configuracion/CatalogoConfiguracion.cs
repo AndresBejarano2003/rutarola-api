@@ -9,12 +9,15 @@ public static class CatalogoConfiguracion
     public const string DiasAlertaVencimiento = "alertas.dias_vencimiento";
     /// <summary>1 = los acudientes ven en el portal la ubicación en vivo del vehículo; 0 = solo el estado y la hora de inicio.</summary>
     public const string AcudientesVenUbicacion = "gps.acudientes_ven_ubicacion";
+    /// <summary>1 = los acudientes de la empresa pueden unir su cuenta con la de otra empresa de transporte (Mi cuenta).</summary>
+    public const string AcudientesUnenCuentas = "portal.acudientes_unen_cuentas";
 
     public static readonly IReadOnlyList<ParametroConfiguracion> Parametros =
     [
         new(DiaLimitePago, "Día del mes en que vence la cuota cuando la factura no tiene programación (por defecto 5).", "5", 1, 31),
         new(DiasAlertaVencimiento, "Días antes del vencimiento de documentos y licencias en que se avisa (por defecto 30).", "30", 1, 120),
         new(AcudientesVenUbicacion, "Los acudientes ven en su portal la ubicación en vivo del vehículo mientras su ruta va en camino. Si se desactiva, solo ven el estado del estudiante y la hora en que inició el recorrido; el administrador sigue viendo el monitoreo completo.", "1", 0, 1),
+        new(AcudientesUnenCuentas, "Los acudientes pueden unir su cuenta de esta empresa con la de otra empresa de transporte que use RutaRola, para ver a todos sus estudiantes con un solo usuario. Cada empresa sigue viendo solo sus propios datos.", "1", 0, 1),
     ];
 
     public static ParametroConfiguracion? Buscar(string clave) => Parametros.FirstOrDefault(p => p.Clave == clave);

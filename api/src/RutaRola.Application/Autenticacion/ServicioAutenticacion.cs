@@ -127,6 +127,22 @@ public class ServicioAutenticacion(
         await db.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Abre una sesión de OTRO usuario sin su contraseña: solo para las cuentas unidas (<see cref="ServicioCuentasUnidas"/>
+    /// ya verificó que son del mismo grupo). Aplica las mismas reglas de acceso que el login.
+    /// </summary>
+    internal async Task<RespuestaLogin> AbrirSesionUnidaAsync(Guid idUsuario, InfoCliente cliente, CancellationToken ct)
+    {
+        var usuario = await UsuariosSinFiltro().FirstOrDefaultAsync(u => u.Id == idUsuario, ct)
+            ?? throw new ErrorNegocio("La cuenta ya no existe.", CodigoError.NoEncontrado);
+        var titular = await ValidarAccesoAsync(usuario, ct);
+        usuario.UltimoLogin = Ahora;
+        var (sesionBd, tokensDto) = await CrearSesionAsync(usuario, titular, cliente, ct);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Cambio a la cuenta unida {IdUsuario}, sesión {IdSesion}", usuario.Id, sesionBd.Id);
+        return new RespuestaLogin(ArmarSesion(usuario, titular, Ahora, tokensDto.Permisos), tokensDto.Tokens);
+    }
+
     public async Task<SesionDto> ObtenerSesionAsync(Guid idUsuario, CancellationToken ct = default)
     {
         var usuario = await UsuariosSinFiltro().FirstOrDefaultAsync(u => u.Id == idUsuario, ct)

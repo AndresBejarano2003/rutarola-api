@@ -77,5 +77,28 @@ public class AuthController(ServicioAutenticacion servicio, ServicioPerfil perfi
         return NoContent();
     }
 
+    /// <summary>Cuentas de acudiente unidas a la de la sesión (en otras empresas de transporte), la actual incluida.</summary>
+    [HttpGet("cuentas")]
+    public Task<IReadOnlyList<CuentaUnidaDto>> Cuentas([FromServices] ServicioCuentasUnidas cuentas, CancellationToken ct) =>
+        cuentas.ListarAsync(ct);
+
+    /// <summary>Une la cuenta de otra empresa escribiendo su usuario y contraseña (solo acudientes).</summary>
+    /// <response code="409">Ya está unida.</response>
+    /// <response code="422">Credenciales incorrectas, misma empresa, inactiva o alguna empresa no lo permite.</response>
+    [HttpPost("cuentas")]
+    [EnableRateLimiting(Autorizacion.PoliticaLimiteAutenticacion)]
+    public Task<IReadOnlyList<CuentaUnidaDto>> UnirCuenta(SolicitudUnirCuenta solicitud, [FromServices] ServicioCuentasUnidas cuentas, CancellationToken ct) =>
+        cuentas.UnirAsync(solicitud, ct);
+
+    /// <summary>Separa una cuenta del grupo (la propia u otra).</summary>
+    [HttpDelete("cuentas/{idUsuario:guid}")]
+    public Task<IReadOnlyList<CuentaUnidaDto>> SepararCuenta(Guid idUsuario, [FromServices] ServicioCuentasUnidas cuentas, CancellationToken ct) =>
+        cuentas.SepararAsync(idUsuario, ct);
+
+    /// <summary>Entra a otra cuenta unida: devuelve la sesión y los tokens de esa empresa y cierra la actual.</summary>
+    [HttpPost("cuentas/{idUsuario:guid}/sesion")]
+    public Task<RespuestaLogin> CambiarCuenta(Guid idUsuario, [FromServices] ServicioCuentasUnidas cuentas, CancellationToken ct) =>
+        cuentas.CambiarAsync(idUsuario, Cliente(), ct);
+
     private InfoCliente Cliente() => new(usuario.DireccionIp, Request.Headers.UserAgent.ToString());
 }

@@ -66,6 +66,20 @@ public class Usuario : Entidad
     public DateTime? UltimoLogin { get; set; }
 }
 
+/// <summary>
+/// Cuentas de acudiente de DISTINTAS empresas que la misma persona unió (Mi cuenta › "Unir otra cuenta", probando que
+/// conoce la contraseña de la otra). Las del mismo <see cref="IdGrupo"/> están unidas: desde cualquiera ve las demás y
+/// cambia de empresa sin volver a escribir la contraseña. Cada empresa conserva su propio acudiente y sus datos.
+/// </summary>
+public class CuentaUnida
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid IdGrupo { get; set; }
+    public Guid IdUsuario { get; set; }
+    public Usuario Usuario { get; set; } = null!;
+    public DateTime FechaCreacion { get; set; }
+}
+
 public class Rol : Entidad
 {
     public string Nombre { get; set; } = "";

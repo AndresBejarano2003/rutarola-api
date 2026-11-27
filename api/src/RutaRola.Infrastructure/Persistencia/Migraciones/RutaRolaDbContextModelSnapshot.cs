@@ -2455,6 +2455,37 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                     b.ToTable("configuracion_sistema", (string)null);
                 });
 
+            modelBuilder.Entity("RutaRola.Domain.Seguridad.CuentaUnida", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_cuenta_unida");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<Guid>("IdGrupo")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_grupo");
+
+                    b.Property<Guid>("IdUsuario")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id_usuario");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cuentas_unidas");
+
+                    b.HasIndex("IdGrupo")
+                        .HasDatabaseName("ix_cuentas_unidas_id_grupo");
+
+                    b.HasIndex("IdUsuario")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cuentas_unidas_id_usuario");
+
+                    b.ToTable("cuentas_unidas", (string)null);
+                });
+
             modelBuilder.Entity("RutaRola.Domain.Seguridad.Empresa", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4331,6 +4362,18 @@ namespace RutaRola.Infrastructure.Persistencia.Migraciones
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_configuracion_sistema_empresas_id_empresa");
+                });
+
+            modelBuilder.Entity("RutaRola.Domain.Seguridad.CuentaUnida", b =>
+                {
+                    b.HasOne("RutaRola.Domain.Seguridad.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("IdUsuario")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_cuentas_unidas_usuarios_id_usuario");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("RutaRola.Domain.Seguridad.FormatoDocumentos", b =>

@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, ServiceLifetime.Singleton);
         services.AddScoped<ServicioAutenticacion>();
         services.AddScoped<ServicioPerfil>();
+        services.AddScoped<ServicioCuentasUnidas>();
         services.AddScoped<ServicioEmpresas>();
         services.AddScoped<ServicioAdministradoresEmpresa>();
         services.AddScoped<ServicioConfiguracion>();

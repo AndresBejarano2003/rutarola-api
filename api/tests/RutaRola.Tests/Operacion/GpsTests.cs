@@ -272,6 +272,20 @@ public class GpsTests(BaseDatosPrueba bd)
     }
 
     [Fact]
+    public async Task En_la_entrega_el_acudiente_ve_la_ubicacion_solo_cuando_su_estudiante_ya_va_a_bordo()
+    {
+        var e = await bd.EscenarioAsync(estudiantes: 1);
+        var r = await (await e.ClienteConductor.IniciarAsync(e.Asignacion.Id, "ENTREGA")).LeerAsync<RecorridoDto>(HttpStatusCode.Created);
+        await EnviarAsync(e.ClienteConductor, r.Id, Punto(DateTime.UtcNow.AddSeconds(-10)));
+        var acudiente = await bd.ClienteDeAsync(e.Acudiente.Usuario, "Clave-123");
+
+        // Aún en el colegio (p. ej. su colegio no ha iniciado la entrega): no la ve.
+        Assert.Equal(HttpStatusCode.NoContent, (await acudiente.GetAsync($"/api/v1/recorridos/{r.Id}/gps/ultima")).StatusCode);
+        await e.ClienteConductor.MarcarAsync(r.Id, "A_BORDO", e.Estudiantes[0].Id);
+        Assert.Equal(HttpStatusCode.OK, (await acudiente.GetAsync($"/api/v1/recorridos/{r.Id}/gps/ultima")).StatusCode);
+    }
+
+    [Fact]
     public async Task Si_la_empresa_no_comparte_la_ubicacion_el_acudiente_no_la_ve_pero_si_la_hora_de_inicio_y_el_admin_si()
     {
         var (e, r) = await EnCursoAsync();

@@ -96,6 +96,20 @@ internal class RolPermisoConfig : IEntityTypeConfiguration<RolPermiso>
     }
 }
 
+internal class CuentaUnidaConfig : IEntityTypeConfiguration<CuentaUnida>
+{
+    public void Configure(EntityTypeBuilder<CuentaUnida> b)
+    {
+        b.ToTable("cuentas_unidas");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Id).HasColumnName("id_cuenta_unida").ValueGeneratedNever();
+        // Un usuario está en un solo grupo.
+        b.HasIndex(x => x.IdUsuario).IsUnique();
+        b.HasIndex(x => x.IdGrupo);
+        b.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.IdUsuario).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 internal class SesionUsuarioConfig : IEntityTypeConfiguration<SesionUsuario>
 {
     public void Configure(EntityTypeBuilder<SesionUsuario> b)
